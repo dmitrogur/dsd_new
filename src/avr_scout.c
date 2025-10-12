@@ -73,7 +73,7 @@ static const char *SC_VERSION = "dsd-fme_new (v3.1 08.10.25)";
 
 // Временная опция: считать любой «зашифрованный VC*» хорошим SF
 #ifndef AVR_SCOUT_ACCEPT_ALL_ENC_VC
-#define AVR_SCOUT_ACCEPT_ALL_ENC_VC 1
+#define AVR_SCOUT_ACCEPT_ALL_ENC_VC 0
 #endif
 
 // Создавать окно на flush, даже если серия не была закрыта по качеству

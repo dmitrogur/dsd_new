@@ -35,7 +35,7 @@
 #define AVR_SCOUT_MIN_SF 2 // минимум 2 SF подряд
 #endif
 #ifndef AVR_SCOUT_MAX_SF
-#define AVR_SCOUT_MAX_SF 8 // максимум 8 SF подряд
+#define AVR_SCOUT_MAX_SF 6 // максимум 6 SF подряд
 #endif
 /*#ifndef AVR_SCOUT_MIN_SF
 #define AVR_SCOUT_MIN_SF AVR_SCOUT_MIN_SF*18 // максимум 8 SF подряд

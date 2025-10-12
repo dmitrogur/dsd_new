@@ -164,13 +164,20 @@ static int parse_int_auto(const char *s, int *out)
   return 0;
 }
 
-static int parse_uint64_auto(const char *s, uint64_t *out) {
-  while (*s==' '||*s=='\t') s++;
+static int parse_uint64_auto(const char *s, uint64_t *out)
+{
+  while (*s == ' ' || *s == '\t')
+    s++;
   int base = 10;
-  if (s[0]=='0' && (s[1]=='x'||s[1]=='X')) { base=16; s+=2; }
+  if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+  {
+    base = 16;
+    s += 2;
+  }
   char *end = NULL;
   unsigned long long v = strtoull(s, &end, base);
-  if (end == s) return -1;
+  if (end == s)
+    return -1;
   *out = (uint64_t)v;
   return 0;
 }
@@ -651,7 +658,8 @@ int kv_csv_load_and_filter(const char *csv_path, kv_key_t **out_vec, size_t *out
       // либо A) alg_or_code,kid,key_hex
       // либо B) index,alg_or_code,key_hex
       uint64_t tmp64;
-      if (parse_uint64_auto(t0, &tmp64) == 0) {
+      if (parse_uint64_auto(t0, &tmp64) == 0)
+      {
         index_val = tmp64;
         hex_raw = t2;
         // alg определим позже
@@ -671,7 +679,7 @@ int kv_csv_load_and_filter(const char *csv_path, kv_key_t **out_vec, size_t *out
       hex_raw = t2;
       if (parse_int_auto(t3, &len_hint_chars) == 0)
         have_len_hint = 1;
-      if (parse_uint64_auto(t0, &tmp64) == 0) 
+      if (parse_uint64_auto(t0, &tmp64) == 0)
       {
         index_val = tmp64;
       }
@@ -781,7 +789,7 @@ int kv_csv_load_and_filter(const char *csv_path, kv_key_t **out_vec, size_t *out
     // По желанию: лог красиво отформатированного ключа
     // fprintf(stderr, "[KV-BATCH] loaded key: alg=%s kid=%d hex=\"%s\" len=%zu bytes index_val =%ld\n",
     //         canon_alg ? canon_alg : "?", kid, hex_grouped, keylen, index_val);
-    // break;         
+    // break;
   }
 
   fclose(f);
@@ -1143,7 +1151,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   if (!st)
     return -1;
   memcpy(st, state, sizeof(dsd_state));
-
+  /*
   st->cur_mp = (mbe_parms *)calloc(1, sizeof(mbe_parms));
   st->prev_mp = (mbe_parms *)calloc(1, sizeof(mbe_parms));
   st->prev_mp_enhanced = (mbe_parms *)calloc(1, sizeof(mbe_parms));
@@ -1155,8 +1163,9 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
     free(st);
     return -1;
   }
+  */
   mbe_initMbeParms(st->cur_mp, st->prev_mp, st->prev_mp_enhanced);
-
+  
   KVTR("[KV-TRACE] alg_id %d!\n", alg_id);
 
   // применяем ключ
@@ -1182,6 +1191,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   st->aes_key_loaded[1] = 1;
   st->dmr_so |= 0x40;
   st->dmr_soR |= 0x40;
+
   const uint8_t cur_slot = st->currentslot;
   // const uint8_t cur_keyid = st->currentslot  ? (uint8_t)st->payload_keyidR : (uint8_t)st->payload_keyid;
 
@@ -1191,6 +1201,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   if (avr_scout_get_pre_window_mbe_parms((uint8_t)cur_slot, &seed_prev) == 0)
   {
     memcpy(st->prev_mp, &seed_prev, sizeof(mbe_parms));
+    memcpy(st->prev_mp_enhanced, &seed_prev, sizeof(mbe_parms));
   }
   // >>> КРИТИЧЕСКОЕ: обнуляем счётчики ОДИН РАЗ перед всей серией из 6×VC* (18 VF)
   st->DMRvcL = 0;       // считать VF 0..17 как в live
@@ -1198,14 +1209,11 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
 
   double s_sum = 0.0;
   int s_cnt = 0;
-  KVTR("[KV-TRACE] for (size_t si = 0; si < %d; ++si)!\n", nsf);
 
   for (size_t si = 0; si < nsf; ++si)
-  { // nsf = кол-во KV-SF в окне!
+  {
     const uint32_t sf_abs = start_sf_idx + si;
-    // KVTR("[KV-TRACE] sf=%u: no hist entry\n", sf_abs);
 
-    // достаём запись:
     uint8_t six27[6][27];
     uint8_t sixIV[6][16];
     uint8_t mask = 0;
@@ -1216,13 +1224,40 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
       KVTR("[KV-TRACE] sf=%u: no hist entry\n", sf_abs);
       continue;
     }
-
-    /* сбрасываем счётчики VF/битов ТОЛЬКО при входе в ПЕРВЫЙ KV-SF окна */
-    if (si == 0)
+    // 1. Сброс счетчиков ПЕРЕД каждым суперкадром.
+    //    Это заставит processMbeFrame сгенерировать новую гамму.
+    if (st->currentslot == 0)
     {
       st->DMRvcL = 0;
       st->bit_counterL = 0;
     }
+    else
+    {
+      st->DMRvcR = 0;
+      st->bit_counterR = 0;
+    }
+
+    // 2. Устанавливаем IV ОДИН РАЗ в начале суперкадра.
+    //    Используем IV от первого доступного VC* (обычно sixIV[0]).
+    //    Больше IV внутри этого SF не меняем.
+    if (mask & 0x01)
+    { // Убедимся, что первый VC* доступен
+      if (st->currentslot == 0)
+      {
+        memcpy(st->aes_iv, sixIV[0], 16);
+      }
+      else
+      {
+        memcpy(st->aes_ivR, sixIV[0], 16);
+      }
+    }
+    else
+    {
+      // Если первый VC* пропущен, мы не можем правильно начать дешифрование SF.
+      // Лучше пропустить весь SF.
+      continue;
+    }
+
     int res = 0;
 
     for (int b = 0; b < 6; ++b)
@@ -1232,8 +1267,9 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
         KVTR("[KV-TRACE] пропуск неполных VC*\n");
         continue; // пропуск неполных VC*
       }
-
-      memcpy(st->aes_iv, sixIV[b], 16); // IV per VC*
+      // memcpy(st->aes_iv, sixIV[b], 16); // IV per VC*
+      // if(slot==1)
+      // memcpy(st->aes_ivR, sixIV[b], 16);
       // НЕ СБРАСЫВАТЬ DMRvcL/bit_counterL здесь!
 
       char fr1[4][24], fr2[4][24], fr3[4][24];
@@ -1256,9 +1292,9 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   if (s_cnt > 0)
     *avg_smooth = (float)(s_sum / (double)s_cnt);
 
-  free(st->cur_mp);
-  free(st->prev_mp);
-  free(st->prev_mp_enhanced);
+  // free(st->cur_mp);
+  // free(st->prev_mp);
+  // free(st->prev_mp_enhanced);
   free(st);
   return 0;
 }
