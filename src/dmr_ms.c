@@ -60,15 +60,6 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
 
   vc = 2;
 
-  //DMH_KV
-  {
-  // На границе каждого суперкадра (перед обработкой его кадров)
-  // проверяем, нужно ли применить новый ключ из очереди перебора.
-  // Это гарантирует, что OFB-поток начнется с правильного MI,
-  // а вся последующая обработка в цикле for будет использовать верный ключ
-    kv_on_superframe_boundary(opts, state);
-  }
-
   //Hardset variables for MS/Mono
   state->currentslot = 0; //0
 
@@ -710,7 +701,6 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
      // if (state->kv_key_t0_ms[slot][kid] == 0)
      state->kv_key_t0_ms[slot][kid] = dsd_now_ms();
   }
-  kv_on_superframe_boundary(opts, state);
   // Вызываем дешифратор, если нужно
   if ((state->payload_algid == 0x24  || state->payload_algid == 0x23 || state->payload_algid == 0x25) && state->aes_key_loaded[state->currentslot & 1] == 1)
   {

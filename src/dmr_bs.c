@@ -316,8 +316,6 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
       if (opts->run_scout)
         avr_scout_finalize_series(opts, state);
 
-      // if (opts->kv_smooth)
-      //  kv_on_voice_end(opts, state);
       dmr_data_sync(opts, state);
       skipcount++;
       goto SKIP;
@@ -898,8 +896,6 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
   } // while loop
 
 END:
-  // --- KV: finalize on abrupt end (errors/resync) ---
-  // if (opts->kv_smooth) kv_on_voice_end(opts, state);
   state->dmr_stereo = 0;
   state->errs = 0;
   state->errs2 = 0;
@@ -1376,9 +1372,6 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
   dmrBS(opts, state); // bootstrap into full TDMA frame for BS mode
   fprintf(stderr, "\n");
 END:
-  // --- KV: finalize on abrupt end (errors/resync) ---
-  // if (opts->kv_smooth) kv_on_voice_end(opts, state);
-  // if we have a tact err, then produce sync pattern/err message
 
   if (tact_okay != 1 || sync_okay != 1)
   {

@@ -11,7 +11,7 @@
 #include "dsd.h"
 #include "mbelib.h"
 
-#define DEBUG 2
+#define DEBUG 0
 
 // -------------------- Defaults (sane fallbacks) --------------------
 #ifndef AVR_KV_NUM_BANDS
@@ -251,21 +251,6 @@ extern "C"
   // int kv_csv_load_and_filter(const char *csv_path, kv_key_t **out_vec, size_t *out_n);
   void kv_write_key_ok_file(const dsd_opts *opts, const dsd_state *state, int kid, int ord);
 
-  // Нормализует строку HEX: убирает всё, кроме [0-9A-Fa-f], UPPERCASE.
-  // Обрезает до чётной длины, затем до кратной 16 длины.
-  // Если длина >=64 → берём 64; иначе если >=48 → 48; иначе если >=32 → 32; иначе 0 (ошибка).
-  // Возвращает 0 при ошибке, иначе длину нормализованной строки (HEX-символов).
-  int kv_hex_sanitize_trim_to_aes(const char *in_hex, char *norm_hex, size_t norm_sz,
-                                  int *alg_id, int *key_len_bytes);
-
-  // Добавляет пробелы каждые 16 HEX-символов (на вход — компактный HEX без пробелов).
-  // Возвращает длину записанной строки (с пробелами) или 0 при ошибке.
-  int kv_hex_group16(const char *norm_hex, char *spaced_hex, size_t out_sz);
-
-  // Конвертирует HEX (с пробелами или без) в байты. Возвращает число байт или 0 при ошибке.
-  int kv_hex_to_bytes(const char *hex_in, uint8_t *out, size_t out_cap);
-
-  // avr_kv.h — НОВОЕ
   int kv_load_ini_overrides(dsd_opts *opts, dsd_state *s);   // парсит opts->kv_ini_path
   void kv_post_cli_ini_adjust(dsd_opts *opts, dsd_state *s); // автодействия после CLI+INI
 
@@ -275,16 +260,12 @@ extern "C"
   // Обработчик кадра: считает HIT/MISS по smooth-окну и рулит ротацией кандидатов
   void kv_enum_on_frame(dsd_opts *opts, dsd_state *state);
 
-  // Граница суперкадра (vc==1): сброс локальных счётчиков и принятие решений по лимитам
-  void kv_on_superframe_boundary(dsd_opts *opts, dsd_state *state);
-
   void kv_after_mbe(dsd_opts *opts, dsd_state *state);
   // Окончание входного файла/потока
   void kv_on_stream_end(dsd_opts *opts, dsd_state *state);
 
   bool getG_enum_active();
   void kv_apply_key_for_name_bytes(dsd_opts *opts, dsd_state *st, uint8_t alg_id, const uint8_t *key_bytes, uint8_t key_len, uint8_t key_id);
-  void kv_on_voice_end(dsd_opts *opts, dsd_state *state);
   void kv_init(dsd_opts *opts, dsd_state *st);
 
   // KV batch init/free (грузим CSV один раз при старте, используем в avr_kv_batch_run)

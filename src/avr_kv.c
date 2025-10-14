@@ -50,7 +50,7 @@ int g_kv_batch_smooth = 0;
 #define KV_CLUSTER_WINDOW_LEN 12
 #endif
 #ifndef KV_MIN_STABLE_RUN_LEN
-#define KV_MIN_STABLE_RUN_LEN 4
+#define KV_MIN_STABLE_RUN_LEN 6
 #endif
 #ifndef KV_MIN_FLAT_RUN_LEN
 #define KV_MIN_FLAT_RUN_LEN 3
@@ -94,10 +94,42 @@ int g_kv_batch_smooth = 0;
 
 // --- Буферы и утилиты логирования ---
 #define KV_GLOBAL_MAX_POINTS (KV_SF_HIST_MAX * KV_SF_FRAMES)
+// Управление логом:
+#if DEBUG
 #define KV_LOG_ERR(...) fprintf(stderr, "[KV - er] " __VA_ARGS__)
+#else
+#define KV_LOG_ERR(...) \
+    do                  \
+    {                   \
+    } while (0)
+#endif
+
+#if DEBUG
 #define KV_LOG_SKIP(...) fprintf(stderr, "[KV skip] " __VA_ARGS__)
+#else
+#define KV_LOG_SKIP(...) \
+    do                   \
+    {                    \
+    } while (0)
+#endif
+
+#if DEBUG
 #define KV_LOG_FECERR(fmt, ...) fprintf(stderr, "[KV FEC ERROR] " fmt, ##__VA_ARGS__)
+#else
+#define KV_LOG_FECERR(...) \
+    do                     \
+    {                      \
+    } while (0)
+#endif
+
+#if DEBUG
 #define KV_LOG_OK1(...) fprintf(stderr, "[KV ok 1] " __VA_ARGS__)
+#else
+#define KV_LOG_OK1(...) \
+    do                  \
+    {                   \
+    } while (0)
+#endif
 #define KV_LOG_OK2(...) fprintf(stderr, "[KV ok 2] " __VA_ARGS__)
 #define KV_LOG_VALI(...) fprintf(stderr, "[KV VALIDATED] " __VA_ARGS__)
 #define KV_LOG_FAIL(...) fprintf(stderr, "[KV FAIL] " __VA_ARGS__)
@@ -668,6 +700,8 @@ static void kv_sf_metrics_clean(const kv_sf_buf_t *sf, kv_sf_metrics_t *out, uin
     int stddev_ok = (out->std_dev <= KV_LOCAL_STDDEV_MAX);
     int range_ok = (out->min_range <= final_range_thr);
     int run_ok = (out->max_stable_run >= KV_MIN_STABLE_RUN_LEN); // KV_MIN_STABLE_RUN_LEN
+    int long_run_ok = (out->max_stable_run >= KV_MIN_STABLE_RUN_LEN * 2);
+
     int flat_ok = (out->max_flat_run >= KV_MIN_FLAT_RUN_LEN);
 
     out->good = (stddev_ok && range_ok) && (run_ok || flat_ok);
@@ -678,9 +712,11 @@ static void kv_sf_metrics_clean(const kv_sf_buf_t *sf, kv_sf_metrics_t *out, uin
         out->quality_coeff += 2;
     if (range_ok)
         out->quality_coeff += 2;
+    if (flat_ok)
+        out->quality_coeff += 1;
     if (run_ok)
         out->quality_coeff += 1;
-    if (flat_ok)
+    if (long_run_ok)
         out->quality_coeff += 1;
 }
 
@@ -729,7 +765,6 @@ static void kv_sf_metrics_clean_batch(const kv_sf_buf_t *sf, kv_sf_metrics_t *ou
     const float final_range_thr = fmaxf(median_s * (KV_RANGE_PROC / 100.0f), KV_RANGE_MIN_ABS);
 
     // --- 4. Расчет метрик стабильности во времени (на несортированных данных) ---
-
     // --- 4.1. max_stable_run (длина самых длинных стабильных участков) ---
     // /// --- НАЧАЛО ИЗМЕНЕНИЙ --- ///
     int max_run1 = 0, max_run2 = 0, current_run = 0;
@@ -814,14 +849,12 @@ static void kv_sf_metrics_clean_batch(const kv_sf_buf_t *sf, kv_sf_metrics_t *ou
     // Сигнал считается стабильным, если есть:
     // - один длинный стабильный участок (>= 8, как в старом `run_ok`)
     // - ИЛИ два средних стабильных участка (оба >= 5, как в старом `run_ok2`)
-    int one_long_run_ok = (max_run1 >= 8 || max_run2 >= 8);                                            // KV_MIN_STABLE_RUN_LEN
-    int two_medium_runs_ok = (max_run1 >= KV_MIN_STABLE_RUN_LEN && max_run2 >= KV_MIN_STABLE_RUN_LEN); // KV_MIN_STABLE_RUN_LEN_MID
-    int one_runs_ok = (max_run1 >= KV_MIN_STABLE_RUN_LEN || max_run2 >= KV_MIN_STABLE_RUN_LEN);        // KV_MIN_STABLE_RUN_LEN_MID
+    int one_long_run_ok = (max_run1 >= KV_MIN_STABLE_RUN_LEN * 2 || max_run2 >= KV_MIN_STABLE_RUN_LEN * 2); // KV_MIN_STABLE_RUN_LEN
+    int two_medium_runs_ok = (max_run1 >= KV_MIN_STABLE_RUN_LEN && max_run2 >= KV_MIN_STABLE_RUN_LEN);      // KV_MIN_STABLE_RUN_LEN_MID
+    int one_runs_ok = (max_run1 >= KV_MIN_STABLE_RUN_LEN || max_run2 >= KV_MIN_STABLE_RUN_LEN);             // KV_MIN_STABLE_RUN_LEN_MID
 
-    int run_ok = one_long_run_ok || two_medium_runs_ok;
+    int run_ok = one_long_run_ok || two_medium_runs_ok || one_runs_ok;
     // /// --- КОНЕЦ ИЗМЕНЕНИЙ --- ///
-
-    out->good = (stddev_ok && range_ok && one_runs_ok) && (run_ok || flat_ok);
 
     fprintf(stderr, "!!!! stddev_ok %d, range_ok %d, flat_ok %d, run_ok %d, one_runs_ok %d\n", stddev_ok, range_ok, flat_ok, run_ok, one_runs_ok);
     out->good = (stddev_ok && range_ok && one_runs_ok) && (run_ok || flat_ok) || (stddev_ok && flat_ok && run_ok && one_runs_ok);
@@ -829,15 +862,15 @@ static void kv_sf_metrics_clean_batch(const kv_sf_buf_t *sf, kv_sf_metrics_t *ou
     // --- 6. Расчет КОЭФФИЦИЕНТА КАЧЕСТВА (quality_coeff) ---
     // Расчет также обновлен, чтобы использовать новую логику `run_ok`.
     out->quality_coeff = 0;
-    if (stddev_ok && flat_ok && run_ok && one_runs_ok)
-        out->quality_coeff += 2;
     if (stddev_ok)
         out->quality_coeff += 2;
     if (range_ok)
         out->quality_coeff += 2;
-    if (run_ok) // Условие `run_ok` теперь включает проверку одного или двух участков
-        out->quality_coeff += 1;
     if (flat_ok)
+        out->quality_coeff += 1;
+    if (one_runs_ok) // Условие `run_ok` теперь включает проверку одного или двух участков
+        out->quality_coeff += 1;
+    if (one_long_run_ok)
         out->quality_coeff += 1;
 }
 
@@ -876,7 +909,7 @@ static int calculate_final_probability(int slot, uint8_t kid)
     if (total_sf == 0)
         return 0;
     float avg_coeff = calculate_average_coeff(slot, kid);
-    float base_prob = 100.0f * (avg_coeff / 6.0f);
+    float base_prob = 100.0f * (avg_coeff / 7.0f);
     int time_penalty = (total_sf < 3) ? abs(total_sf - 3) * 10 : abs(total_sf - 3) * 1;
     int final_prob = (int)(base_prob - time_penalty);
     if (final_prob > 100)
@@ -984,64 +1017,7 @@ void kv_write_key_ok_file(const dsd_opts *opts, const dsd_state *state, int kid,
         fclose(fo);
     }
 }
-
-// Вызывается на границе суперкадра (заглушка).
-void kv_on_superframe_boundary(dsd_opts *opts, dsd_state *st)
-{
-    (void)opts;
-    (void)st;
-}
-
-// Вызывается в конце голосовой передачи.
-void kv_on_voice_end(dsd_opts *opts, dsd_state *state)
-{
-    if (!opts || !state || !opts->kv_smooth)
-        return;
-    const int slot = (state->currentslot & 1);
-    const uint8_t kid = slot ? (uint8_t)state->payload_keyidR : (uint8_t)state->payload_keyid;
-    const uint8_t algid = slot ? (uint8_t)state->payload_algidR : (uint8_t)state->payload_algid;
-    if (algid == 0x00 || kid >= 256)
-        return;
-
-    // Если решение уже принято, ничего не делать.
-    if (state->dmr_key_validation_status[slot][kid] != KEY_UNKNOWN)
-    {
-        return;
-    }
-    int total_sf, good_sf, bad_sf;
-    kv_hist_stats(slot, kid, &total_sf, &good_sf, &bad_sf);
-
-    // Если материала для анализа слишком мало, считаем это неудачей
-    if (total_sf < KV_MIN_SF_BEFORE_DECISION)
-    {
-        state->dmr_key_validation_status[slot][kid] = KEY_FAILED;
-        KV_LOG_FAIL("alg=0x%02X kid=%u cause=end-of-voice (too short) sf=%d\n",
-                    (unsigned)algid, (unsigned)kid, total_sf);
-    }
-    else
-    {
-        // Финальный вердикт: если хороших SF больше, чем плохих, - успех.
-        if (good_sf > bad_sf)
-        {
-            state->dmr_key_validation_status[slot][kid] = KEY_VALIDATED;
-            state->kv_key_probability[slot][kid] = calculate_final_probability(slot, kid);
-            KV_LOG_VALI("alg=0x%02X kid=%u cause=end-of-voice (tie-break) sf=%d prob=%u%%\n",
-                        (unsigned)algid, (unsigned)kid, total_sf, state->kv_key_probability[slot][kid]);
-        }
-        else
-        {
-            state->dmr_key_validation_status[slot][kid] = KEY_FAILED;
-            KV_LOG_FAIL("alg=0x%02X kid=%u cause=end-of-voice (tie-break) sf=%d\n",
-                        (unsigned)algid, (unsigned)kid, total_sf);
-        }
-    }
-    kv_reset_pair_local(slot, kid);
-}
-
-#ifndef KV_SINGLE_VF_DIAG
-#define KV_SINGLE_VF_DIAG 1
-#endif
-
+//==========================================================================
 // Основная функция анализа, вызывается после обработки каждого MBE-фрейма.
 void kv_after_mbe(dsd_opts *opts, dsd_state *state)
 {
@@ -1053,7 +1029,7 @@ void kv_after_mbe(dsd_opts *opts, dsd_state *state)
     const uint8_t algid = slot ? (uint8_t)state->payload_algidR : (uint8_t)state->payload_algid;
 
     // Прекращаем, если нет ALGID, неверный KID, или решение уже принято
-    if (algid == 0x00 || kid >= 256)
+    if (algid == 0x00 || kid >= 255)
         return;
 
     /// if (state->dmr_key_validation_status[slot][kid] != KEY_UNKNOWN) return;
@@ -1074,7 +1050,7 @@ void kv_after_mbe(dsd_opts *opts, dsd_state *state)
 
     // --- 1. Первичная фильтрация кадра ---
     sf->n_vc++; // Увеличиваем счетчик полученных кадров в SF
-    if (errs2 > KV_UNCORR_ERRS2_THR)
+    if (errs2 > KV_UNCORR_ERRS2_THR+5)
     {
         sf->n_err++;
         // KV_LOG_FECERR("smooth NA\n");
@@ -1087,18 +1063,6 @@ void kv_after_mbe(dsd_opts *opts, dsd_state *state)
     float s = 0.0f;
     kv_compute_s(state->cur_mp, state->prev_mp, &s);
 
-#if KV_SINGLE_VF_DIAG
-    {
-        // Оценим индексы b/vf относительно текущего DMRvcL
-        int dvc = (state->DMRvcL % 18);
-        int b = dvc / 3;
-        int vf = dvc % 3;
-        float s_local = 0.0f;
-        kv_compute_s(state->cur_mp, state->prev_mp, &s_local);
-        fprintf(stderr, "[SINGLE][VF] sf->n_vc=%u b=%d vf=%d DMRvcL=%d errs2=%d s=%.3f\n",
-                (unsigned)sf->n_vc, b, vf, state->DMRvcL, state->errs2, s_local);
-    }
-#endif
     // Отбрасываем кадр, если значение 's' является выбросом
     if (s < SMOOTH_MIN_CLIP || s > SMOOTH_MAX_CLIP)
     {
@@ -1124,10 +1088,7 @@ void kv_after_mbe(dsd_opts *opts, dsd_state *state)
     {
         sf->s[sf->n_valid++] = s;
     }
-    if (DEBUG)
-    {
-        KV_LOG_OK1("smooth=%.3f ALG=0x%02X KID=%u\n", s, (unsigned)algid, (unsigned)kid);
-    }
+    KV_LOG_OK1("smooth=%.3f ALG=0x%02X KID=%u\n", s, (unsigned)algid, (unsigned)kid);
     // fprintf(stderr, "[KV ok 1] smooth=%.3f ALG=0x%02X KID=%u slot=%d\n" s, (unsigned)algid, (unsigned)kid, slot);
     // fprintf(stderr, "kv_after_mbe 7\n");
 
@@ -1172,7 +1133,7 @@ CLOSE_SF:;
     int action = 0; // 0: продолжать, 1: валидировать, -1: отказ
 
     // --- Путь А: Ранние решения на основе перевеса "хороших" или "плохих" SF ---
-    if (total_sf >= KV_MIN_SF_BEFORE_DECISION)
+    if (total_sf > KV_MIN_SF_BEFORE_DECISION)
     {
         if (good_sf >= bad_sf + 2)
             action = 1;
@@ -1191,7 +1152,7 @@ CLOSE_SF:;
             action = 1;
     }
     // --- Путь В: Решение на основе глобальной стабильности сигнала ---
-    if (action == 0 && total_sf > 2 && kv_check_global_stability(slot, kid))
+    if (action == 0 && total_sf >= 2 && kv_check_global_stability(slot, kid))
     {
         action = 1;
     }
@@ -1565,18 +1526,54 @@ int kv_apply_runtime_key_from_bytes(dsd_opts *opts, dsd_state *st,
                                     size_t key_len,
                                     int kid)
 {
-    if (!st || !opts || !key_bytes || !(key_len == 16 || key_len == 32))
+    if (!st || !opts || !key_bytes)
     {
         fprintf(stderr, "[KV-RUNTIME] invalid params (len=%d)\n", (int)key_len);
         return -1;
     }
-
     uint64_t A1 = 0, A2 = 0, A3 = 0, A4 = 0;
+    // ARC4/RC4 (ALGID 0x21): один ключ -> оба слота (R и RR). НИКАКИХ A1..A4.
+    if ((alg_id & 0xFF) == 0x21)
+    {
+        // Принимаем 1..8 байт (обычно 5). Никакой 10-байтной «по 5 на слот».
+        if (key_len == 0 || key_len > 8)
+        {
+            fprintf(stderr, "[KV-RUNTIME] RC4 key len invalid: %zu (need 1..8 bytes, typically 5)\n", key_len);
+            return -1;
+        }
+        // big-endian сборка как из "%llX"
+        uint64_t K = 0;
+        for (size_t i = 0; i < key_len; i++)
+        {
+            K = (K << 8) | (uint64_t)key_bytes[i];
+        }
+        st->R = K;
+        st->RR = K;
+
+        // При желании фиксируем контекст (как делает ручной ввод)
+        st->payload_algid = 0x21;
+        st->payload_keyid = (kid > 0 ? kid : 0);
+
+        // размьют и отключение keyloader
+        opts->dmr_mute_encL = 0;
+        opts->dmr_mute_encR = 0;
+        st->keyloader = 0;
+
+        fprintf(stderr, "[KV-RUNTIME] RC4 key set: 0x%llX (len=%zu) -> R/RR; kid=%d\n",
+                (unsigned long long)st->R, key_len, st->payload_keyid);
+        return 0;
+    }
 
     if (key_len == 16)
     {
         A1 = kv_pack64_be(&key_bytes[0]);
         A2 = kv_pack64_be(&key_bytes[8]);
+    }
+    else if (key_len == 24)
+    {
+        A1 = kv_pack64_be(&key_bytes[0]);
+        A2 = kv_pack64_be(&key_bytes[8]);
+        A3 = kv_pack64_be(&key_bytes[16]);
     }
     else
     { // 32
@@ -1816,17 +1813,211 @@ void kv_batch_finalize_decision_for_pair(dsd_opts *opts, dsd_state *st,
 //====================================================================
 //====================================================================
 //====================================================================
+// Основная функция анализа, вызывается после обработки каждого MBE-фрейма.
 int kv_after_mbe_core_batch(dsd_opts *opts, dsd_state *state)
 {
+    // fprintf(stderr, "kv_after_mbe start\n");
     // if (!opts || !state || !opts->kv_smooth)
-    //     return; //  || !opts->kv_smooth
+    //    return; //  || !opts->kv_smooth
+    const int slot = (state->currentslot & 1);
+    const uint8_t kid = slot ? (uint8_t)state->payload_keyidR : (uint8_t)state->payload_keyid;
+    const uint8_t algid = slot ? (uint8_t)state->payload_algidR : (uint8_t)state->payload_algid;
+
+    // Прекращаем, если нет ALGID, неверный KID, или решение уже принято
+    if (algid == 0x00 || kid >= 255)
+        return;
+
+    /// if (state->dmr_key_validation_status[slot][kid] != KEY_UNKNOWN) return;
+
+    // fprintf(stderr, "kv_after_mbe state->dmr_key_validation_status[%d][%d] = %d \n", slot, kid, state->dmr_key_validation_status[slot][kid]);
+
+    // Сбрасываем состояние при смене ALGID или KID
+    if (kv_last_algid[slot] != algid || kv_last_kid[slot] != kid)
+    {
+        kv_reset_pair_local(slot, kid);
+        kv_last_algid[slot] = algid;
+        kv_last_kid[slot] = kid;
+    }
+
+    kv_sf_buf_t *sf = &g_sf[slot][kid];
+    const float stat_thr = (opts->kv_stat_thr > 0.0f) ? opts->kv_stat_thr : KV_S_FOR_STATS_MAX_DEFAULT;
+    const int errs2 = slot ? state->errs2R : state->errs2;
+
+    // --- 1. Первичная фильтрация кадра ---
+    sf->n_vc++; // Увеличиваем счетчик полученных кадров в SF
+    if (errs2 > KV_UNCORR_ERRS2_THR+5)
+    {
+        sf->n_err++;
+        // KV_LOG_FECERR("smooth NA\n");
+        if (sf->n_vc >= KV_SF_FRAMES)
+            goto CLOSE_SF;
+        return 0;
+    }
+    // fprintf(stderr, "kv_after_mbe errs2 (%d) <= KV_UNCORR_ERRS2_THR) \n", errs2);
+
+    float s = 0.0f;
+    kv_compute_s(state->cur_mp, state->prev_mp, &s);
+
+    // Отбрасываем кадр, если значение 's' является выбросом
+    if (s < SMOOTH_MIN_CLIP || s > SMOOTH_MAX_CLIP)
+    {
+        sf->n_gate++;
+        // KV_LOG_ERR("smooth=%.3f OUTLIER -> GATED\n", s);
+        if (sf->n_vc >= KV_SF_FRAMES)
+            goto CLOSE_SF;
+        return 0;
+    }
+
+    // Пропускаем кадр (но не считаем ошибкой), если 's' выше порога для статистики
+    if (s > stat_thr)
+    {
+        sf->n_skip++;
+        // KV_LOG_SKIP("smooth=%.3f > stat_thr=%.1f -> SKIP\n", s, stat_thr);
+        if (sf->n_vc >= KV_SF_FRAMES)
+            goto CLOSE_SF;
+        return 0;
+    }
+
+    // --- 2. Накопление валидных данных ---
+    if (sf->n_valid < KV_SF_FRAMES)
+    {
+        sf->s[sf->n_valid++] = s;
+    }
+    KV_LOG_OK1("smooth=%.3f ALG=0x%02X KID=%u\n", s, (unsigned)algid, (unsigned)kid);
+    // fprintf(stderr, "[KV ok 1] smooth=%.3f ALG=0x%02X KID=%u slot=%d\n" s, (unsigned)algid, (unsigned)kid, slot);
+    // fprintf(stderr, "kv_after_mbe 7\n");
+
+    // Если суперкадр еще не заполнен, выходим
+    if (sf->n_vc < KV_SF_FRAMES)
+        return 0;
+
+// --- 3. Анализ и принятие решения на границе суперкадра ---
+CLOSE_SF:;
+
+    fprintf(stderr, "kv_after_mbe CLOSE_SF\n");
+
+    // Отбрасываем SF, если процент ошибок слишком высок
+    if (sf->n_vc > 0 && (100 * (int)sf->n_err) / (int)sf->n_vc > 20)
+    {
+        memset(sf, 0, sizeof(*sf));
+        return;
+    }
+
+    // Рассчитываем метрики качества для собранного SF
+    kv_sf_metrics_t m;
+    uint8_t quality;
+    kv_sf_metrics_clean(sf, &m, &quality);
+
+    // Накапливаем сырые данные в глобальный буфер для долгосрочного анализа
+    for (int i = 0; i < sf->n_valid; i++)
+    {
+        uint16_t *pn = &g_raw_len[slot][kid];
+        if (*pn < KV_GLOBAL_MAX_POINTS)
+        {
+            g_raw_buf[slot][kid][(*pn)++] = sf->s[i];
+        }
+    }
+    // Добавляем результаты анализа SF в историю
+    kv_hist_push(slot, kid, &m, quality);
+
+    // Получаем общую статистику по всем SF в истории
+    int total_sf, good_sf, bad_sf;
+    kv_hist_stats(slot, kid, &total_sf, &good_sf, &bad_sf);
+
+    // --- 4. Многоуровневая логика принятия решений ---
+    int action = 0; // 0: продолжать, 1: валидировать, -1: отказ
+
+    // --- Путь А: Ранние решения на основе перевеса "хороших" или "плохих" SF ---
+    if (total_sf > KV_MIN_SF_BEFORE_DECISION)
+    {
+        if (good_sf >= bad_sf + 2)
+            action = 1;
+        else if (bad_sf >= good_sf + 2)
+            action = -1;
+        else if (bad_sf >= KV_EARLY_FAIL_BAD_SF)
+            action = -1;
+        else if (good_sf >= KV_EARLY_VALID_GOOD_SF)
+            action = 1;
+    }
+    // --- Путь Б: Решение на основе среднего коэффициента качества ---
+    if (action == 0 && total_sf >= 4)
+    {
+        float avg_coeff = calculate_average_coeff(slot, kid);
+        if (avg_coeff >= KV_AVG_COEFF_VALID_THR)
+            action = 1;
+    }
+    // --- Путь В: Решение на основе глобальной стабильности сигнала ---
+    if (action == 0 && total_sf >= 2 && kv_check_global_stability(slot, kid))
+    {
+        action = 1;
+    }
+    // --- Путь Г: Принудительное решение по таймауту (достигнут лимит SF) ---
+    if (total_sf >= KV_HARD_CAP_TOTAL_SF)
+    {
+        action = (good_sf > bad_sf) ? 1 : -1;
+    }
+
+    // --- 5. Выполнение действия и логирование ---
+    int final_probability = calculate_final_probability(slot, kid);
+    KV_LOG_OK2("SF=%d | std=%.1f rng=%.1f run=%u flat=%u coeff=%u | HIST g=%d b=%d prob=%d%% | -> %s\n",
+               total_sf, m.std_dev, m.min_range, (unsigned)m.max_stable_run, (unsigned)m.max_flat_run, (unsigned)m.quality_coeff,
+               good_sf, bad_sf, final_probability,
+               (action == 1 ? "VALID" : (action == -1 ? "FAIL" : "CONT")));
+
+    if (action == 1)
+    {
+        state->dmr_key_validation_status[slot][kid] = KEY_VALIDATED;
+        state->kv_key_probability[slot][kid] = final_probability;
+        KV_LOG_VALI("alg=0x%02X kid=%u sf=%d prob=%u%%\n",
+                    (unsigned)algid, (unsigned)kid, total_sf, final_probability);
+        // kv_result.txt
+        long now_ms = dsd_now_ms();
+        long t_key_ms = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+        long t_total_ms = (state->kv_prog_t0_ms > 0) ? now_ms - state->kv_prog_t0_ms : 0;
+        char kvpath[600];
+        kv_build_result_path(opts, "kv_result.txt", kvpath, sizeof(kvpath));
+        FILE *pFile; // file pointer
+        if ((pFile = fopen(kvpath, "a")) != NULL)
+        {
+            fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u total_sf %d\n",
+                    (unsigned)algid, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid], total_sf);
+            fclose(pFile);
+        }
+        // keyOK_<id>.txt
+        kv_write_key_ok_file(opts, state, kid, 0);
+        // if(final_probability<65) //QQQQ
+        //       action = -1;
+    }
+    else if (action == -1)
+    {
+        state->dmr_key_validation_status[slot][kid] = KEY_FAILED;
+        KV_LOG_FAIL("alg=0x%02X kid=%u sf=%d\n", (unsigned)algid, (unsigned)kid, total_sf);
+    }
+
+    // Если решение принято, сбросить всё. Иначе - только буфер текущего SF.
+    if (action != 0)
+    {
+        kv_reset_pair_local(slot, kid);
+    }
+    else
+    {
+        memset(sf, 0, sizeof(*sf));
+    }
+    return state->dmr_key_validation_status[slot][kid];
+
+}
+
+int kv_after_mbe_core_batch2(dsd_opts *opts, dsd_state *state)
+{
+    if (!opts || !state)
+        return -1;
 
     const int slot = (state->currentslot & 1);
     const uint8_t kid = slot ? (uint8_t)state->payload_keyidR : (uint8_t)state->payload_keyid;
     const uint8_t algid = slot ? (uint8_t)state->payload_algidR : (uint8_t)state->payload_algid;
     /// fprintf(stderr, "kv_after_mbe_core_batch\n");
     // Прекращаем, если нет ALGID, неверный KID, или решение уже принято
-    if (algid == 0x00 || kid >= 256)
+    if (algid == 0x00 || kid >= 255)
         return 0;
     // fprintf(stderr, "algid (%d, kid %d) \n", algid, kid);
 
@@ -1857,7 +2048,7 @@ int kv_after_mbe_core_batch(dsd_opts *opts, dsd_state *state)
     float s = 0.0f;
     kv_compute_s(state->cur_mp, state->prev_mp, &s);
     // Отбрасываем кадр, если значение 's' является выбросом
-    if (s < 5 || s > SMOOTH_MAX_CLIP)
+    if (s < SMOOTH_MIN_CLIP || s > SMOOTH_MAX_CLIP)
     {
         sf->n_gate++;
         KV_LOG_ERR("smooth=%.3f OUTLIER -> GATED\n", s);
@@ -1873,7 +2064,7 @@ int kv_after_mbe_core_batch(dsd_opts *opts, dsd_state *state)
         KV_LOG_SKIP("smooth=%.3f > stat_thr=%.1f -> SKIP\n", s, stat_thr);
         if (sf->n_vc >= KV_SF_FRAMES)
             goto CLOSE_SF;
-        return;
+        return 0;
     }
 
     // --- 2. Накопление валидных данных ---
@@ -1881,12 +2072,8 @@ int kv_after_mbe_core_batch(dsd_opts *opts, dsd_state *state)
     {
         sf->s[sf->n_valid++] = s;
     }
-    if (DEBUG)
-    {
-        KV_LOG_OK1("smooth=%.3f ALG=0x%02X KID=%u\n", s, (unsigned)algid, (unsigned)kid);
-    }
+    KV_LOG_OK1("smooth=%.3f ALG=0x%02X KID=%u\n", s, (unsigned)algid, (unsigned)kid);
     // fprintf(stderr, "[KV ok 1] smooth=%.3f ALG=0x%02X KID=%u slot=%d\n" s, (unsigned)algid, (unsigned)kid, slot);
-    // fprintf(stderr, "kv_after_mbe 7\n");
 
     // Если суперкадр еще не заполнен, выходим
     if (sf->n_vc < KV_SF_FRAMES)
@@ -1910,7 +2097,8 @@ CLOSE_SF:;
     // Рассчитываем метрики качества для собранного SF
     kv_sf_metrics_t m;
     uint8_t quality;
-    kv_sf_metrics_clean_batch(sf, &m, &quality); // QQQQQQQQQQQQQQQQQQQ
+    // kv_sf_metrics_clean_batch(sf, &m, &quality); // QQQQQQQQQQQQQQQQQQQ
+    kv_sf_metrics_clean(sf, &m, &quality); // QQQQQQQQQQQQQQQQQQQ
 
     // Накапливаем сырые данные в глобальный буфер для долгосрочного анализа
     for (int i = 0; i < sf->n_valid; i++)
@@ -1936,11 +2124,7 @@ CLOSE_SF:;
     int final_probability = calculate_final_probability(slot, kid);
 
     fprintf(stderr, "SF=%d,  final_probability %d\n", total_sf, final_probability);
-    if (final_probability > 90)
-    {
-        action = 1;
-    }
-    else if (final_probability < 50)
+    if (final_probability < 5)
     {
         action = -1;
     }
@@ -1965,7 +2149,7 @@ CLOSE_SF:;
             action = 1;
     }
     // --- Путь В: Решение на основе глобальной стабильности сигнала ---
-    if (action == 0 && total_sf > 2 && kv_check_global_stability(slot, kid))
+    if (action == 0 && total_sf > 1 && kv_check_global_stability(slot, kid))
     {
         action = 1;
     }
@@ -1997,8 +2181,8 @@ CLOSE_SF:;
         FILE *pFile; // file pointer
         if ((pFile = fopen(kvpath, "a")) != NULL)
         {
-            fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u\n",
-                    (unsigned)algid, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid]);
+            fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u total_sf %d\n",
+                    (unsigned)algid, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid], total_sf);
             fclose(pFile);
         }
         // keyOK_<id>.txt

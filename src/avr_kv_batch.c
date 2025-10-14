@@ -876,11 +876,7 @@ static inline void aes_ofb_dec_27B_one_sf(uint8_t iv16[16],
   }
 }
 // ====== ГЛАВНЫЙ проход по окну — дешифр., AMBE, smooth, интеграция в kv ======
-#ifndef KV_TRACE
-#define KV_TRACE 1
-#endif
-
-#if KV_TRACE
+#if DEBUG
 #define KVTR(...)                 \
   do                              \
   {                               \
@@ -1014,6 +1010,7 @@ static inline void kv_accumulate_frame(dsd_opts *opts, dsd_state *st,
   kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
   // kv_after_mbe_core_batch(opts, st, slot, kid, alg_id, s_local, errs2_local);
   kv_after_mbe_core_batch(opts, st);
+  // kv_after_mbe(opts, st);
 
   if (errs2_local >= 0 && errs2_local <= 3 && isfinite(s_local))
   {
@@ -1139,7 +1136,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
     return -1;
   if (nsf == 0)
     return -1;
-  if (key_len != 16 && key_len != 24 && key_len != 32)
+  if (key_len != 5 && key_len != 16 && key_len != 24 && key_len != 32)
     return -1;
 
   *avg_smooth = 0.f;
@@ -1282,6 +1279,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
         float s_local = 0.f;
         // kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
         res = kv_after_mbe_core_batch(opts, st); // , (slot & 1), kid, (uint8_t)alg_id, s_local, st->errs2);
+
         mbe_moveMbeParms(st->cur_mp, st->prev_mp);
       }
     }

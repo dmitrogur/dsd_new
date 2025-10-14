@@ -881,7 +881,6 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     (void)opts;
     if (!st)
         return;
-
     // --- 1) Слот и индекс SF ---
     const uint8_t slot = scout_slot(st);
     SC.last_slot = slot;
@@ -897,6 +896,8 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     last_vc18_epoch[slot] = vc18_epoch;
 
     const int bad_flco = (slot < 2 && st->flco_fec_err[slot]);
+    SLOG(" >>> ENTER sf=%u slot=%u\n", (unsigned)sf_idx, slot);
+
     // --- [SCOUT STATS] базовая статистика по SuperFrame ---
     avr_scout_group_t *G = NULL;
     if (SC.ngroups > 0)
@@ -1169,6 +1170,9 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
 
     SLOG(" <<< EXIT  sf=%u slot=%u post.active=%u post.len=%u\n",
          (unsigned)sf_idx, slot, r->active, r->len_sf);
+    
+    st->DMRvcL = 0;       // считать VF 0..17 как в live
+    st->bit_counterL = 0; // сбросить битовый счётчик OFB только один раз
 
     // --- 8) Сдвиг кольца истории — строго в самом конце ---
     SC.hist_wr[slot] = (wr + 1) % AVR_SCOUT_MAX_SF;
@@ -1394,6 +1398,9 @@ void avr_scout_on_superframe_old(dsd_opts *opts, dsd_state *st)
 #endif
     }
 #endif // AVR_SCOUT_GROUP_STATS
+
+  st->DMRvcL = 0;       // считать VF 0..17 как в live
+  st->bit_counterL = 0; // сбросить битовый счётчик OFB только один раз
 
 #if AVR_SCOUT_DIAG
     SLOG(" <<< EXIT  sf=%u slot=%u post.active=%u post.len=%u\n", (unsigned)sf_idx, slot, r->active, r->len_sf);
