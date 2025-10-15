@@ -1126,11 +1126,12 @@ static inline void kv_unpack_27B_enc_to_ambe3_strict(const uint8_t enc27[27],
   }
 }
 
+
 int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
-                         size_t nsf, uint8_t kid, int alg_id,
-                         const uint8_t *enkey_bytes, int key_len,
-                         uint32_t start_sf_idx,
-                         float *avg_smooth, int *ok_frames, int *bad_errs2)
+                             size_t nsf, uint8_t kid, int alg_id,
+                             const uint8_t *enkey_bytes, int key_len,
+                             uint32_t start_sf_idx,
+                             float *avg_smooth, int *ok_frames, int *bad_errs2)
 {
   if (!opts || !state || !enkey_bytes || !avg_smooth || !ok_frames || !bad_errs2)
     return -1;
@@ -1162,7 +1163,7 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   }
   */
   mbe_initMbeParms(st->cur_mp, st->prev_mp, st->prev_mp_enhanced);
-  
+
   KVTR("[KV-TRACE] alg_id %d!\n", alg_id);
 
   // применяем ключ
@@ -1221,70 +1222,124 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
       KVTR("[KV-TRACE] sf=%u: no hist entry\n", sf_abs);
       continue;
     }
-    // 1. Сброс счетчиков ПЕРЕД каждым суперкадром.
-    //    Это заставит processMbeFrame сгенерировать новую гамму.
-    if (st->currentslot == 0)
-    {
-      st->DMRvcL = 0;
-      st->bit_counterL = 0;
-    }
-    else
-    {
-      st->DMRvcR = 0;
-      st->bit_counterR = 0;
-    }
 
-    // 2. Устанавливаем IV ОДИН РАЗ в начале суперкадра.
-    //    Используем IV от первого доступного VC* (обычно sixIV[0]).
-    //    Больше IV внутри этого SF не меняем.
-    if (mask & 0x01)
-    { // Убедимся, что первый VC* доступен
-      if (st->currentslot == 0)
+    // --- ВЕТКА ДЛЯ RC4/DES ---
+    if (alg_id == 0x21 || alg_id == 0x22)
+    {
+      // Для RC4/DES дешифровка происходит "на лету" внутри dmr_process_enc_vc
+      // Нам нужно только подготовить стейт
+
+      // 1. Устанавливаем MI из IV
+      uint32_t mi = ((uint32_t)sixIV[0][0] << 24) | ((uint32_t)sixIV[0][1] << 16) | ((uint32_t)sixIV[0][2] << 8) | sixIV[0][3];
+      st->payload_mi = mi;
+      if (cur_slot == 0)
       {
-        memcpy(st->aes_iv, sixIV[0], 16);
+        st->dmr_so |= 0x40;
       }
       else
       {
-        memcpy(st->aes_ivR, sixIV[0], 16);
+        st->dmr_soR |= 0x40;
+      }
+
+      // 2. Сбрасываем счетчики для RC4
+      if (cur_slot == 0)
+      {
+        st->bit_counterL = 0;
+      }
+      else
+      {
+        st->bit_counterR = 0;
+      }
+
+      // 3. Цикл по 6 блокам (Voice Call bursts) суперфрейма
+      for (int b = 0; b < 6; ++b)
+      {
+        if (!((mask >> b) & 1))
+          continue;
+
+        char fr1[4][24], fr2[4][24], fr3[4][24];
+        kv_unpack_27B_enc_to_ambe3_strict(six27[b], fr1, fr2, fr3);
+
+        for (int vf = 0; vf < 3; ++vf)
+        {
+          char (*ambe)[24] = (vf == 0) ? fr1 : (vf == 1 ? fr2 : fr3);
+
+          // Вызываем processMbeFrame. Внутри него, для RC4, будет вызвана dmr_process_enc_vc,
+          // которая использует st->R, st->payload_mi для дешифровки.
+          processMbeFrame(opts, st, NULL, ambe, NULL);
+
+          kv_after_mbe_core_batch(opts, st);
+          mbe_moveMbeParms(st->cur_mp, st->prev_mp);
+        }
       }
     }
     else
     {
-      // Если первый VC* пропущен, мы не можем правильно начать дешифрование SF.
-      // Лучше пропустить весь SF.
-      continue;
-    }
-
-    int res = 0;
-
-    for (int b = 0; b < 6; ++b)
-    {
-      if ((mask & (1u << b)) == 0)
+      // 1. Сброс счетчиков ПЕРЕД каждым суперкадром.
+      //    Это заставит processMbeFrame сгенерировать новую гамму.
+      if (st->currentslot == 0)
       {
-        KVTR("[KV-TRACE] пропуск неполных VC*\n");
-        continue; // пропуск неполных VC*
+        st->DMRvcL = 0;
+        st->bit_counterL = 0;
       }
-      // memcpy(st->aes_iv, sixIV[b], 16); // IV per VC*
-      // if(slot==1)
-      // memcpy(st->aes_ivR, sixIV[b], 16);
-      // НЕ СБРАСЫВАТЬ DMRvcL/bit_counterL здесь!
-
-      char fr1[4][24], fr2[4][24], fr3[4][24];
-      kv_unpack_27B_enc_to_ambe3_strict(six27[b], fr1, fr2, fr3);
-      // KVTR("[KV-TRACE] int vf = 0; vf < 3; ++vf\n");
-      for (int vf = 0; vf < 3; ++vf)
+      else
       {
-        char (*ambe)[24] = (vf == 0) ? fr1 : (vf == 1 ? fr2 : fr3);
-        processMbeFrame(opts, st, NULL, ambe, NULL);
-        float s_local = 0.f;
-        // kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
-        res = kv_after_mbe_core_batch(opts, st); // , (slot & 1), kid, (uint8_t)alg_id, s_local, st->errs2);
-
-        mbe_moveMbeParms(st->cur_mp, st->prev_mp);
+        st->DMRvcR = 0;
+        st->bit_counterR = 0;
       }
+
+      // 2. Устанавливаем IV ОДИН РАЗ в начале суперкадра.
+      //    Используем IV от первого доступного VC* (обычно sixIV[0]).
+      //    Больше IV внутри этого SF не меняем.
+      if (mask & 0x01)
+      { // Убедимся, что первый VC* доступен
+        if (st->currentslot == 0)
+        {
+          memcpy(st->aes_iv, sixIV[0], 16);
+        }
+        else
+        {
+          memcpy(st->aes_ivR, sixIV[0], 16);
+        }
+      }
+      else
+      {
+        // Если первый VC* пропущен, мы не можем правильно начать дешифрование SF.
+        // Лучше пропустить весь SF.
+        continue;
+      }
+
+      int res = 0;
+
+      for (int b = 0; b < 6; ++b)
+      {
+        if ((mask & (1u << b)) == 0)
+        {
+          KVTR("[KV-TRACE] пропуск неполных VC*\n");
+          continue; // пропуск неполных VC*
+        }
+        // memcpy(st->aes_iv, sixIV[b], 16); // IV per VC*
+        // if(slot==1)
+        // memcpy(st->aes_ivR, sixIV[b], 16);
+        // НЕ СБРАСЫВАТЬ DMRvcL/bit_counterL здесь!
+
+        char fr1[4][24], fr2[4][24], fr3[4][24];
+        kv_unpack_27B_enc_to_ambe3_strict(six27[b], fr1, fr2, fr3);
+        // KVTR("[KV-TRACE] int vf = 0; vf < 3; ++vf\n");
+        for (int vf = 0; vf < 3; ++vf)
+        {
+          char (*ambe)[24] = (vf == 0) ? fr1 : (vf == 1 ? fr2 : fr3);
+          processMbeFrame(opts, st, NULL, ambe, NULL);
+          float s_local = 0.f;
+          // kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
+          res = kv_after_mbe_core_batch(opts, st); // , (slot & 1), kid, (uint8_t)alg_id, s_local, st->errs2);
+
+          mbe_moveMbeParms(st->cur_mp, st->prev_mp);
+        }
+      }
+      if (res != 0)
+        break;
     }
-    if (res != 0)
-      break;
   }
 
   if (s_cnt > 0)

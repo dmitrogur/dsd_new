@@ -11,7 +11,7 @@
 #include "dsd.h"
 #include "mbelib.h"
 
-#define DEBUG 0
+#define DEBUG 2
 
 // -------------------- Defaults (sane fallbacks) --------------------
 #ifndef AVR_KV_NUM_BANDS

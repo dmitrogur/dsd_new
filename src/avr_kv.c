@@ -1532,36 +1532,48 @@ int kv_apply_runtime_key_from_bytes(dsd_opts *opts, dsd_state *st,
         return -1;
     }
     uint64_t A1 = 0, A2 = 0, A3 = 0, A4 = 0;
-    // ARC4/RC4 (ALGID 0x21): один ключ -> оба слота (R и RR). НИКАКИХ A1..A4.
-    if ((alg_id & 0xFF) == 0x21)
+
+    uint8_t alg = (uint8_t)(alg_id & 0xFF);
+    // --- Обработка ARC4 (0x21) и DES (0x22) ---
+    if (alg == 0x21 || alg == 0x22)
     {
-        // Принимаем 1..8 байт (обычно 5). Никакой 10-байтной «по 5 на слот».
-        if (key_len == 0 || key_len > 8)
+        const char* alg_name = (alg == 0x21) ? "RC4" : "DES";
+        size_t expected_len = (alg == 0x21) ? 5 : 8; // RC4 обычно 5 байт (40 бит), DES - 8 байт (64 бит, 56 из них значащие)
+
+        // Для RC4 допускаем до 8 байт, для DES - строго 8.
+        if ((alg == 0x21 && (key_len == 0 || key_len > 8)) || (alg == 0x22 && key_len != 8))
         {
-            fprintf(stderr, "[KV-RUNTIME] RC4 key len invalid: %zu (need 1..8 bytes, typically 5)\n", key_len);
+            fprintf(stderr, "[KV-RUNTIME] %s key len invalid: %zu (expected %zu)\n", alg_name, key_len, expected_len);
             return -1;
         }
-        // big-endian сборка как из "%llX"
+
+        // big-endian сборка ключа в 64-битное число
         uint64_t K = 0;
         for (size_t i = 0; i < key_len; i++)
         {
             K = (K << 8) | (uint64_t)key_bytes[i];
         }
+
+        // 1. Установка ключей в стейт (как делает опция -1)
         st->R = K;
-        st->RR = K;
+        st->RR = K; // Дублируем для обоих слотов
 
-        // При желании фиксируем контекст (как делает ручной ввод)
-        st->payload_algid = 0x21;
+        // 2. Установка идентификаторов (для логирования и внутренней логики)
+        st->payload_algid = alg;
+        st->payload_algidR = alg;
         st->payload_keyid = (kid > 0 ? kid : 0);
+        st->payload_keyidR = (kid > 0 ? kid : 0);
 
-        // размьют и отключение keyloader
-        opts->dmr_mute_encL = 0;
-        opts->dmr_mute_encR = 0;
-        st->keyloader = 0;
+        // 3. Установка всех необходимых флагов для размьючивания (из анализа dsd_main.c)
+        opts->dmr_mute_encL = 0;        // Размьют для DMR, слот 1
+        opts->dmr_mute_encR = 0;        // Размьют для DMR, слот 2
+        opts->unmute_encrypted_p25 = 0; // Размьют для P25 (этот флаг вы правильно заметили)
+        st->keyloader = 0;              // Отключаем авто-загрузчик ключей
 
-        fprintf(stderr, "[KV-RUNTIME] RC4 key set: 0x%llX (len=%zu) -> R/RR; kid=%d\n",
-                (unsigned long long)st->R, key_len, st->payload_keyid);
-        return 0;
+        fprintf(stderr, "[KV-RUNTIME] %s key set: 0x%llX (len=%zu) -> R/RR; kid=%d\n",
+                alg_name, (unsigned long long)st->R, key_len, st->payload_keyid);
+
+        return 0; // Успешное применение ключа
     }
 
     if (key_len == 16)
@@ -1576,7 +1588,7 @@ int kv_apply_runtime_key_from_bytes(dsd_opts *opts, dsd_state *st,
         A3 = kv_pack64_be(&key_bytes[16]);
     }
     else
-    { // 32
+    { // 32avr_kv_batch_run
         A1 = kv_pack64_be(&key_bytes[0]);
         A2 = kv_pack64_be(&key_bytes[8]);
         A3 = kv_pack64_be(&key_bytes[16]);
