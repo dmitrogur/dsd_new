@@ -108,6 +108,9 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
         state->payload_keyid = PI_BYTE[2];
         state->payload_mi    = ((unsigned long long int)PI_BYTE[3] << 24ULL) | ((unsigned long long int)PI_BYTE[4] << 16ULL) | ((unsigned long long int)PI_BYTE[5] << 8ULL) | ((unsigned long long int)PI_BYTE[6] << 0ULL);
         
+        if(state->payload_algid < 0x21 || state->payload_algid > 0x25)
+          state->analyzer = 1;
+
         if (state->payload_algid <= 0x26)
         {
           fprintf (stderr, "%s ", KYEL);
@@ -186,6 +189,10 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
         state->payload_algidR = PI_BYTE[0];
         state->payload_keyidR = PI_BYTE[2];
         state->payload_miR    = ((unsigned long long int)PI_BYTE[3] << 24ULL) | ((unsigned long long int)PI_BYTE[4] << 16ULL) | ((unsigned long long int)PI_BYTE[5] << 8ULL) | ((unsigned long long int)PI_BYTE[6] << 0ULL);
+
+        if(state->payload_algidR < 0x21 || state->payload_algidR > 0x25)
+          state->analyzer=1;
+
         if (state->payload_algidR <= 0x26)
         {
           fprintf (stderr, "%s ", KYEL);
@@ -450,7 +457,7 @@ void LFSR128d(dsd_state * state)
         fprintf (stderr, " AES-192;");
       else  
         if (state->payload_algid == 0x25)
-          fprintf (stderr, " AES-128;");
+          fprintf (stderr, " AES-256;");
         else
           fprintf (stderr, " NA;");
 
@@ -482,7 +489,7 @@ void LFSR128d(dsd_state * state)
         fprintf (stderr, " AES-192;");
       else  
         if (state->payload_algidR == 0x25)
-          fprintf (stderr, " AES-128;");
+          fprintf (stderr, " AES-256;");
         else
           fprintf (stderr, " NA;");    state->payload_miR = next_mi;
     //IPP

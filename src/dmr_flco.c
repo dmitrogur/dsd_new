@@ -722,6 +722,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
           // strcat (state->call_string[slot], "-P1");
           fprintf(stderr, "Priority 1 ");
           ippl_adds("flco_info", "Priority 1");//IPP
+          state->Priority1++;
         }
         else if((so & 0x03) == 0x02)
         {
@@ -729,6 +730,8 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
           // strcat (state->call_string[slot], "-P2");
           fprintf(stderr, "Priority 2 ");
           ippl_adds("flco_info", "Priority 2");//IPP
+          state->Priority2++;
+
         }
         else if((so & 0x03) == 0x03)
         {
@@ -736,6 +739,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
           // strcat (state->call_string[slot], "-P3");
           fprintf(stderr, "Priority 3 ");
           ippl_adds("flco_info", "Priority 3");//IPP
+          state->Priority3++;
         }
         else /* We should never go here */
         {
@@ -931,10 +935,10 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     if (type != 3) fprintf (stderr, "\n");
     fprintf (stderr, "%s", KRED);
     fprintf (stderr, " SLOT %d", state->currentslot+1);
-    fprintf (stderr, " FLCO FEC ERR ");
+    fprintf (stderr, " FLCO FEC ERR");
     //IPP
-    ippl_add("err", "1"); 
-    ippl_add("errv", "FLCO FEC ERR"); // IPP_ERR   
+    // ippl_add("err", "1"); 
+    // ippl_add("errv", "FLCO FEC ERR"); // IPP_ERR   
     fprintf (stderr, "%s", KNRM);
     if (slot < 2) state->flco_fec_err[slot] = 1;
   }

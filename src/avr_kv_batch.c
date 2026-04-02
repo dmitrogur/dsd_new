@@ -56,7 +56,6 @@ typedef struct
 extern void aes_ecb_bytewise_payload_crypt(uint8_t *in, uint8_t *key, uint8_t *out, int type, int enc);
 
 //==========================================================================
-
 // 1) Копирование 27-байт пэйлоада по окну из Scout (RAM → локальный буфер).
 //    TODO(Этап 3): реализовать через внутренние буферы SC.hist.
 //    Сейчас возвращаем 0, чтобы не трогать Scout.
@@ -284,7 +283,6 @@ void kv_batch_free(void)
 // где у тебя уже был пайплайн под -jc.
 // Глобальная функция с ИМЕНЕМ, которое ждёт линкер (как в твоём вызове)
 // --- helper: parse ALG token -> ALG_ID (0x24/0x25/0x21/...) ---
-// --- helper: parse ALG token -> ALG_ID (0x24/0x25/...) ---
 static int parse_alg_token(const char *s, int *alg_id_out)
 {
   if (!s || !*s)
@@ -320,7 +318,12 @@ static int parse_alg_token(const char *s, int *alg_id_out)
     *alg_id_out = 0x24;
     return 0;
   }
-  if (strstr(buf, "arc4") || strstr(buf, "rc4"))
+  if (strstr(buf, "des64") || strstr(buf, "des"))
+  {
+    *alg_id_out = 0x22;
+    return 0;
+  }
+  if (strstr(buf, "arc4") || strstr(buf, "rc4") || strstr(buf, "arc"))
   {
     *alg_id_out = 0x21;
     return 0;
@@ -756,14 +759,41 @@ int kv_csv_load_and_filter(const char *csv_path, kv_key_t **out_vec, size_t *out
     }
 
     // Для "aes" (или aes128/192/256) — проверим валидные длины 16/24/32. Иначе можно оставить как есть для не-AES.
-    if (canon_alg &&
-        (strcmp(canon_alg, "aes") == 0 || strncmp(canon_alg, "aes", 3) == 0))
+    // Вместо проверки по имени `canon_alg`, проверяем по `alg_id`.
+    bool len_ok = false;
+    if (alg_id == 0x24 || alg_id == 0x23 || alg_id == 0x25) // AES-128/192/256
     {
-      if (!(keylen == 16 || keylen == 24 || keylen == 32))
+      if (keylen == 16 || keylen == 24 || keylen == 32)
       {
-        // некорректная длина для AES — отбрасываем
-        continue;
+        len_ok = true;
       }
+    }
+    else if (alg_id == 0x22) // DES64
+    {
+      if (keylen == 8)
+      {
+        len_ok = true;
+      }
+    }
+    else if (alg_id == 0x21) // ARC4/RC4
+    {
+      if (keylen >= 5 && keylen <= 16)
+      {
+        len_ok = true;
+      }
+    }
+    else
+    {
+      // Для других алгоритмов, которые могут быть в вашем коде (PC4, BP и т.д.),
+      // оставляем как есть или добавляем их правила. Пока считаем их валидными.
+      len_ok = true;
+    }
+
+    if (!len_ok)
+    {
+      // некорректная длина — отбрасываем
+      fprintf(stderr, "[KV-BATCH] WARN: Invalid key length %zu for alg_id 0x%02X in CSV.\n", keylen, alg_id);
+      continue;
     }
 
     K.key_len = (uint8_t)keylen;
@@ -894,7 +924,7 @@ static inline void aes_ofb_dec_27B_one_sf(uint8_t iv16[16],
 static inline int kv_alg_is_aes_dmra(int alg_id)
 {
   return (alg_id == KV_ALG_AES128 || alg_id == KV_ALG_AES192 || alg_id == KV_ALG_AES256 ||
-          alg_id == 0x21 || alg_id == 0x23 || alg_id == 0x25);
+          alg_id == 0x24 || alg_id == 0x23 || alg_id == 0x25);
 }
 
 // 3) Расшифровка 27B OFB → 27B голосового payload’а (1 SF).
@@ -953,75 +983,6 @@ static void kv_mean_stddev(const float *data, int n, float *mean, float *stddev)
   *mean = (float)(sum / n);
   double var = (sum_sq / n) - (*mean * *mean);
   *stddev = (float)sqrt(fmax(0.0, var));
-}
-
-#define BATCH_MAX_S_VALUES 64
-
-static inline void kv_bits72_to_ambe_enc(const uint8_t b72[72], char ambe_fr[4][24])
-{
-  int k = 0;
-  for (int j = 0; j < 24; j++)
-  {
-    if (j >= 12 && j <= 14)
-      continue; // три служебных столбца
-    // порядок строк 0..3 соответствует live-пути
-    ambe_fr[0][j] = (char)(b72[k++] & 1);
-    ambe_fr[1][j] = (char)(b72[k++] & 1);
-    ambe_fr[2][j] = (char)(b72[k++] & 1);
-    ambe_fr[3][j] = (char)(b72[k++] & 1);
-  }
-}
-
-// Разложить 27 байт (216 бит) суперкадра в три массива по 72 бита (побитово, MSB→LSB).
-// Это просто линейная раскладка без каких-либо «голосовых» перестановок.
-static inline void kv_split_27B_to_3x72bits(const uint8_t enc27[27],
-                                            uint8_t out72[3][72])
-{
-  int bit = 0;
-  for (int i = 0; i < 27; i++)
-  {
-    for (int b = 7; b >= 0; b--)
-    {
-      uint8_t v = (enc27[i] >> b) & 1u;
-      int blk = bit / 72;
-      int ofs = bit % 72;
-      out72[blk][ofs] = v;
-      bit++;
-    }
-  }
-}
-
-static inline void kv_batch_seed_prev_mp_from_scout(dsd_state *st, uint8_t slot)
-{
-  mbe_parms pre;
-  if (avr_scout_get_pre_window_mbe_parms(slot, &pre) == 0)
-  {
-    memcpy(st->prev_mp, &pre, sizeof(mbe_parms));
-  }
-}
-
-static inline void kv_accumulate_frame(dsd_opts *opts, dsd_state *st,
-                                       int slot, uint8_t kid, int alg_id,
-                                       double *s_sum, int *s_cnt,
-                                       int *ok_frames, int *bad_errs2)
-{
-  const int errs2_local = st->errs2;
-  float s_local = 0.0f;
-  kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
-  // kv_after_mbe_core_batch(opts, st, slot, kid, alg_id, s_local, errs2_local);
-  kv_after_mbe_core_batch(opts, st);
-  // kv_after_mbe(opts, st);
-
-  if (errs2_local >= 0 && errs2_local <= 3 && isfinite(s_local))
-  {
-    *s_sum += (double)s_local;
-    *s_cnt += 1;
-    (*ok_frames)++;
-  }
-  else
-  {
-    (*bad_errs2)++;
-  }
 }
 
 // extern-ы у тебя уже есть выше:
@@ -1126,12 +1087,49 @@ static inline void kv_unpack_27B_enc_to_ambe3_strict(const uint8_t enc27[27],
   }
 }
 
+// Новая функция для ARC4/DES
+static inline void kv_unpack_27B_linear_to_ambe3(const uint8_t enc27[27],
+                                                 char fr1[4][24], char fr2[4][24], char fr3[4][24])
+{
+  memset(fr1, 0, 4 * 24);
+  memset(fr2, 0, 4 * 24);
+  memset(fr3, 0, 4 * 24);
 
+  int dibit_index = 0;
+
+  // VF #1: дибиты 0..35
+  for (int i = 0; i < 36; i++)
+  {
+    uint8_t d = kv_get_dibit_from_enc27(enc27, dibit_index++);
+    fr1[rW[i]][rX[i]] = (d >> 1) & 1;
+    fr1[rY[i]][rZ[i]] = d & 1;
+  }
+
+  // VF #2: дибиты 36..71 (ЛИНЕЙНО)
+  for (int i = 0; i < 36; i++)
+  {
+    uint8_t d = kv_get_dibit_from_enc27(enc27, dibit_index++);
+    fr2[rW[i]][rX[i]] = (d >> 1) & 1;
+    fr2[rY[i]][rZ[i]] = d & 1;
+  }
+
+  // VF #3: дибиты 72..107
+  for (int i = 0; i < 36; i++)
+  {
+    uint8_t d = kv_get_dibit_from_enc27(enc27, dibit_index++);
+    fr3[rW[i]][rX[i]] = (d >> 1) & 1;
+    fr3[rY[i]][rZ[i]] = d & 1;
+  }
+}
+
+// 3) Правильная ветка RC4/DES в kv_batch_eval_window (AES-путь не трогаем)
+// ОБНОВЛЕННАЯ СИГНАТУРА БЕЗ enc_window:
+// slot, nsf, kid, alg_id, key_bytes, key_len, start_sf_idx, avg_smooth, ok_frames, bad_errs2
 int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
-                             size_t nsf, uint8_t kid, int alg_id,
-                             const uint8_t *enkey_bytes, int key_len,
-                             uint32_t start_sf_idx,
-                             float *avg_smooth, int *ok_frames, int *bad_errs2)
+                         size_t nsf, uint8_t kid, int alg_id,
+                         const uint8_t *enkey_bytes, int key_len,
+                         uint32_t start_sf_idx,
+                         float *avg_smooth, int *ok_frames, int *bad_errs2)
 {
   if (!opts || !state || !enkey_bytes || !avg_smooth || !ok_frames || !bad_errs2)
     return -1;
@@ -1149,20 +1147,11 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   if (!st)
     return -1;
   memcpy(st, state, sizeof(dsd_state));
-  /*
-  st->cur_mp = (mbe_parms *)calloc(1, sizeof(mbe_parms));
-  st->prev_mp = (mbe_parms *)calloc(1, sizeof(mbe_parms));
-  st->prev_mp_enhanced = (mbe_parms *)calloc(1, sizeof(mbe_parms));
-  if (!st->cur_mp || !st->prev_mp || !st->prev_mp_enhanced)
-  {
-    free(st->cur_mp);
-    free(st->prev_mp);
-    free(st->prev_mp_enhanced);
-    free(st);
-    return -1;
-  }
-  */
-  mbe_initMbeParms(st->cur_mp, st->prev_mp, st->prev_mp_enhanced);
+
+  if (slot)
+    mbe_initMbeParms(st->cur_mp2, st->prev_mp2, st->prev_mp_enhanced2);
+  else
+    mbe_initMbeParms(st->cur_mp, st->prev_mp, st->prev_mp_enhanced);
 
   KVTR("[KV-TRACE] alg_id %d!\n", alg_id);
 
@@ -1170,9 +1159,18 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   if (kv_apply_runtime_key_from_bytes(opts, st, alg_id, enkey_bytes, key_len, (int)kid) != 0)
   {
     KVTR("[KV-TRACE] kv_apply_runtime_key_from_bytes error %d!\n", alg_id);
-    free(st->cur_mp);
-    free(st->prev_mp);
-    free(st->prev_mp_enhanced);
+    if (slot)
+    {
+      free(st->cur_mp2);
+      free(st->prev_mp2);
+      free(st->prev_mp_enhanced2);
+    }
+    else
+    {
+      free(st->cur_mp);
+      free(st->prev_mp);
+      free(st->prev_mp_enhanced);
+    }
     free(st);
     return -1;
   }
@@ -1200,6 +1198,229 @@ int kv_batch_eval_window(dsd_opts *opts, dsd_state *state, int slot,
   {
     memcpy(st->prev_mp, &seed_prev, sizeof(mbe_parms));
     memcpy(st->prev_mp_enhanced, &seed_prev, sizeof(mbe_parms));
+  }
+  // >>> КРИТИЧЕСКОЕ: обнуляем счётчики ОДИН РАЗ перед всей серией из 6×VC* (18 VF)
+  st->DMRvcL = 0;       // считать VF 0..17 как в live
+  st->bit_counterL = 0; // сбросить битовый счётчик OFB только один раз
+
+  double s_sum = 0.0;
+  int s_cnt = 0;
+
+  for (size_t si = 0; si < nsf; ++si)
+  {
+    const uint32_t sf_abs = start_sf_idx + si;
+
+    uint8_t six27[6][27];
+    uint8_t sixIV[6][16];
+    uint8_t mask = 0;
+
+    int rc = avr_scout_get_6x27B_and_6xIV_by_sf((uint8_t)cur_slot, sf_abs, six27, sixIV, &mask);
+    if (rc < 0)
+    {
+      KVTR("[KV-TRACE] sf=%u: no hist entry\n", sf_abs);
+      continue;
+    }
+    // --- ВЕТКА ДЛЯ RC4/DES ---
+    if (alg_id == 0x21 || alg_id == 0x22)
+    {
+      // Цикл по каждому суперфрейму (SF)
+      for (size_t si = 0; si < nsf; ++si)
+      {
+        if (!((mask >> si) & 1))
+          continue;
+
+        // 1. Устанавливаем MI и ПОЛНОСТЬЮ сбрасываем счетчики состояния для каждого SF
+        uint32_t mi = ((uint32_t)sixIV[0][0] << 24) | ((uint32_t)sixIV[0][1] << 16) | ((uint32_t)sixIV[0][2] << 8) | sixIV[0][3];
+        if (cur_slot == 0)
+        {
+          st->payload_mi = mi;
+          st->dmr_so |= 0x40;
+          st->dropL = 0;        // Сброс для RC4
+          st->DMRvcL = 0;       // Сброс для DES
+          st->bit_counterL = 0; // Сброс для DES
+        }
+        else
+        {
+          st->payload_miR = mi;
+          st->dmr_so |= 0x40;
+          st->dropR = 0;        // Сброс для RC4
+          st->DMRvcR = 0;       // Сброс для DES
+          st->bit_counterR = 0; // Сброс для DES
+        }
+
+        // 2. Распаковываем 27 байт в 3 AMBE-кадра
+        char fr1[4][24], fr2[4][24], fr3[4][24];
+        kv_unpack_27B_linear_to_ambe3(six27[si], fr1, fr2, fr3);
+        char *ambe_frames[3] = {(char *)fr1, (char *)fr2, (char *)fr3};
+
+        // 3. Цикл по 3-м кадрам, вызывая ОДНУ И ТУ ЖЕ функцию processMbeFrame
+        for (int vf = 0; vf < 3; ++vf)
+        {
+          char (*ambe)[24] = (char (*)[24])ambe_frames[vf];
+          processMbeFrame(opts, st, NULL, ambe, NULL);
+          kv_after_mbe_core_batch(opts, st);
+          mbe_moveMbeParms(st->cur_mp, st->prev_mp);
+        }
+      }
+    }
+    else // Ветка AES
+    {
+      // 1. Сброс счетчиков ПЕРЕД каждым суперкадром.
+      //    Это заставит processMbeFrame сгенерировать новую гамму.
+      if (st->currentslot == 0)
+      {
+        st->DMRvcL = 0;
+        st->bit_counterL = 0;
+      }
+      else
+      {
+        st->DMRvcR = 0;
+        st->bit_counterR = 0;
+      }
+
+      // 2. Устанавливаем IV ОДИН РАЗ в начале суперкадра.
+      //    Используем IV от первого доступного VC* (обычно sixIV[0]).
+      //    Больше IV внутри этого SF не меняем.
+      if (mask & 0x01)
+      { // Убедимся, что первый VC* доступен
+        if (st->currentslot == 0)
+        {
+          memcpy(st->aes_iv, sixIV[0], 16);
+        }
+        else
+        {
+          memcpy(st->aes_ivR, sixIV[0], 16);
+        }
+      }
+      else
+      {
+        // Если первый VC* пропущен, мы не можем правильно начать дешифрование SF.
+        // Лучше пропустить весь SF.
+        continue;
+      }
+
+      int res = 0;
+
+      for (int b = 0; b < 6; ++b)
+      {
+        if ((mask & (1u << b)) == 0)
+        {
+          KVTR("[KV-TRACE] пропуск неполных VC*\n");
+          continue; // пропуск неполных VC*
+        }
+        // memcpy(st->aes_iv, sixIV[b], 16); // IV per VC*
+        // if(slot==1)
+        // memcpy(st->aes_ivR, sixIV[b], 16);
+        // НЕ СБРАСЫВАТЬ DMRvcL/bit_counterL здесь!
+
+        char fr1[4][24], fr2[4][24], fr3[4][24];
+        kv_unpack_27B_enc_to_ambe3_strict(six27[b], fr1, fr2, fr3);
+        // KVTR("[KV-TRACE] int vf = 0; vf < 3; ++vf\n");
+        for (int vf = 0; vf < 3; ++vf)
+        {
+          char (*ambe)[24] = (vf == 0) ? fr1 : (vf == 1 ? fr2 : fr3);
+          processMbeFrame(opts, st, NULL, ambe, NULL);
+          float s_local = 0.f;
+          // kv_compute_s(st->cur_mp, st->prev_mp, &s_local);
+          res = kv_after_mbe_core_batch(opts, st); // , (slot & 1), kid, (uint8_t)alg_id, s_local, st->errs2);
+
+          mbe_moveMbeParms(st->cur_mp, st->prev_mp);
+        }
+      }
+    }
+  }
+
+  if (s_cnt > 0)
+    *avg_smooth = (float)(s_sum / (double)s_cnt);
+
+  // free(st->cur_mp);
+  // free(st->prev_mp);
+  // free(st->prev_mp_enhanced);
+  free(st);
+  return 0;
+}
+
+int kv_batch_eval_window2(dsd_opts *opts, dsd_state *state, int slot,
+                          size_t nsf, uint8_t kid, int alg_id,
+                          const uint8_t *enkey_bytes, int key_len,
+                          uint32_t start_sf_idx,
+                          float *avg_smooth, int *ok_frames, int *bad_errs2)
+{
+  if (!opts || !state || !enkey_bytes || !avg_smooth || !ok_frames || !bad_errs2)
+    return -1;
+  if (nsf == 0)
+    return -1;
+  if (key_len != 5 && key_len != 16 && key_len != 24 && key_len != 32)
+    return -1;
+
+  *avg_smooth = 0.f;
+  *ok_frames = 0;
+  *bad_errs2 = 0;
+
+  // изолируем стейт
+  dsd_state *st = (dsd_state *)malloc(sizeof(dsd_state));
+  if (!st)
+    return -1;
+  memcpy(st, state, sizeof(dsd_state));
+
+  if (slot)
+    mbe_initMbeParms(st->cur_mp2, st->prev_mp2, st->prev_mp_enhanced2);
+  else
+    mbe_initMbeParms(st->cur_mp, st->prev_mp, st->prev_mp_enhanced);
+
+  KVTR("[KV-TRACE] alg_id %d!\n", alg_id);
+
+  // применяем ключ
+  if (kv_apply_runtime_key_from_bytes(opts, st, alg_id, enkey_bytes, key_len, (int)kid) != 0)
+  {
+    KVTR("[KV-TRACE] kv_apply_runtime_key_from_bytes error %d!\n", alg_id);
+    if (slot)
+    {
+      free(st->cur_mp2);
+      free(st->prev_mp2);
+      free(st->prev_mp_enhanced2);
+    }
+    else
+    {
+      free(st->cur_mp);
+      free(st->prev_mp);
+      free(st->prev_mp_enhanced);
+    }
+    free(st);
+    return -1;
+  }
+  KVTR("[KV-TRACE] kv_apply_runtime_key_from_bytes OK!!! %d!\n", alg_id);
+
+  st->is_simulation_active = 1;
+
+  // слотовая/crypto маркировка
+  st->currentslot = (slot & 1);
+  st->payload_algid = (uint8_t)alg_id;
+  st->payload_algidR = (uint8_t)alg_id;
+  st->H = 1;
+  st->aes_key_loaded[0] = 1;
+  st->aes_key_loaded[1] = 1;
+  st->dmr_so |= 0x40;
+  st->dmr_soR |= 0x40;
+
+  const uint8_t cur_slot = st->currentslot;
+  // const uint8_t cur_keyid = st->currentslot  ? (uint8_t)st->payload_keyidR : (uint8_t)st->payload_keyid;
+
+  // seed prev_mp "до" первого VC*
+  mbe_parms seed_prev;
+  // if (avr_scout_get_pre_window_mbe_parms((uint8_t)cur_slot, start_sf_idx, &seed_prev) == 0)
+  if (avr_scout_get_pre_window_mbe_parms((uint8_t)cur_slot, &seed_prev) == 0)
+  {
+    if (slot)
+    {
+      memcpy(st->prev_mp2, &seed_prev, sizeof(mbe_parms));
+      memcpy(st->prev_mp_enhanced2, &seed_prev, sizeof(mbe_parms));
+    }
+    else
+    {
+      memcpy(st->prev_mp, &seed_prev, sizeof(mbe_parms));
+      memcpy(st->prev_mp_enhanced, &seed_prev, sizeof(mbe_parms));
+    }
   }
   // >>> КРИТИЧЕСКОЕ: обнуляем счётчики ОДИН РАЗ перед всей серией из 6×VC* (18 VF)
   st->DMRvcL = 0;       // считать VF 0..17 как в live
@@ -1423,8 +1644,8 @@ void avr_kv_batch_run(dsd_opts *opts, dsd_state *st)
             opts, st,
             G->slot,            // slot
             (size_t)W->len_sf,  // nsf
-            kid,                // kid (из группы!)
-            G->alg_id,          // alg_id
+            (uint8_t)G->key_id, // kid ИМЕННО из группы
+            K->alg_id,          // alg_id
             K->key, K->key_len, // key bytes/len
             W->start_sf_idx,    // абсолютный старт окна
             &avg_s, &ok, &bad   // метрики окна
@@ -1447,4 +1668,23 @@ void avr_kv_batch_run(dsd_opts *opts, dsd_state *st)
       }
     }
   }
+}
+
+static int kv_apply_runtime_rc4_key(dsd_state *st, int slot, const uint8_t *key5, size_t len, int kid)
+{
+  if (!st || !key5 || len != 5)
+    return -1;
+  uint64_t R = 0;
+  for (size_t i = 0; i < 5; i++)
+    R = (R << 8) | key5[i];
+  if ((slot & 1) == 0)
+    st->R = R;
+  else
+    st->RR = R;
+
+  if ((slot & 1) == 0)
+    st->payload_keyid = (kid > 0 ? kid : 0);
+  else
+    st->payload_keyidR = (kid > 0 ? kid : 0);
+  return 0;
 }

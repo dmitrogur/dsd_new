@@ -90,7 +90,8 @@ extern volatile uint8_t exitflag; //fix for issue #136
 #include <sys/time.h>
 
 // быстрый helper в мс
-static inline long dsd_now_ms(void) {
+typedef int64_t time_ms_t;
+static inline time_ms_t dsd_now_ms(void) {
   struct timeval tv; gettimeofday(&tv, NULL);
   return (long)(tv.tv_sec * 1000LL + tv.tv_usec / 1000);
 }
@@ -338,7 +339,10 @@ typedef enum {
   KV_ALG_AES192 = 9,
   KV_ALG_AES256 = 10,
   KV_ALG_VEDA   = 11,
-  KV_ALG_RETEVIS = 12
+  KV_ALG_RETEVIS = 12,
+  KV_ALG_NULL = 13,  
+  KV_ALG_XOR = 14,  
+  KV_ALG_XOR_2 = 15  
 } kv_alg_filter_t;
 
 kv_alg_filter_t kv_algid_to_filter(uint8_t alg_id, uint8_t key_len);
@@ -366,6 +370,7 @@ typedef struct
   unsigned char SlowData[NB_OF_DPMR_VOICE_FRAME_TO_DECODE];
   unsigned int  ColorCode[NB_OF_DPMR_VOICE_FRAME_TO_DECODE / 2];
 } dPMRVoiceFS2Frame_t;
+
 //
 typedef struct
 {
@@ -448,6 +453,7 @@ typedef struct
   int uvquality;
   int inverted_x2tdma;
   int inverted_dmr;
+  int inverted_nxdn;
   int mod_threshold;
   int ssize;
   int msize;
@@ -461,6 +467,7 @@ typedef struct
   int unmute_encrypted_p25;
   int rtl_dev_index;
   int rtl_gain_value;
+  int rtl_gain_actual;
   int rtl_squelch_level;
   int rtl_volume_multiplier;
   int rtl_udp_port;
@@ -636,7 +643,7 @@ typedef struct
   float kv_stat_thr;
   char kv_batch_scout_dir[512];
   int kv_batch_enable;
-  uint64_t curr_index;                
+  uint64_t curr_index; 
 } dsd_opts;
 
 typedef struct
@@ -769,7 +776,7 @@ typedef struct
   unsigned long long int K2;
   unsigned long long int K3;
   unsigned long long int K4;
-  int M;
+  uint8_t forced_alg_id; 
   int menuopen;
 
   //AES Key Segments
@@ -1024,6 +1031,7 @@ typedef struct
   uint8_t nxdn_sacch_frame_segcrc[4];
   uint8_t nxdn_alias_block_number;
   char nxdn_alias_block_segment[4][4][8];
+  uint16_t nxdn_pn95_seed;  
 
   //site/srv/cch info
   char nxdn_location_category[14];
@@ -1094,11 +1102,17 @@ typedef struct
   char m17_src_str[50];
   char m17_dst_str[50];
 
-  uint8_t m17_meta[16]; //packed meta
-  uint8_t m17_enc;      //enc type
-  uint8_t m17_enc_st;   //scrambler or data subtye
-  int m17encoder_tx;    //if TX (encode + decode) M17 Stream is enabled
-  int m17encoder_eot;   //signal if we need to send the EOT frame
+  uint8_t m17_meta[16];    //packed meta
+  uint8_t m17_aes_iv[16]; //aes iv
+  uint8_t m17_enc;        //enc type
+  uint8_t m17_enc_st;    //scrambler or data subtye     
+  
+  char m17_text_string[1024];
+  char m17_gnss_string[1024];
+  char m17_data_string[1024];
+  char m17_meta_string[1024];
+
+  float m17_viterbi_err;  
 
   //misc str storage
   char str50a[50];
@@ -1128,22 +1142,19 @@ typedef struct
   //anytone bp
   int any_bp;
 
+    //baofeng ap
+  int baofeng_ap;
+
+  //connect systems ee
+  int csi_ee;
+
   //generic ks
   int straight_ks;
   int straight_mod;
-
+  
+  //DMH
   uint8_t static_ks_bits[2][882];
   int static_ks_counter[2];
-
-  //DMH
-  short* sample_block_buffer; // Буфер для хранения блока сэмплов
-  int samples_in_buffer;      // Сколько сэмплов в нем осталось
-  int current_sample_idx;   // Текущий индекс в буфере  
-
-  float timing_error;      // Текущая ошибка фазы (от -0.5 до +0.5 символа)
-  float timing_error_acc;  // Накопленная ошибка (интегратор)
-  float timing_error_avg;  // Средняя ошибка (пропорциональная часть)
-  float dc_offset;
 
   // Добавляем массив для хранения статуса для каждого KID (0-255)
   dmr_key_status_t dmr_key_validation_status[2][256];
@@ -1153,47 +1164,28 @@ typedef struct
   // --- Key Check (DMR) instrumentation  -------------------- // KC++
   uint32_t kc_frames_total[2];     // сколько embedded/LC кадров обработано в текущем суперфрейме
   uint32_t kc_frames_ok[2];        // из них успешно декодированы (FEC/CRC ок) после расшифровки
-  uint32_t kc_uncorrectable[2];    // не исправимые кадры (FEC/CRC fail) после расшифровки
-  // uint32_t kc_corrections_sum;  // суммарные исправления (если решите считать — пока не используется)
-  // uint32_t kc_lc_crc_ok;        // именно LC (embedded) прошёл без ошибок (сильный сигнал «ключ верный»)  
-  // uint8_t kc_alg_id, kc_key_id; // снято из PI (если доступно)  
-
-  int aes_decrypt_success[2]; // [0] для слота 0, [1] для слота 1  
+  uint32_t kc_uncorrectable[2];
   key_verifier_t kv[2]; // [0]=slot1, [1]=slot2
 
-  float kv_smooth_score;
-  uint8_t dmr_payload_decoded_bits[216]; // // для хранения последних дешифрованных 216 бит
-  int kv_payload_bits_filled;
-  int kv_hits_consecutive[2]; 
-  kv_frame_tag_t kv_frame_tag;
-  long kv_prog_t0_ms;                 // старт программы (мс)
-  long kv_key_t0_ms[2][256];          // старт проверки по (slot,kid) (мс)  
+  time_ms_t kv_prog_t0_ms;                 // старт программы (мс)
+  time_ms_t kv_key_t0_ms[2][256];          // старт проверки по (slot,kid) (мс)  
 
-// --- KV CSV ЭНУМЕРАЦИЯ (рантайм) ---
-int      kv_enum_active;            // 0/1 — идёт перебор CSV
-int      kv_enum_real_kid;          // KID из эфира для этой передачи
-int      kv_enum_algid;             // ALGID из эфира для этой передачи (0x24/0x25/ARC4)
-int      kv_enum_cur;               // текущий кандидат в батче 0..kv_enum_count-1
-int      kv_enum_count;             // сколько кандидатов в батче (<=10)
-int      kv_enum_frames;            // сколько кадров проверено у текущего кандидата
-int      kv_enum_hits;              // сколько HIT у текущего кандидата (по smooth окну)
+  bool exit_after_batch;
+  int indx_SF;
+  int is_simulation_active;
+  bool ms_mode;
+  int ngroups;
+  uint8_t flco_fec_err[2];  // 0/1: на текущем SF слота был FLCO FEC ERR
+  int kv_enum_count;
+  int total_sf[2];
+  int total_good[2];
+  bool analyzer;    
+  // VEDA
+  uint16_t Priority1;            
+  uint16_t Priority2;            
+  uint16_t Priority3; 
+  uint16_t irr_err;
 
-// текущий батч из CSV (виртуальные KID 0..9)
-uint8_t  kv_enum_keylen[10];        // 16/24/32 (AES) или N (ARC4)
-uint8_t  kv_enum_keys[10][32];      // ключи батча
-uint8_t  kv_enum_alg[10];           // KV_ALG_* для каждого
-int      kv_enum_csv_index[10];     // индекс строки в исходном CSV для логов
-
-// тайминг на кандидата/запуск
-struct timeval kv_enum_t0_prog;     // старт всего процесса (первый запуск перебора)
-struct timeval kv_enum_t0_key;      // старт текущего кандидата  
-int kv_pi_pending[2];   // [slot] = 1 → только что был PI C-, ждём boundary-apply
-bool exit_after_batch;
-int indx_SF;
-int is_simulation_active;
-bool ms_mode;
-int ngroups;
-uint8_t flco_fec_err[2];  // 0/1: на текущем SF слота был FLCO FEC ERR
 } dsd_state;
 
 /*
@@ -1420,7 +1412,6 @@ int p25_12(uint8_t * input, uint8_t treturn[12]);
 //new p25 lsd fec function
 int p25p1_lsd_fec(uint8_t * input);
 
-void processP25lcw (dsd_opts * opts, dsd_state * state, char *lcformat, char *mfid, char *lcinfo);
 void processHDU (dsd_opts * opts, dsd_state * state);
 void processLDU1 (dsd_opts * opts, dsd_state * state);
 void processLDU2 (dsd_opts * opts, dsd_state * state);
@@ -1493,6 +1484,12 @@ uint16_t crc15(const uint8_t buf[], int len);
 uint16_t crc16cac(const uint8_t buf[], int len);
 uint8_t crc7_scch(uint8_t bits[], int len); //converted from op25 crc6
 
+//libm17 magic soft decision based viterbi
+#define SYM_PER_PLD 184
+void slice_symbols(uint16_t out[2*SYM_PER_PLD], const float inp[SYM_PER_PLD]);
+void randomize_soft_bits(uint16_t inp[SYM_PER_PLD*2]);
+void reorder_soft_bits(uint16_t outp[SYM_PER_PLD*2], const uint16_t inp[SYM_PER_PLD*2]);
+
 /* NXDN Convolution functions */
 void CNXDNConvolution_start(void);
 void CNXDNConvolution_decode(uint8_t s0, uint8_t s1);
@@ -1526,8 +1523,6 @@ void NXDN_decode_site_info(dsd_opts * opts, dsd_state * state, uint8_t * Message
 void NXDN_decode_adj_site(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 //Type-D SCCH Message Decoder
 void NXDN_decode_scch(dsd_opts * opts, dsd_state * state, uint8_t * Message, uint8_t direction);
-
-void dPMRVoiceFrameProcess(dsd_opts * opts, dsd_state * state);
 
 //dPMR functions
 void ScrambledPMRBit(uint32_t * LfsrValue, uint8_t * BufferIn, uint8_t * BufferOut, uint32_t NbOfBitToScramble);
@@ -1828,6 +1823,14 @@ void tyt_ep_aes_keystream_creation(dsd_state * state, char * input);
 void tyt_ap_pc4_keystream_creation(dsd_state * state, char * input);
 void retevis_rc2_keystream_creation(dsd_state *state, char *input);     
 
+void baofeng_ap_pc5_keystream_creation(dsd_state *state, char *input);
+void csi72_ambe2_codeword_keystream(dsd_state * state, char ambe_fr[4][24]);
+
+//Kirisun
+uint32_t kirisun_lfsr(unsigned long long int mi);
+void kirisun_adv_keystream_creation(dsd_state *state);
+void kirisun_uni_keystream_creation(dsd_state *state);
+        
 //Misc Other Encryption Modes
 void ken_dmr_scrambler_keystream_creation(dsd_state * state, char * input);
 void anytone_bp_keystream_creation(dsd_state * state, char * input);

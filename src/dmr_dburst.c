@@ -616,11 +616,11 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   if (IrrecoverableErrors != 0 && databurst != 0x08 && databurst != 0x09) //&& databurst != 0x05
   {
     //IPP
-    ippl_add("err", "1"); 
-    ippl_add("errv", "FEC ERR");
+    // ippl_add("err", "1"); 
+    // ippl_add("errv", "FEC ERR");
 
     fprintf (stderr, "%s", KRED);
-    fprintf(stderr, " (FEC ERR)");
+    fprintf(stderr, " (FEC ERR) %d. \n", IrrecoverableErrors);
     fprintf (stderr, "%s", KNRM);
   }
 

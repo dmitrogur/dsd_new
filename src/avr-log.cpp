@@ -269,32 +269,35 @@ void Record::init(void)
     info = "as="; info += to_string(as);
     info += " err="; info += to_string(err);
 
-    {
 	string b_type = Str("b_type");
-	if(!b_type.empty())
-	    m["b_type"] = to_uppercase(b_type);
-	info += " b_type="; info += b_type;
+    {
+		if(!b_type.empty())
+	    	m["b_type"] = to_uppercase(b_type);
+		info += " b_type="; info += b_type;
     };
     
     if(slot == -1) {
-	if(Str("b_type") == "MS")
-	    slot = 1;
+		if(Str("b_type") == "MS")
+	    	slot = 1;
     };
     info += " slot="; info += to_string(slot);
     
     if(!dmr_check)
 	return;
     
-    if(err)
-	return;
+    //if(err) return;
     
     const string &vp = Str("vp");
+	if(!b_type.empty()) {
+		if(b_type=="bs" || b_type=="ms")
+		dmr_check_count++;
+	}	
     if(vp == "IDLE" || vp == "VLC" || vp == "TLC" || vp == "CSBK")
-	dmr_check_count++;
+		dmr_check_count++;
     else {
-	const string &vc = Str("vc");
-	if(!vc.empty())
-	    dmr_check_count++;
+		const string &vc = Str("vc");
+		if(!vc.empty())
+	    	dmr_check_count++;
     };
 
     if(dmr_check_count < 5)

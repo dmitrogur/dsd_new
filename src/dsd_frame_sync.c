@@ -384,8 +384,18 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               lbuf2[i] = lbuf[i];
             }
           qsort (lbuf2, t_max, sizeof (int), comp);
-          lmin = (lbuf2[1] + lbuf2[2] + lbuf2[3]) / 3;
-          lmax = (lbuf2[t_max - 3] + lbuf2[t_max - 2] + lbuf2[t_max - 1]) / 3;
+          //on shorter sync patterns, we need to look at the edges since we don't have many to pull from
+          if (t_max < 13)
+          {
+            lmin = (lbuf2[0] + lbuf2[1] + lbuf2[2]) / 3;
+            lmax = (lbuf2[t_max - 3] + lbuf2[t_max - 2] + lbuf2[t_max - 1]) / 3;
+          }
+          //on longer sync patterns, we can get more towards the middle and eliminate outlier values
+          else
+          {
+            lmin = (lbuf2[2] + lbuf2[3] + lbuf2[4]) / 3;
+            lmax = (lbuf2[t_max - 5] + lbuf2[t_max - 4] + lbuf2[t_max - 3]) / 3;
+          }  
 
           if (state->rf_mod == 1)
             {
@@ -1290,7 +1300,8 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
 
             }
 
-          //NXDN
+                  #ifdef NXDN_OLD_SYNC
+          //NXDN (previous sync, now a cmake option -DNOS=ON ..)
           else if ((opts->frame_nxdn96 == 1) || (opts->frame_nxdn48 == 1))
           {
             strncpy (synctest10, (synctest_p - 9), 10); //FSW only
@@ -1304,11 +1315,14 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
                 )
             {
 
-              state->offset = synctest_pos;
-              state->max = ((state->max) + lmax) / 2;
-              state->min = ((state->min) + lmin) / 2;
+              //debug
+              // fprintf (stderr, " %s ", synctest10);
+
               if (state->lastsynctype == 28)
               {
+                state->offset = synctest_pos;
+                state->max = ((state->max) + lmax) / 2;
+                state->min = ((state->min) + lmin) / 2;
                 state->last_cc_sync_time = time(NULL);
                 return (28);
               }
@@ -1326,9 +1340,66 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
                     )
             {
 
+              //debug
+              // fprintf (stderr, " %s ", synctest10);
+
+              if (state->lastsynctype == 29)
+              {
+                state->offset = synctest_pos;
+                state->max = ((state->max) + lmax) / 2;
+                state->min = ((state->min) + lmin) / 2;
+                state->last_cc_sync_time = time(NULL);
+                return (29);
+              }
+              state->lastsynctype = 29;
+            }
+          }
+
+          #else //new sync
+          //NXDN (positive sync only)
+          else if (opts->inverted_nxdn == 0 && ((opts->frame_nxdn96 == 1) || (opts->frame_nxdn48 == 1)) )
+          {
+            strncpy (synctest10, (synctest_p - 9), 10); //FSW only
+            if (
+                   (strcmp (synctest10, "3131331131") == 0 ) //this seems to be the most common 'correct' pattern on Type-C
+                || (strcmp (synctest10, "3331331131") == 0 ) //this seems to be the most common 'correct' pattern on Conventional
+                )
+            {
+
               state->offset = synctest_pos;
               state->max = ((state->max) + lmax) / 2;
               state->min = ((state->min) + lmin) / 2;
+
+              //debug
+              // fprintf (stderr, " %s ", synctest10);
+
+              if (state->lastsynctype == 28)
+              {
+                state->last_cc_sync_time = time(NULL);
+                return (28);
+              }
+              state->lastsynctype = 28;
+            }
+
+          }
+
+          //NXDN (inverted sync only)
+          else if (opts->inverted_nxdn == 1 && ((opts->frame_nxdn96 == 1) || (opts->frame_nxdn48 == 1)) )
+          {
+            strncpy (synctest10, (synctest_p - 9), 10); //FSW only
+            if (
+                   (strcmp (synctest10, "1313113313") == 0 ) //this seems to be the most common 'correct' pattern on Type-C
+                || (strcmp (synctest10, "1113113313") == 0 ) //this seems to be the most common 'correct' pattern on Conventional
+               )
+            {
+
+              state->offset = synctest_pos;
+              state->max = ((state->max) + lmax) / 2;
+              state->min = ((state->min) + lmin) / 2;
+
+              //debug
+              // fprintf (stderr, " %s ", synctest10);
+
               if (state->lastsynctype == 29)
               {
                 state->last_cc_sync_time = time(NULL);
@@ -1336,7 +1407,9 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               }
               state->lastsynctype = 29;
             }
+
           }
+          #endif 
 
           //Provoice Conventional -- Some False Positives due to shortened frame sync pattern, so use squelch if possible
           #ifdef PVCONVENTIONAL

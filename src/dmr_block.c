@@ -188,7 +188,7 @@ void dmr_dheader (dsd_opts * opts, dsd_state * state, uint8_t dheader[], uint8_t
       else if (p_mfid == 0x08) { sprintf (mfid_string, "%s", "Hytera");   sprintf (state->dmr_branding, "%s", (char *) mfid_string);  } 
       else if (p_mfid == 0x06) { sprintf (mfid_string, "%s", "Trid/Mot"); sprintf (state->dmr_branding, "%s", (char *) mfid_string);  }
       else if (p_mfid == 0x00) sprintf (mfid_string, "%s", "Standard");
-      else                     sprintf (mfid_string, "%s", "Other");
+      else                     sprintf (mfid_string, "%s", "Other"); 
     }
 
     //udt format string handling
@@ -1204,7 +1204,7 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
         else if (alg == 0)
         {
           uint16_t bp_key = 0;
-          if (state->K != 0) //state->M == 1 &&
+          if (state->K != 0) //state->forced_alg_id == 1 &&
           {
             //load the BP key into the output blocks (only need two)
             bp_key = BPK[state->K];

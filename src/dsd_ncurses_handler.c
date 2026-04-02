@@ -34,10 +34,7 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
 
   //keyboard shortcuts - codes same as ascii codes
   if (c == 10) //Return / Enter key, open menu
-  {
-    if (opts->m17encoder == 0) //don't allow menu if using M17 encoder
-      ncursesMenu (opts, state);
-  }
+    ncursesMenu (opts, state);
 
   //use k and l keys to test tg hold toggles on slots 1 and slots 2
   if (c == 107) //'k' key, hold tg on slot 1 for trunking purposes, or toggle clear
@@ -214,14 +211,14 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
 
   if (c == 52) // '4' key, toggle force privacy key over fid and svc (dmr)
   {
-    if (state->M == 1 || state->M == 0x21) state->M = 0;
-    else state->M = 1;
+    if (state->forced_alg_id == 1 || state->forced_alg_id == 0x21) state->forced_alg_id = 0;
+    else state->forced_alg_id = 1;
   }
 
   if (c == 54) // '6' key, toggle force rc4 key over missing pi header/late entry
   {
-    if (state->M == 1 || state->M == 0x21) state->M = 0;
-    else state->M = 0x21;
+    if (state->forced_alg_id == 1 || state->forced_alg_id == 0x21) state->forced_alg_id = 0;
+    else state->forced_alg_id = 0x21;
   }
 
   if (c == 105) //'i' key, toggle signal inversion on inverted types
@@ -233,7 +230,7 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
       opts->inverted_dpmr = 1;
       opts->inverted_x2tdma = 1;
       opts->inverted_ysf = 1;
-      opts->inverted_m17 = 1;
+      opts->inverted_nxdn = 1;
     }
     else
     {
@@ -241,7 +238,7 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
       opts->inverted_dpmr = 0;
       opts->inverted_x2tdma = 0;
       opts->inverted_ysf = 0;
-      opts->inverted_m17 = 0;
+      opts->inverted_nxdn = 0;
     }
   }
 
@@ -597,7 +594,7 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
     else opts->trunk_tune_enc_calls = 1;
   }
 
-  if (opts->p25_trunk == 1 && c == 103) //'g' key, toggle tune group calls
+  if (opts->p25_trunk == 1 && c == 84) //'T' key, toggle tune group calls
   {
     if (opts->trunk_tune_group_calls == 1) opts->trunk_tune_group_calls = 0;
     else opts->trunk_tune_group_calls = 1;
@@ -888,16 +885,6 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
     else opts->use_hpf_d = 0;
   }
 
-  if (opts->m17encoder == 1 && c == 92) //'\' key - toggle M17 encoder Encode + TX
-  {
-    if (state->m17encoder_tx == 0) state->m17encoder_tx = 1;
-    else state->m17encoder_tx = 0;
-
-    //flag on the EOT marker to send last frame after toggling encoder to zero
-    if (state->m17encoder_tx == 0) state->m17encoder_eot = 1;
-
-  }
-
   if(opts->frame_provoice == 1 && c == 65) //'A' Key, toggle ESK mask 0xA0
   {
     if (state->esk_mask == 0) state->esk_mask = 0xA0;
@@ -930,6 +917,26 @@ uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c)
 
   if (c == 123)
     opts->rtlsdr_ppm_error--;
+
+  //RTL Gain Manual Adjustment
+  if (c == 103)
+  {
+    if (opts->rtl_gain_value > 0)
+    {
+      opts->rtl_gain_value--;
+      opts->rtl_gain_actual = 0;
+    }
+  }
+
+  if (c == 71)
+  {
+    if (opts->rtl_gain_value < 49)
+    {
+      opts->rtl_gain_value++;
+      opts->rtl_gain_actual = 0;
+    }
+  }
+    
 
   //anything with an entry box will need the inputs and outputs stopped first
   //so probably just write a function to handle c input, and when c = certain values

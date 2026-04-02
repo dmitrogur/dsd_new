@@ -36,7 +36,9 @@
 #include "dsd.h"    // dsd_state, dsd_opts, Event_History
 #include "avr_kv.h" // общие типы для Scout/KV (win/group/прототипы)
 
-static const char *SC_VERSION = "dsd-fme_new (v3.1 08.10.25)";
+#define SCOUT_CAN_DEC_DBG true
+
+static const char *SC_VERSION = "dsd-fme_new (v3.3 05.11.25)";
 // ============================== КОНФИГУРАЦИЯ ===============================
 #ifndef AVR_SCOUT_VERBOSE
 #define AVR_SCOUT_VERBOSE DEBUG // подробный лог по ходу работы
@@ -87,7 +89,7 @@ static const char *SC_VERSION = "dsd-fme_new (v3.1 08.10.25)";
 
 // Управление логом:
 #if AVR_SCOUT_VERBOSE
-#define SLOG(fmt, ...) fprintf(stderr, "[scout] " fmt, ##__VA_ARGS__)
+#define SLOG(fmt, ...) fprintf(stderr, "[SCOUT] " fmt, ##__VA_ARGS__)
 #else
 #define SLOG(fmt, ...) \
     do                 \
@@ -190,7 +192,19 @@ const avr_scout_export_t *avr_scout_export(void)
     return &E;
 }
 // ===================== ВСПОМОГАТЕЛЬНЫЕ ПРОТОТИПЫ =====================
+// Кэш для MI, который мы перехватим из dsd_main.c
+static uint32_t g_scout_cached_mi[2] = {0, 0};
 
+// Функция для сохранения MI в кэш
+void avr_scout_cache_mi(int slot, unsigned long long int mi)
+{
+    if (slot < 0 || slot > 1)
+        return;
+    if (mi != 0)
+    {
+        g_scout_cached_mi[slot] = mi;
+    }
+}
 // --- Доступ к полям стейта (слотовые accessor’ы) ---
 static inline uint8_t scout_slot(const dsd_state *st);
 static inline uint8_t scout_algid(const dsd_state *st, uint8_t slot);
@@ -214,7 +228,7 @@ static void scout_record_event_history(dsd_state *st, uint8_t slot, const char *
 static void scout_store_window_payload(dsd_opts *opts, dsd_state *st, const avr_scout_window_ref_t *wref, const uint8_t payload27[][27]);
 
 // --- Финальный отчёт (в консоль) ---
-static void avr_scout_report_summary(bool ms_mode);
+static void avr_scout_report_summary(bool ms_mode, dsd_state *stat);
 
 // по заданному slot/sf_idx находим 27B в кольцевой истории; возвращаем 0 при успехе
 int avr_scout_get_27B_by_sf(uint8_t slot, uint32_t sf_idx, uint8_t out27[27])
@@ -365,22 +379,45 @@ done:
     // Если в твоём тестовом AES-коде порядок другой — здесь легко инвертировать.
     return 0;
 }
+
 // ===================== ГРУППЫ (по ключу Slot/ALG/KEY/TG/SRC) =====================
 
 // Ищет существующую группу или создаёт новую.
 // Возвращает индекс группы (0..ngroups-1) или -1 при переполнении.
 static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid, uint32_t tg)
 {
+
     for (int i = 0; i < SC.ngroups; ++i)
     {
         avr_scout_group_t *G = &SC.groups[i];
-        if (G->slot == slot && G->alg_id == alg && G->key_id == kid && G->tg == tg)
+        SLOG("%d. scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", i, alg, kid, tg, slot);
+        SLOG("%d. scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}, SC.sf_total {%d}  !!!\n\n", i, G->alg_id, G->key_id, G->tg, G->slot, SC.sf_total[slot]);
+        if (G->slot == slot)
         {
-            return i;
+            if (G->alg_id == alg && G->key_id == kid && G->tg == tg)
+            {
+                return i;
+            }
+            if (SC.sf_total[slot] < 3) // для влзможного сбоя
+            {
+                if (G->tg == tg)
+                {
+                    if ((G->alg_id == 0 && alg > 0) && (G->key_id == 0 && kid > 0))
+                    {
+                        SLOG("UPDATE scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", alg, kid, tg, slot);
+                        SLOG("UPDATE scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n\n", G->alg_id, G->key_id, G->tg, G->slot);
+                        G->alg_id = alg;
+                        G->key_id = kid;
+                        return i;
+                    }
+                }
+            }
         }
     }
     if (SC.ngroups >= AVR_SCOUT_MAX_GROUPS)
         return -1;
+
+    // SLOG("\n\nscout_find_or_make_group_key  SC.ngroups {%d}. alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", SC.ngroups, alg, kid, tg, slot);
 
     avr_scout_group_t *G = &SC.groups[SC.ngroups];
     memset(G, 0, sizeof(*G));
@@ -390,6 +427,14 @@ static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid, 
     G->tg = tg;
     // src можно не фиксировать как часть ключа, но можно сохранить последнее встреченное:
     G->src = SC.run[slot].src;
+    G->flco_err_count = 0;
+    G->sf_total = 0;
+    G->sf_total_scan = 0;
+    G->sf_good = 0;
+    G->sf_bad = 0;
+    G->Priority = 0;
+    G->Synctype = 0;
+    G->irr_err = 0;
     return SC.ngroups++;
 }
 
@@ -419,6 +464,7 @@ static void scout_series_extend(uint8_t slot)
     if (r->active && r->len_sf < AVR_SCOUT_MAX_SF)
     {
         r->len_sf++;
+        SLOG("!!!! r->active %u. r->len_sf %u < AVR_SCOUT_MAX_SF\n", r->active, r->len_sf);
     }
 }
 
@@ -467,9 +513,10 @@ void scout_series_finalize_and_store(dsd_opts *opts, dsd_state *st, uint8_t slot
 
     // найти/создать группу по КЛЮЧУ БЕЗ SRC: (Slot, ALG, KID, TG)
     int gi = scout_find_or_make_group_key(slot, alg, kid, tg);
+    /// SLOG("111111 (gi < 0)!!!\n\n");
     if (gi < 0)
     {
-        // SLOG("scout_series_abort  if (gi < 0)!!!\n\n");
+        SLOG("scout_series_abort  if (gi < 0)!!!\n\n");
         scout_series_abort(slot);
         return;
     }
@@ -658,16 +705,18 @@ static void scout_store_window_payload(dsd_opts *opts, dsd_state *st,
 
 // ===================== ФИНАЛЬНЫЙ ОТЧЁТ (В КОНСОЛЬ) =====================
 // Печатает сводку по всем группам и окнам, найденным Scout’ом.
-static void avr_scout_report_summary(bool ms_mode)
+static void avr_scout_report_summary(bool ms_mode, dsd_state *stat)
 {
     unsigned total_groups = (unsigned)SC.ngroups;
-    unsigned total_sf = 0;
-    unsigned total_good = 0;
+    stat->total_sf[0] = 0;
+    stat->total_good[0] = 0;
+    stat->total_sf[1] = 0;
+    stat->total_good[1] = 0;
     for (int i = 0; i < SC.ngroups; ++i)
     {
         const avr_scout_group_t *G = &SC.groups[i];
-        total_sf += G->sf_total;
-        total_good += G->sf_good;
+        stat->total_sf[G->slot] += G->sf_total;
+        stat->total_good[G->slot] += G->sf_good;
     }
     SC.ms_mode = ms_mode;
     if (SC.ngroups > 1)
@@ -675,15 +724,14 @@ static void avr_scout_report_summary(bool ms_mode)
         if (ms_mode)
         {
             fprintf(stderr, "\n MS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
-                    total_groups, total_good, total_sf);
+                    total_groups, (stat->total_good[0] + stat->total_good[1]), (stat->total_sf[0] + stat->total_sf[1]));
         }
         else
         {
             fprintf(stderr, "\n BS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
-                    total_groups, total_good, total_sf);
+                    total_groups, (stat->total_good[0] + stat->total_good[1]), (stat->total_sf[0] + stat->total_sf[1]));
         }
     }
-
     for (int i = 0; i < SC.ngroups; ++i)
     {
         const avr_scout_group_t *G = &SC.groups[i];
@@ -809,7 +857,7 @@ void avr_scout_on_alg_seen(uint8_t slot, uint8_t alg_id, uint8_t key_id)
     SC.pi_le_seen[slot] = 1;
 
     // if (SC.verbose)
-    fprintf(stderr, "[scout] on_alg_seen: slot=%d alg=0x%02X kid=%d\n", slot, alg_id, key_id);
+    fprintf(stderr, "[SCOUT] on_alg_seen: slot=%d alg=0x%02X kid=%d\n", slot, alg_id, key_id);
 }
 
 // Бекфилл текущего SF признаками из PI/LE (когда LC пришёл позже VC*)
@@ -881,9 +929,21 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     (void)opts;
     if (!st)
         return;
+
     // --- 1) Слот и индекс SF ---
     const uint8_t slot = scout_slot(st);
     SC.last_slot = slot;
+    const uint8_t alg_raw = scout_algid(st, slot);
+    const uint8_t kid_raw = scout_keyid(st, slot);
+
+    if (opts->kv_csv_path[0] != '\0')
+    {
+        if (alg_raw == 0 || kid_raw == 0)
+        {
+            SLOG(">>> BREAK slot=%u, alg_raw=%u, kid_raw=%u \n", slot, alg_raw, kid_raw);
+            return;
+        }
+    }
 
     // Правильно: сначала зафиксировать новый индекс SF...
     uint32_t sf_idx = ++SC.sf_idx[slot];
@@ -891,12 +951,12 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
 
     // ...а уже потом при желании обновить "эпоху" (без возврата из функции)
     static uint32_t last_vc18_epoch[2] = {0, 0};
-    const uint32_t vc18_epoch = (slot ? (uint32_t)((st->DMRvcR << 16) ^ sf_idx): (uint32_t)((st->DMRvcL << 16) ^ sf_idx));
+    const uint32_t vc18_epoch = (slot ? (uint32_t)((st->DMRvcR << 16) ^ sf_idx) : (uint32_t)((st->DMRvcL << 16) ^ sf_idx));
     // просто запоминаем — НО НЕ ВОЗВРАЩАЕМСЯ
     last_vc18_epoch[slot] = vc18_epoch;
 
     const int bad_flco = (slot < 2 && st->flco_fec_err[slot]);
-    SLOG(" >>> ENTER sf=%u slot=%u\n", (unsigned)sf_idx, slot);
+    SLOG("\n >>> ENTER sf=%u slot=%u\n", (unsigned)sf_idx, slot);
 
     // --- [SCOUT STATS] базовая статистика по SuperFrame ---
     avr_scout_group_t *G = NULL;
@@ -913,29 +973,11 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
         }
     }
     SC.sf_total[slot]++;
-    if (G)
-    {
-        // Общие SF-счётчики
-        G->sf_total++;
-        G->sf_total_scan++;
-
-        // Проверка FLCO FEC ERR
-        if (st->flco_fec_err[slot])
-        {
-            G->sf_bad++;
-            G->flco_err_count++;
-        }
-        else
-        {
-            G->sf_good++;
-            G->sf_good_scan++;
-            SC.sf_good[slot]++;
-        }
-    }
     // --- [SCOUT STATS END] ---
 
     // --- 2) Кольцевая история: пишем ТОЛЬКО метаданные (без 27B/IV) ---
     const uint32_t wr = SC.hist_wr[slot] % AVR_SCOUT_MAX_SF;
+    // scout_sf_entry_t *current_hist_entry = &SC.hist[slot][wr];
 
     SC.cur_sf_idx[slot] = sf_idx;
     SC.cur_wr[slot] = wr;
@@ -981,16 +1023,24 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
          (unsigned)sf_idx, slot, r->active, r->len_sf);
 
     // --- 4) Сырые признаки из текущего SF ---
-    const uint8_t alg_raw = scout_algid(st, slot);
-    const uint8_t kid_raw = scout_keyid(st, slot);
     const uint32_t tg_raw = scout_tg(st, slot);
     const uint32_t src_raw = scout_src(st, slot);
     const uint8_t can_use_eff = (db_eff_alg_valid[slot] && db_eff_kid_valid[slot]);
 
-    if (tg_raw)
-        SC.last_tg[slot] = tg_raw;
-    if (src_raw)
-        SC.last_src[slot] = src_raw;
+    if (opts->kv_csv_path[0] != '\0') // НЕ МЕНЯТЬ TG
+    {
+        if (SC.last_tg[slot] == 0)
+            SC.last_tg[slot] = tg_raw;
+        if (SC.last_src[slot] == 0)
+            SC.last_src[slot] = src_raw;
+    }
+    else
+    {
+        if (tg_raw)
+            SC.last_tg[slot] = tg_raw;
+        if (src_raw)
+            SC.last_src[slot] = src_raw;
+    }
 
     if (is_good)
         good_streak[slot]++;
@@ -1005,6 +1055,33 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     if (SC.last_tg[slot] == 0 && tg_raw == 0)
         eff_tg = 0;
     uint32_t eff_src = (src_raw != 0) ? src_raw : SC.last_src[slot];
+
+    // Если алгоритм ARC4 или DES, сохраняем 27 байт и IV из MI прямо здесь.
+    // Логика для AES (0x24, 0x25) остается в avr_scout_on_vc, которую dmr_voice вызывает 6 раз.
+
+    if (eff_alg == 0x21 || eff_alg == 0x22)
+    {
+        // --- ШАГ 1: Запись 27 байт (216 бит) в SC.hist ---
+        uint8_t sf27[27];
+        if (scout_pack_27bytes_from_superframe(st, sf27) == 0)
+        {
+            // Пишем именно в индекс VC=0
+            memcpy(SC.hist[slot][wr].data27[0], sf27, 27);
+            // Устанавливаем флаг наличия данных для VC=0
+            SC.hist[slot][wr].have27_mask |= (1 << 0);
+        }
+
+        // --- ШАГ 2: Заполнение IV в SC.hist по веткам ALG ---
+
+        uint32_t mi32 = scout_mi(st, slot); // Получаем MI
+
+        // Формируем iv16: первые 4 байта = MI32 (BE), остальные - нули
+        SC.hist[slot][wr].iv16[0][0] = (uint8_t)(mi32 >> 24);
+        SC.hist[slot][wr].iv16[0][1] = (uint8_t)(mi32 >> 16);
+        SC.hist[slot][wr].iv16[0][2] = (uint8_t)(mi32 >> 8);
+        SC.hist[slot][wr].iv16[0][3] = (uint8_t)(mi32);
+        memset(&SC.hist[slot][wr].iv16[0][4], 0, 12); // Заполняем остаток нулями
+    }
 
     /*
     if(!opts->kv_batch_enable) { // Осторожно - влияет на smoth
@@ -1096,10 +1173,11 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
         {
             // Более корректное сообщение в логе
             SLOG(" series idle (no call info or bad SF) slot=%u sf=%u\n", slot, (unsigned)sf_idx);
-            }
+        }
     }
     else
     {
+        SLOG(" ??? series FINALIZE ? (slot=%u) len=%u, group_changed %d, is_good %d \n", slot, r->len_sf, group_changed, is_good);
         if (!is_good || group_changed || r->len_sf >= AVR_SCOUT_MAX_SF)
         {
             const char *reason = !is_good ? "bad" : (group_changed ? "grp" : "full");
@@ -1124,9 +1202,11 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
 
     // --- 7) Групповые счётчики (ключ без SRC, как у тебя сейчас) ---
 #if AVR_SCOUT_GROUP_STATS
-    /*
+    // Не создаём "пустую" группу, если нет ни TG, ни ALG
+    if (eff_tg != 0 || eff_alg != 0)
     {
         const int gi = scout_find_or_make_group_key(slot, eff_alg, eff_kid, eff_tg);
+        SLOG("const int gi = {%d} !!\n\n", gi);
         if (gi >= 0)
         {
             avr_scout_group_t *G = &SC.groups[gi];
@@ -1137,40 +1217,30 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
             G->sf_total_scan++;
             if (SC.hist[slot][wr].good_scan)
                 G->sf_good_scan++;
-
+            if (st->Priority3 > 0)
+                G->Priority++;
+            if (st->irr_err > 0)
+                G->irr_err++;
+            if (st->irr_err > 0 && (st->Priority1 > 0 || st->Priority2 > 0 || st->Priority3 > 0))
+            {
+                ippl_add("kEncrypted", "1"); // IPP
+                SLOG(" VEDA Priority[%d] irr_err=%u\n", G->Priority, G->irr_err);
+            }
+            G->Synctype = st->synctype;
             SLOG(" grp[%d] sf_total=%u sf_good=%u\n", gi, (unsigned)G->sf_total, (unsigned)G->sf_good);
         }
         else
         {
             SLOG(" warn: group not found/made (slot=%u)\n", slot);
         }
-    }
-    */
-       // Не создаём "пустую" группу, если нет ни TG, ни ALG
-    if (eff_tg != 0 || eff_alg != 0)
-    {
-        const int gi = scout_find_or_make_group_key(slot, eff_alg, eff_kid, eff_tg);
-        if (gi >= 0)
-        {
-            avr_scout_group_t *G = &SC.groups[gi];
-            G->sf_total++;
-            if (is_good) G->sf_good++;
-
-            G->sf_total_scan++;
-            if (SC.hist[slot][wr].good_scan) G->sf_good_scan++;
-
-            SLOG(" grp[%d] sf_total=%u sf_good=%u\n", gi, (unsigned)G->sf_total, (unsigned)G->sf_good);
-        }
-        else
-        {
-            SLOG(" warn: group not found/made (slot=%u)\n", slot);
-        }
+        st->irr_err = 0;
+        st->Priority3 = 0;
     }
 #endif // AVR_SCOUT_GROUP_STATS
 
     SLOG(" <<< EXIT  sf=%u slot=%u post.active=%u post.len=%u\n",
          (unsigned)sf_idx, slot, r->active, r->len_sf);
-    
+
     st->DMRvcL = 0;       // считать VF 0..17 как в live
     st->bit_counterL = 0; // сбросить битовый счётчик OFB только один раз
 
@@ -1178,241 +1248,6 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     SC.hist_wr[slot] = (wr + 1) % AVR_SCOUT_MAX_SF;
 
     // отметка «ключ применён», если контекст совпал (оставлено как у тебя)
-    scout_mark_key_applied_if_match(st, SC.last_slot);
-}
-
-void avr_scout_on_superframe_old(dsd_opts *opts, dsd_state *st)
-{
-    (void)opts;
-    if (!st)
-        return;
-
-    // --- 1) Слот и локальный индекс SF ---
-    const uint8_t slot = scout_slot(st);
-    SC.last_slot = slot;
-    uint32_t sf_idx = ++SC.sf_idx[slot];
-    st->indx_SF = sf_idx;
-
-    const int bad_flco = (slot < 2 && st->flco_fec_err[slot]);
-
-    if (bad_flco)
-    {
-        // 1) ничего не финализируем и не создаём новую группу
-        // 2) учитывай этот SF только в общей статистике, если она у тебя есть (SCAN),
-        //    в KV-окно его НЕ клади (т.е. не увеличивай «good» для KV)
-        // 3) можно добавить короткий лог причины (одноразово/редко):
-        fprintf(stderr, "[scout] slot=%u SF=%u: FLCO FEC ERR -> skip KV, keep series\n", slot, sf_idx);
-        //    return; // или просто «мягкий» пропуск текущего шага расширения серии
-    }
-    // --- 2) Безусловное сохранение контекста в кольцевой буфер ---
-    // Это ключевое изменение: мы сохраняем контекст для КАЖДОГО SF,
-    // чтобы гарантировать непрерывную историю для "горячего старта".
-    const uint32_t wr = SC.hist_wr[slot] % AVR_SCOUT_MAX_SF;
-
-    // prev_mp: снимок ДО первого VF этого KV-SF (как у тебя через cached_prev_mp)
-    // 1. Сохраняем в историю состояние, "запомненное" на ПРЕДЫДУЩЕМ шаге.
-    //    Это и есть правильное состояние ДО обработки текущего кадра.
-    if (sf_idx == 1)
-    {
-        // если у тебя есть явная инициализация mbe — можешь заменить на mbe_initMbeParms(...)
-        // memset(&SC.cached_prev_mp[slot], st->prev_mp, sizeof(mbe_parms));
-        memset(&SC.cached_prev_mp[slot], 0, sizeof(mbe_parms));
-    }
-
-    SC.hist[slot][wr].sf_idx = sf_idx;
-    memcpy(&SC.hist[slot][wr].prev_mp, &SC.cached_prev_mp[slot], sizeof(mbe_parms));
-    // 2. "Запоминаем" ТЕКУЩЕЕ состояние, чтобы использовать его на СЛЕДУЮЩЕМ шаге.
-    memcpy(&SC.cached_prev_mp[slot], st->prev_mp, sizeof(mbe_parms));
-
-    memcpy(SC.hist[slot][wr].iv16, st->aes_iv, 16);
-
-    // ... (остальной код: упаковка sf27, смещение указателя wr) ...
-    // memset(SC.hist[slot][wr].data27, 0, sizeof(SC.hist[slot][wr].data27));
-    // SC.hist[slot][wr].have27_mask = 0;
-
-    uint8_t sf27[27];
-    if (scout_pack_27bytes_from_superframe(st, sf27) == 0)
-    {
-        memcpy(SC.hist[slot][wr].data27, sf27, 27);
-    }
-
-    uint8_t is_good = 0;
-    is_good = scout_errs2_good(st, slot);
-
-    SC.hist[slot][wr].good_kv = is_good;                // строгий флаг
-    SC.hist[slot][wr].good_scan = (bad_flco == 0);      // мягкий флаг (пока без дебаунса)
-    SC.hist[slot][wr].good = SC.hist[slot][wr].good_kv; // алиас на старое .good
-    // --- 4) Безусловное смещение указателя ---
-    // Указатель смещается всегда, чтобы следующий SF писал в новую ячейку.
-    SC.hist_wr[slot] = (wr + 1) % AVR_SCOUT_MAX_SF;
-    // Диагностика заполнения кольца и «годной» серии
-    scout_run_t *r = &SC.run[slot];
-    uint32_t fill = (SC.sf_idx[slot] < AVR_SCOUT_MAX_SF) ? SC.sf_idx[slot] : AVR_SCOUT_MAX_SF;
-    SLOG("hist slot=%u fill=%u/%u | ready6=%u ready8=%u\n",
-         slot, (unsigned)fill, (unsigned)AVR_SCOUT_MAX_SF,
-         (unsigned)(fill >= 6), (unsigned)(fill >= 8));
-
-    SLOG("series slot=%u len_sf=%u active=%u | good_ready6=%u good_ready8=%u\n",
-         slot, (unsigned)r->len_sf, (unsigned)r->active,
-         (unsigned)(r->len_sf >= 6), (unsigned)(r->len_sf >= 8));
-
-// --- 5) Остальная логика анализа серий (остается без изменений) ---
-#if AVR_SCOUT_DIAG
-    SLOG(" >>> ENTER sf=%u slot=%u pre.active=%u pre.len=%u\n", (unsigned)sf_idx, slot, r->active, r->len_sf);
-#endif
-    // --- 3) «сырые» признаки из текущего SF ---
-    const uint8_t alg_raw = scout_algid(st, slot);
-    const uint8_t kid_raw = scout_keyid(st, slot);
-    const uint32_t tg_raw = scout_tg(st, slot);
-    const uint32_t src_raw = scout_src(st, slot);
-
-    // Обновим last_* при ненулевых
-    if (tg_raw)
-        SC.last_tg[slot] = tg_raw;
-    if (src_raw)
-        SC.last_src[slot] = src_raw;
-
-    // --- 4) ЭФФЕКТИВНЫЕ признаки (VC часто несут нули) ---
-    // --- 5) Эффективные признаки VC часто несут нули) ---
-    uint8_t  eff_alg = alg_raw;
-    uint8_t  eff_kid = kid_raw;
-    uint32_t eff_tg  = (tg_raw != 0) ? tg_raw  : SC.last_tg[slot];
-    if (SC.last_tg[slot] == 0 && tg_raw == 0) eff_tg = 0;
-    uint32_t eff_src = (src_raw != 0) ? src_raw : SC.last_src[slot];
-
-    // если raw пустые — берём из «эффективной» БД (то, что накинули из PI/LE/FLCO)
-    if (eff_alg == 0 && db_eff_alg_valid[slot]) eff_alg = db_eff_alg[slot];
-    if (eff_kid == 0 && db_eff_kid_valid[slot]) eff_kid = db_eff_kid[slot];
-    if (eff_tg  == 0 && db_eff_tg_valid[slot])  eff_tg  = db_eff_tg[slot];
-    // if (eff_src == 0 && db_eff_src_valid[slot]) eff_src = db_eff_src[slot];
-
-    // фиксируем last_* если что-то подтянули из БД
-    if (eff_tg)  SC.last_tg[slot]  = eff_tg;
-    // if (eff_src) SC.last_src[slot] = eff_src;    
-
-    // --- 5) Критерий «годный/негодный» SF ---
-
-#if AVR_SCOUT_FIND_GOOD_REGIONS
-#if AVR_SCOUT_ACCEPT_ALL_ENC_VC
-    if (!is_good)
-    {
-        const uint8_t enc_ctx = (alg_raw != 0) || (r->active && r->alg_id != 0);
-        if (enc_ctx)
-            is_good = 1;
-    }
-#endif
-#endif
-
-#if AVR_SCOUT_DIAG
-    SLOG(" sf=%u/%u slot=%u alg(raw/eff)=0x%02X/0x%02X kid(raw/eff)=%u/%u "
-         "tg(raw/eff)=%u/%u src(raw/eff)=%u/%u good=%u\n",
-         (unsigned)sf_idx, st->indx_SF, slot,
-         alg_raw, eff_alg, kid_raw, eff_kid,
-         tg_raw, eff_tg, src_raw, eff_src, is_good);
-#endif
-
-    // --- 6) Управление серией (только на eff_* признаках) ---
-#if AVR_SCOUT_FIND_GOOD_REGIONS
-    const uint8_t group_changed =
-        (r->active) &&
-        (r->alg_id != eff_alg || r->key_id != eff_kid || r->tg != eff_tg);
-
-#if AVR_SCOUT_DIAG
-    if (r->active && group_changed)
-    {
-        SLOG(" group_changed: was alg=0x%02X kid=%u tg=%u src=%u "
-             "→ now alg=0x%02X kid=%u tg=%u src=%u\n",
-             r->alg_id, r->key_id, r->tg, r->src,
-             eff_alg, eff_kid, eff_tg, eff_src);
-    }
-#endif
-
-    if (!r->active)
-    {
-        if (is_good  && (eff_tg != 0))
-        {
-            scout_series_start(slot, eff_alg, eff_kid, eff_tg, eff_src, sf_idx);
-#if AVR_SCOUT_DIAG
-            SLOG(" series START (slot=%u) len=1\n", slot);
-#endif
-        }
-#if AVR_SCOUT_DIAG
-        else
-        {
-            SLOG(" series idle (bad SF) slot=%u sf=%u\n", slot, (unsigned)sf_idx);
-        }
-#endif
-    }
-    else
-    {
-        if (!is_good || group_changed || r->len_sf >= AVR_SCOUT_MAX_SF)
-        {
-#if AVR_SCOUT_DIAG
-            const char *reason = !is_good ? "bad" : (group_changed ? "grp" : "full");
-            SLOG(" series FINALIZE (slot=%u) len=%u reason=%s\n",
-                 slot, r->len_sf, reason);
-#endif
-            // добавит окно, если r->len_sf >= AVR_SCOUT_MIN_SF и сбросит r->active=0
-            scout_series_finalize_and_store(opts, st, slot);
-
-            if (is_good)
-            {
-                scout_series_start(slot, eff_alg, eff_kid, eff_tg, eff_src, sf_idx);
-#if AVR_SCOUT_DIAG
-                SLOG(" series RE-START (slot=%u) len=1\n", slot);
-#endif
-            }
-        }
-        else
-        {
-            scout_series_extend(slot);
-#if AVR_SCOUT_DIAG
-            SLOG(" series EXTEND (slot=%u) len=%u\n", slot, r->len_sf);
-#endif
-        }
-    }
-#endif // AVR_SCOUT_FIND_GOOD_REGIONS
-
-    // --- 7) Групповые счётчики (на eff_*) ---
-#if AVR_SCOUT_GROUP_STATS
-    {
-        const int gi = scout_find_or_make_group_key(slot, eff_alg, eff_kid, eff_tg);
-        if (gi >= 0)
-        {
-            avr_scout_group_t *G = &SC.groups[gi];
-            G->sf_total++;
-            if (is_good)
-                G->sf_good++;
-            G->sf_total_scan++;
-            if (SC.hist[slot][wr].good_scan)
-                G->sf_good_scan++;
-#if AVR_SCOUT_DIAG
-            SLOG(" grp[%d] sf_total=%u sf_good=%u\n", gi, (unsigned)G->sf_total, (unsigned)G->sf_good);
-#endif
-        }
-#if AVR_SCOUT_DIAG
-        else
-        {
-            SLOG(" warn: group not found/made (slot=%u)\n", slot);
-        }
-#endif
-    }
-#endif // AVR_SCOUT_GROUP_STATS
-
-  st->DMRvcL = 0;       // считать VF 0..17 как в live
-  st->bit_counterL = 0; // сбросить битовый счётчик OFB только один раз
-
-#if AVR_SCOUT_DIAG
-    SLOG(" <<< EXIT  sf=%u slot=%u post.active=%u post.len=%u\n", (unsigned)sf_idx, slot, r->active, r->len_sf);
-#endif
-
-    // --- 8) (опц.) открытые участки ---
-#if AVR_SCOUT_DECODE_CLEAR
-    if (eff_alg == 0x00)
-    {
-        // TODO: путь декодирования clear-участков
-    }
-#endif
     scout_mark_key_applied_if_match(st, SC.last_slot);
 }
 
@@ -1453,9 +1288,14 @@ void avr_scout_on_lc_update(dsd_state *st, uint8_t slot, uint32_t tg, uint32_t s
 // Завершает работу Scout по окончании голоса/потока.
 void avr_scout_finalize_series(dsd_opts *opts, dsd_state *st)
 {
-    for (uint8_t slot = 0; slot < 2; ++slot)
-        if (SC.run[slot].active)
-            scout_series_finalize_and_store(opts, st, slot);
+    uint8_t slot = st->currentslot;
+    if(opts->kv_csv_path[0]!='0' && SC.sf_idx>=6) {
+        return;
+    }
+
+    SLOG("\n\n avr_scout_finalize_series %u !!!\n\n", slot);
+    if (SC.run[slot].active) 
+        scout_series_finalize_and_store(opts, st, slot);
 }
 
 // форсируем добавление окна из текущей (незавершённой) серии на заданном слоте
@@ -1470,6 +1310,7 @@ static void scout_force_window_on_flush(dsd_opts *opts, dsd_state *st, uint8_t s
         return; // серии нет или пустая
 
     // найдём/создадим группу под признаки незавершённой серии
+    // printf("3333 r->alg_id {%d} !!!\n\n", r->alg_id);
     const int gi = scout_find_or_make_group_key(slot, r->alg_id, r->key_id, r->tg);
     if (gi < 0)
         return;
@@ -1505,10 +1346,12 @@ bool avr_scout_is_series_ready(uint8_t slot)
 {
     if (slot > 1)
         return false;
+    fprintf(stderr, "[SCOUT] avr_scout_is_series_ready\n");
     // «Готово» = уже создано >=1 окна в любой из групп этого слота
     for (int g = 0; g < SC.ngroups; ++g)
     {
         const avr_scout_group_t *grp = &SC.groups[g];
+        fprintf(stderr, "[SCOUT] %d. grp->slot %d.  grp->nwins %d\n", g, grp->slot, grp->nwins);
         if (grp->slot == slot && grp->nwins > 0)
             return true;
     }
@@ -1521,20 +1364,36 @@ void avr_scout_flush(dsd_opts *opts, dsd_state *st, bool ms_mode)
     // сначала попытаемся штатно финализировать серии (закроет длинные)
     if (SC.ngroups < 0 || SC.ngroups > AVR_SCOUT_MAX_GROUPS)
     {
-        fprintf(stderr, "[scout] WARN: SC.ngroups out-of-range (%d), resetting internal SC\n", SC.ngroups);
+        fprintf(stderr, "[SCOUT] WARN: SC.ngroups out-of-range (%d), resetting internal SC\n", SC.ngroups);
         memset(&SC, 0, sizeof(SC));
         memset(SC_prev_mp, 0, sizeof(SC_prev_mp));
     }
+
+    SLOG("SC.sf_idx[%u] = %d\n", st->currentslot, SC.sf_idx[st->currentslot]);
+
+    if (opts->kv_csv_path[0] != '\0' && ms_mode == 0)
+    { // ДЛЯ BS
+        if (SC.sf_idx[st->currentslot] < 6)
+        {
+            SLOG("\n avr_scout_flush STOP ms_mode=%d\n", ms_mode);
+            SC.ngroups = 0;
+            SC.sf_idx[st->currentslot] = 0;
+        }
+        else
+            return;
+    }
     // сначала попытаемся штатно финализировать серии (закроет длинные)
     avr_scout_finalize_series(opts, st);
+
     st->ms_mode = ms_mode;
     // защищённая запись в внешний стейт
     st->ngroups = (SC.ngroups < 0 || SC.ngroups > AVR_SCOUT_MAX_GROUPS) ? 0 : SC.ngroups;
+
     // затем, если остались короткие незавершённые — форсируем по одному окну на слот
     scout_force_window_on_flush(opts, st, 0);
     scout_force_window_on_flush(opts, st, 1);
     // и уже потом печатаем сводку (теперь wins не будет 0 на коротком файле)
-    avr_scout_report_summary(ms_mode);
+    avr_scout_report_summary(ms_mode, st);
 }
 // Отладочный дамп (можно вызывать в любом месте для быстрого просмотра стейта).
 void avr_scout_dump_groups(dsd_opts *opts, dsd_state *st)
@@ -1560,14 +1419,20 @@ int avr_scout_has_series_with_min_sf(uint8_t slot, uint8_t min_sf)
 #if AVR_SCOUT_FIND_GOOD_REGIONS
     // 1) проверяем «живую» серию на слоте
     const scout_run_t *r = &SC.run[slot];
+    SLOG("???? if (r->active %d && r->len_sf %d >= min_sf %d) \n", r->active, r->len_sf, min_sf);
     if (r->active && r->len_sf >= min_sf)
         return 1;
+
 #endif
 #if AVR_SCOUT_GROUP_STATS
     // 2) проверяем уже сохранённые окна в группах
     for (int gi = 0; gi < SC.ngroups; ++gi)
     {
         const avr_scout_group_t *G = &SC.groups[gi];
+        SLOG("???? grp[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u sf=%u/%u wins=%u\n",
+             gi, G->slot, G->alg_id, G->key_id, G->tg, G->src,
+             (unsigned)G->sf_good, (unsigned)G->sf_total, G->nwins);
+
         if (G->slot != slot)
             continue;
         for (int w = 0; w < G->nwins; ++w)
@@ -1819,7 +1684,7 @@ static void fill_report_from_internal_group(int gi,
     scout_sf_stat_t *buf = (scout_sf_stat_t *)calloc(expected, sizeof(scout_sf_stat_t));
     if (!buf)
     {
-        fprintf(stderr, "[scout] WARN: no memory for sf_buf (group %d)\n", gi);
+        fprintf(stderr, "[SCOUT] WARN: no memory for sf_buf (group %d)\n", gi);
         return;
     }
 
@@ -1888,7 +1753,7 @@ static inline int scout_can_decrypt_fallback(const avr_scout_group_t *G)
 {
     if (G->alg_id == 0x00)
         return 0; // открытая — 0
-    if (G->sf_good >= 6)
+    if (G->sf_good >= AVR_SCOUT_VC_PER_SF)
         return 1; // достаточно good-SF в принципе
     return 0;
 }
@@ -1906,6 +1771,65 @@ static int compute_can_decrypt(uint8_t alg_id,
 
 // Возвращает 1, если в группе gi есть 6 подряд SF с errs2 <= 2, иначе 0.
 // Если группа открытая (alg_id == 0x00) — всегда 0.
+#ifndef SCOUT_SF_IS_GOOD
+// при необходимости поменяй на ((e)->is_good) или ((e)->kv_ok)
+#define SCOUT_SF_IS_GOOD(e) ((e)->good)
+#endif
+
+static int scout_can_decrypt_for_group2(int gi)
+{
+    if (gi < 0 || gi >= SC.ngroups)
+        return 0;
+
+    const avr_scout_group_t *G = &SC.groups[gi];
+    if (G->alg_id == 0x00)
+        return 0;
+
+    // меньше 6 SF – сразу нет
+    if (G->sf_total < AVR_SCOUT_MAX_SF)
+        return 0;
+
+    uint32_t run = 0;
+
+    for (uint8_t w = 0; w < G->nwins; ++w)
+    {
+        const avr_scout_window_ref_t *W = &G->win[w];
+        const uint32_t start_sf_idx = W->start_sf_idx;
+        const uint32_t len_sf = W->len_sf;
+
+        for (uint32_t k = 0; k < len_sf; ++k)
+        {
+            const uint32_t sf_i = start_sf_idx + k;
+
+            int have_hist = 0, is_good = 0;
+
+            // ищем sf_i в истории слота
+            for (uint32_t j = 0; j < AVR_SCOUT_MAX_SF; ++j)
+            {
+                const scout_sf_entry_t *e = &SC.hist[G->slot][j];
+                if (e->sf_idx == sf_i)
+                {
+                    have_hist = 1;
+                    is_good = SCOUT_SF_IS_GOOD(e) ? 1 : 0;
+                    break;
+                }
+            }
+
+            // строго: отсутствие записи = обрыв последовательности
+            if (!have_hist || !is_good)
+            {
+                run = 0;
+            }
+            else
+            {
+                if (++run >= AVR_SCOUT_MAX_SF)
+                    return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 static int scout_can_decrypt_for_group(int gi)
 {
     if (gi < 0 || gi >= SC.ngroups)
@@ -1913,19 +1837,18 @@ static int scout_can_decrypt_for_group(int gi)
     const avr_scout_group_t *G = &SC.groups[gi];
     if (G->alg_id == 0x00)
         return 0;
-
     // КОРОТКИЕ ГРУППЫ: если меньше 6 SF, то "можно подбирать",
     // только если все имеющиеся SF хорошие
-    if (G->sf_total < 6)
+    if (G->sf_good < AVR_SCOUT_VC_PER_SF)
     {
         int ok = (G->sf_total > 0 && G->sf_good == G->sf_total) ? 1 : 0;
 #if SCOUT_CAN_DEC_DBG
         fprintf(stderr, "[SCOUT] can_decrypt(short) gi=%d slot=%u sf_total=%u sf_good=%u -> %d\n",
                 gi, G->slot, G->sf_total, G->sf_good, ok);
 #endif
-        return ok;
+        // return ok;
+        return false;
     }
-
     // Попробуем по окнам пройтись покадрово (если good сохранён в hist)
     uint32_t run = 0;
     for (uint8_t w = 0; w < G->nwins; ++w)
@@ -1944,7 +1867,6 @@ static int scout_can_decrypt_for_group(int gi)
                 if (e->sf_idx == sf_i)
                 {
                     have_hist = 1;
-                    // поправь имя поля good/is_good/kv_ok
                     is_good = e->good ? 1 : 0;
                     break;
                 }
@@ -1956,7 +1878,7 @@ static int scout_can_decrypt_for_group(int gi)
             }
             if (is_good)
             {
-                if (++run >= 6)
+                if (++run >= AVR_SCOUT_VC_PER_SF)
                     return 1;
             }
             else
@@ -1968,12 +1890,13 @@ static int scout_can_decrypt_for_group(int gi)
     // Не нашли подряд — используем фолбэк (например, твой кейс 42/42)
     return scout_can_decrypt_fallback(G);
 }
+
 // ---------- Печать одной группы в JSON (с «quality» в процентах) ----------
-static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi, int need_comma)
+static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi, int need_comma, int mfid, int veda)
 {
     if (G->tg == 0)
         return;
-    char alg_hex[6], key_hex[6];
+    char alg_hex[AVR_SCOUT_VC_PER_SF], key_hex[AVR_SCOUT_VC_PER_SF];
     hex_u8_str(alg_hex, G->alg_id);
     hex_u8_str(key_hex, G->key_id);
 
@@ -1992,27 +1915,38 @@ static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi
     uint32_t sf_bad = 0;
     if (G->sf_total > G->sf_good)
         sf_bad = G->sf_total - G->sf_good;
-
+    int curr_alg = 0;
+    if (G->alg_id == 0x00 && mfid == -1)
+    {
+        if (G->sf_good > 4)
+        {
+            if (veda)
+            {
+                if ((G->Priority * 10 > G->sf_good * 8) || (G->irr_err * 10 > G->sf_good * 8))
+                    curr_alg = 0xEF;
+            }
+            else
+            {
+                if ((G->Priority * 10 > G->sf_good * 8) && (G->irr_err * 10 > G->sf_good * 8))
+                    curr_alg = 0xEF;
+            }
+        }
+    }
     // alg_name
     const char *alg_name =
-        (G->alg_id == 0x25) ? "AES-256" : (G->alg_id == 0x24) ? "AES-128"
-                                      : (G->alg_id == 0x21)   ? "RC4"
-                                      : (G->alg_id == 0x22)   ? "DES64"
-                                      : (G->alg_id == 0x23)   ? "AES-192"
-                                      : (G->alg_id == 0x23)   ? "Kirisan BP"
-                                      : (G->alg_id == 0xFC)   ? "TYT BP"
-                                      : (G->alg_id == 0xFD)   ? "TYT PC4"
-                                      : (G->alg_id == 0xFE)   ? "TYT EP"
-                                      : (G->alg_id == 0xD1)   ? "LIRA"
-                                      : (G->alg_id == 0xD2)   ? "LIRA"
-                                      : (G->alg_id == 0xEF)   ? "VEDA"
-                                      : (G->alg_id == 0x00)   ? "Clear"
-                                                              : "Unknown";
-
-    // decrypt: 0=open; 1=ключ применён; 2=encrypted, ключ не применён
-    int decrypt = (G->alg_id == 0x00) ? 0 : (G->key_applied_confirmed ? 1 : 2);
-    // can_decrypt — строго по твоей функции:
-    int can_decrypt = scout_can_decrypt_for_group(gi);
+        (G->alg_id == 0x25) ? "AES-256" : (G->alg_id == 0x24)                   ? "AES-128"
+                                      : (G->alg_id == 0x21)                     ? "RC4"
+                                      : (G->alg_id == 0x22)                     ? "DES64"
+                                      : (G->alg_id == 0x23)                     ? "AES-192"
+                                      : (G->alg_id == 0x26)                     ? "Kirisan BP"
+                                      : (G->alg_id == 0xFC)                     ? "TYT BP"
+                                      : (G->alg_id == 0xFD)                     ? "TYT PC4"
+                                      : (G->alg_id == 0xFE)                     ? "TYT EP"
+                                      : (G->alg_id == 0xD1)                     ? "XOR"
+                                      : (G->alg_id == 0xD2)                     ? "LIRA"
+                                      : (curr_alg == 0xEF || G->alg_id == 0xEF) ? "VEDA"
+                                      : (G->alg_id == 0x00)                     ? "Clear"
+                                                                                : "Unknown";
     // int quality_percent = 0;
     uint32_t duration_ms = G->sf_total * 540; // DMR_MS_PER_SUPERFRAME = 540 мс
 
@@ -2050,56 +1984,19 @@ static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi
         strcat(reason, "pi_crc_low");
     }
 
-    // 2) Ключ/дешифрование
-    if (!G->key_applied_confirmed && decrypt == 2)
-    {
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "key_not_applied");
-    }
-    if (can_decrypt && decrypt == 2)
-    {
-        // KV сказал “можно”, но ключ не применён → хороший индикатор отличить «не настроено» от «битый сигнал»
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "kv_possible_key_missing");
-    }
-
     // 3) Качество KV против SCAN
     int q_scan = (G->sf_total_scan > 0) ? (int)floor(0.5 + 100.0 * (double)G->sf_good_scan / (double)G->sf_total_scan) : 0;
     int q_kv = (G->sf_total_kv > 0) ? (int)floor(0.5 + 100.0 * (double)G->sf_good_kv / (double)G->sf_total_kv) : 0;
-
-    if (G->sf_total_kv == 0 && G->sf_total_scan >= 6 && q_scan >= 90)
-    {
-        // Скан хороший/длинный, а строгий KV пуст — типично для “битых заголовков”
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "no_kv_good_scan");
-    }
-    if (G->sf_bad > 0 || G->flco_err_count > 0)
-    {
-        // Явно видны ошибки в потоке
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "flco_err");
-    }
-
-    // 4) Длина серии/участка
-    if (G->sf_total < 6)
-    {
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "short_run");
-    }
-
-    // 5) MI-нестабильность
-    if (G->mi_mismatch_count > 0)
-    {
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "mi_mismatch");
-    }
     // «короткий участок» — мягкий сигнал, только если при этом скан-качество 100%
     uint32_t quality_scan = (G->sf_total_scan > 0) ? (int)floor(0.5 + 100.0 * (double)G->sf_good_scan / (double)G->sf_total_scan) : 0;
-    if (quality_scan == 100 && G->sf_total < 6)
-    {
-        strcat(reason, (reason[0] ? "; " : ""));
-        strcat(reason, "short_run");
-    }
+    uint32_t quality = (G->sf_total > 6) ? (uint32_t)lround(100.0 * (double)G->sf_good / (double)G->sf_total) : 0;
+
+    // decrypt: 0=open; 1=ключ применён; 2=encrypted, ключ не применён
+    int decrypt = (G->alg_id == 0x00 && curr_alg == 0) ? 0 : (G->key_applied_confirmed ? 1 : 2);
+    // can_decrypt — строго по твоей функции:
+    // int can_decrypt = scout_can_decrypt_for_group(gi);
+    int can_decrypt = ((mfid == -1 || quality < 70) ? 0 : scout_can_decrypt_for_group(gi));
+
     // Печать JSON (поля и порядок — как в твоём примере)
     fprintf(f,
             "    {\n"
@@ -2122,6 +2019,9 @@ static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi
             "      \"sf_total_kv\": %u,\n"
             "      \"sf_good_kv\": %u,\n"
             "      \"quality_kv\": %u,\n"
+            "      \"Synctype\": %u,\n"
+            "      \"Priority\": %u,\n"
+            "      \"irr_err\": %u,\n"
             "\n"
             "      \"flco_err_count\": %u,\n"
             "      \"le_seen\": %s,\n"
@@ -2154,7 +2054,7 @@ static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi
             (unsigned)G->sf_total,
             (unsigned)G->sf_good,
             (unsigned)sf_bad,
-            (unsigned)quality_scan,
+            (unsigned)quality,
 
             (unsigned)G->nwins,
             (unsigned)G->key_applied_confirmed,
@@ -2162,6 +2062,9 @@ static void json_write_one_group_ext(FILE *f, const avr_scout_group_t *G, int gi
             (unsigned)G->sf_total_kv,
             (unsigned)G->sf_good_kv,
             (unsigned)quality_kv,
+            (unsigned)G->Synctype,
+            (unsigned)G->Priority,
+            (unsigned)G->irr_err,
 
             (unsigned)G->flco_err_count,
             G->le_seen ? "true" : "false",
@@ -2196,27 +2099,142 @@ void avr_scout_write_json_summary_ext(const char *path, dsd_opts *opts, dsd_stat
     FILE *f = fopen(path, "w");
     if (!f)
     {
-        fprintf(stderr, "[scout] ERROR: cannot open %s for write\n", path);
+        fprintf(stderr, "[SCOUT] ERROR: cannot open %s for write\n", path);
         return;
     }
 
+    int Brand = 0;
     // slots_used и flco_err_total считаем по группам, без новых полей в SC
     unsigned slots_mask = 0;
     uint32_t flco_err_total = 0;
+    int valid_pairs_cnt = 0; // Количество пар, не содержащих нулей
+    int unique_cnt = 0;      // Количество уникальных пар среди валидных
     for (int gi = 0; gi < SC.ngroups; ++gi)
     {
         const avr_scout_group_t *G = &SC.groups[gi];
         slots_mask |= (1u << (G->slot & 1));
         flco_err_total += G->flco_err_count;
-    }
+        if (G->alg_id > 0)
+        {
+            if (G->alg_id < 0x21 || G->alg_id > 0x25)
+            {
+                if (G->alg_id < 0xFC)
+                    stat->analyzer = 1;
+                if (G->alg_id == 0x26)
+                {
+                    Brand = 3; // kirisan
+                }
+                else if (G->alg_id == 0xD2)
+                    Brand = 2; // LIRA
+            }
+            else
+            {
+                if (G->Synctype < 11)
+                {
+                    stat->analyzer = 3;
+                }
+            }
+        }
+        if (G->alg_id == 0x00 && stat->dmr_mfid == -1 && G->sf_good > 4)
+        {
+            if ((G->Priority * 10 > G->sf_good * 8) && (G->irr_err * 10 > G->sf_good * 8))
+            {
+                Brand = 1;
+            }
+        }
 
+        if (Brand == 0 && stat->dmr_mfid == -1)
+        {
+            if (G->tg > 1000000 && G->src > 1000000)
+            {
+                valid_pairs_cnt++; // Нашли валидную пару для статистики
+
+                int is_duplicate = 0;
+
+                // Вложенный цикл для поиска дубликатов
+                for (int j = 0; j < SC.ngroups; ++j)
+                {
+                    if (gi == j)
+                        continue; // Не сравниваем строку саму с собой
+
+                    // Если нашли совпадение пары в другой строке
+                    if (SC.groups[j].tg == G->tg && SC.groups[j].src == G->src)
+                    {
+                        is_duplicate = 1;
+                        break;
+                    }
+                }
+
+                // Если дубликатов не найдено - считаем пару уникальной
+                if (is_duplicate == 0)
+                {
+                    unique_cnt++;
+                }
+            }
+        }
+    }
+    fprintf(stderr, "!!!! SC.ngroups %d, valid_pairs_cnt %d\n", SC.ngroups, valid_pairs_cnt);
+    // Условие 2: Должна быть хотя бы одна валидная пара (valid_pairs_cnt > 0), чтобы не делить на 0
+    if (Brand == 0 && stat->dmr_mfid == -1)
+    {
+        fprintf(stderr, " SC.ngroups %d, valid_pairs_cnt %d\n", SC.ngroups, valid_pairs_cnt);
+        if (SC.ngroups >= 2 && valid_pairs_cnt > 0)
+        {
+            if (unique_cnt * 10 >= valid_pairs_cnt * 9)
+            {
+                Brand = 1;
+            }
+        }
+    }
+    if (Brand == 1)
+    {
+        sprintf(stat->dmr_branding, "%s", "VEDA");
+        stat->analyzer = 3;
+    }
+    else if (Brand == 2)
+    {
+        sprintf(stat->dmr_branding, "%s", "LIRA");
+        stat->analyzer = 3;
+    }
+    else if (stat->dmr_mfid == 0x0A || Brand == 3)
+    {
+        sprintf(stat->dmr_branding, "%s", "Kirisun");
+        stat->analyzer = 2;
+    }
+    else if (stat->dmr_mfid == -1)
+    {
+        sprintf(stat->dmr_branding, "%s", "TYT");
+    }
+    else if (stat->dmr_mfid == 0x06)
+        printf(stat->dmr_branding, "%s", "Motorola");
+    else if (stat->dmr_mfid == 0x08)
+        sprintf(stat->dmr_branding, "%s", "Hytera");
+    else if (stat->dmr_mfid == 0x20)
+    {
+        sprintf(stat->dmr_branding, "%s", "Kenwood");
+        stat->analyzer = 2;
+    }
+    else if (stat->dmr_mfid == 0x58)
+    {
+        sprintf(stat->dmr_branding, "%s", "Tait");
+        stat->analyzer = 2;
+    }
+    else if (stat->dmr_mfid == 0x68)
+        sprintf(stat->dmr_branding, "%s", "Hytera");
+    else if (stat->dmr_mfid == 0x77)
+    {
+        sprintf(stat->dmr_branding, "%s", "Vertex Standard");
+        stat->analyzer = 2;
+    }
     // --- Корень ---
     fputs("{\n", f);
     fprintf(f, "  \"version\": \"%s\",\n", SC_VERSION); // задаёшь вручную
     fprintf(f, "  \"input_file\": \"%s\",\n", opts ? (opts->audio_in_dev ? opts->audio_in_dev : "") : "");
     fprintf(f, "  \"mode\": \"%s\",\n", SC.ms_mode ? "MS" : "BS");
-
+    // needs to be analyzed
     // slots_used
+    fprintf(f, "  \"need_analyzed\": %d,\n", stat->analyzer);
+
     fputs("  \"slots_used\": [", f);
     int first = 1;
     for (int s = 0; s < 2; ++s)
@@ -2237,42 +2255,41 @@ void avr_scout_write_json_summary_ext(const char *path, dsd_opts *opts, dsd_stat
     int quality_percent_all = 0;
     int quality_percent = 0;
 
-    unsigned int total_sf = SC.sf_total[0] + SC.sf_total[1];
-    unsigned int good_sf = SC.sf_good[0] + SC.sf_good[1];
+    unsigned int total_sf = stat->total_sf[0] + stat->total_sf[1];
+    unsigned int good_sf = stat->total_good[0] + stat->total_good[1];
 
-    if (SC.sf_total[0] > 0)
+    if (stat->total_sf[0] > 0)
     {
-        double q = floor(0.5 + (100.0 * (double)SC.sf_good[0] / (double)SC.sf_total[0]));
+        double q = floor(0.5 + (100.0 * (double)stat->total_good[0] / (double)stat->total_sf[0]));
         if (q < 0.0)
             q = 0.0;
         if (q > 100.0)
             q = 100.0;
         quality_percent = (int)q;
-        fprintf(f, "  \"SF Total [0]\": %u,\n", SC.sf_total[0]);
-        fprintf(f, "  \"SF Good  [0]\": %u,\n", SC.sf_good[0]);
+        fprintf(f, "  \"SF Total [0]\": %u,\n", stat->total_sf[0]);
+        fprintf(f, "  \"SF Good  [0]\": %u,\n", stat->total_good[0]);
         fprintf(f, "  \"Quality  [0], %%\": %d,\n", quality_percent);
     }
 
-    if (SC.sf_total[1] > 0)
+    if (stat->total_sf[1] > 0)
     {
-        double q = floor(0.5 + (100.0 * (double)SC.sf_good[1] / (double)SC.sf_total[1]));
+        double q = floor(0.5 + (100.0 * (double)stat->total_good[1] / (double)stat->total_sf[1]));
         if (q < 0.0)
             q = 0.0;
         if (q > 100.0)
             q = 100.0;
         quality_percent = (int)q;
-        fprintf(f, "  \"SF Total [1]\": %u,\n", SC.sf_total[1]);
-        fprintf(f, "  \"SF Good  [1]\": %u,\n", SC.sf_good[1]);
+        fprintf(f, "  \"SF Total [1]\": %u,\n", stat->total_sf[1]);
+        fprintf(f, "  \"SF Good  [1]\": %u,\n", stat->total_good[1]);
         fprintf(f, "  \"Quality  [1], %%\": %d,\n", quality_percent);
     }
-    fprintf(f, "  \"Manufacturer ID \": %d ,\n", stat->dmr_mfid);
-    if(stat->dmr_mfid==-1)
-        sprintf (stat->dmr_branding, "%s", "TYT"); 
+    fprintf(f, "  \"Manufacturer ID \": %d,\n", stat->dmr_mfid);
+
     if (stat->dmr_branding[0])
-        fprintf(f, "  \"Branding          : %s,\n", stat->dmr_branding);
+        fprintf(f, "  \"Branding\": \"%s\",\n", stat->dmr_branding);
 
     if (stat->dmr_branding_sub[0])
-        fprintf(f, "  \"Branding_sub      : %s,\n", stat->dmr_branding_sub);
+        fprintf(f, "  \"Branding_sub    \": \"%s\",\n", stat->dmr_branding_sub);
 
     if (total_sf > 0)
     {
@@ -2294,13 +2311,13 @@ void avr_scout_write_json_summary_ext(const char *path, dsd_opts *opts, dsd_stat
     fputs("  \"groups\": [\n", f);
     for (int gi = 0; gi < SC.ngroups; ++gi)
     {
-        json_write_one_group_ext(f, &SC.groups[gi], gi, (gi + 1 < SC.ngroups));
+        json_write_one_group_ext(f, &SC.groups[gi], gi, (gi + 1 < SC.ngroups), stat->dmr_mfid, Brand);
     }
     fputs("  ]\n", f);
     fputs("}\n", f);
     fclose(f);
 
-    fprintf(stderr, "[scout] JSON saved: %s (groups=%d)\n", path, SC.ngroups);
+    fprintf(stderr, "[SCOUT] JSON saved: %s (groups=%d)\n", path, SC.ngroups);
 }
 
 // Явная очистка внутреннего стейта Scout — вызывать при старте файла/потока.
@@ -2385,4 +2402,20 @@ void avr_scout_stat_le_observe(uint8_t slot, int crc_ok)
 
     avr_scout_group_t *G = &SC.groups[gi];
     G->le_seen = 1;
+}
+
+int avr_scout_get_mi_by_sf(uint8_t slot, uint32_t sf_idx, uint32_t *mi_out)
+{
+    if (slot > 1 || !mi_out)
+        return -1;
+    for (uint32_t i = 0; i < AVR_SCOUT_MAX_SF; ++i)
+    {
+        const scout_sf_entry_t *e = &SC.hist[slot][i];
+        if (e->sf_idx == sf_idx)
+        {
+            *mi_out = e->mi32;
+            return 0;
+        }
+    }
+    return -1;
 }

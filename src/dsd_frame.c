@@ -85,6 +85,8 @@ processFrame (dsd_opts * opts, dsd_state * state)
       state->maxref = state->max;
       state->minref = state->min;
     }
+  
+  fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d, state->slot %d \n", state->synctype, opts->errorbars, (state->currentslot & 1));
 
   //NXDN FSW
   if ((state->synctype == 28) || (state->synctype == 29))
@@ -149,13 +151,13 @@ processFrame (dsd_opts * opts, dsd_state * state)
       }      
       //disable so radio id doesn't blink in and out during ncurses and aggressive_framesync
       state->nac = 0;
-
+      fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d\n", state->synctype, opts->errorbars);
       if (opts->errorbars == 1)
       {
         if (opts->verbose > 0)
         {
           level = (int) state->max / 164;
-          //fprintf (stderr,"inlvl: %2i%% ", level);
+          // fprintf (stderr,"inlvl: %2i%% ", level);
         }
       }
       if ( (state->synctype == 11) || (state->synctype == 12) || (state->synctype == 32) ) //DMR Voice Modes
@@ -187,24 +189,6 @@ processFrame (dsd_opts * opts, dsd_state * state)
           }
           else dmrBSBootstrap (opts, state); //bootstrap into BS Bootstrap
         }
-        if (opts->kv_csv_path[0]) {
-          const uint8_t slot = (state->currentslot & 1);
-          // Используем this_ms из dsd_frame.c или просто true, если это некритично для отчета
-          // bool this_ms = true;     
-          fprintf(stderr, "opts->kv_csv_path batch_run_executed %d min sf = %d\n", batch_run_executed, avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF));
-          if (opts->kv_batch_enable && !batch_run_executed && avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF)) {      
-            batch_run_executed = 1;
-            if (!avr_scout_is_series_ready(slot)) {
-              scout_series_finalize_and_store(opts, state, slot);
-            }        
-            // avr_scout_flush(opts, state, this_ms);
-            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION RUNNING <<<\n");
-            avr_kv_batch_run(opts, state);
-            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION FINISHED <<<\n");      
-            // Останавливаем программу после анализа
-            exit(0);
-          }
-        }  
       }
       else if ( (state->synctype == 33) || (state->synctype == 34) ) //MS Data and RC data
       {
@@ -236,6 +220,25 @@ processFrame (dsd_opts * opts, dsd_state * state)
           dmr_data_sync (opts, state);
         }
       }
+      if (opts->kv_csv_path[0] != '\0') {
+          const uint8_t slot = (state->currentslot & 1);
+          // Используем this_ms из dsd_frame.c или просто true, если это некритично для отчета
+          // bool this_ms = true;     
+          fprintf(stderr, "!!!! opts->kv_csv_path batch_run_executed %d min sf = %d, kv_batch_enable %d\n", batch_run_executed, avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF), opts->kv_batch_enable);
+          if (opts->kv_batch_enable && !batch_run_executed && avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF)) {      
+            batch_run_executed = 1;
+            if (!avr_scout_is_series_ready(slot)) {              
+              fprintf(stderr, "!avr_scout_is_series_ready(slot)!!!\n");
+              scout_series_finalize_and_store(opts, state, slot);
+            }        
+            // avr_scout_flush(opts, state, this_ms);
+            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION RUNNING <<<\n");
+            avr_kv_batch_run(opts, state);
+            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION FINISHED <<<\n");      
+            // Останавливаем программу после анализа
+            exit(0);
+          }
+      }  
       return;
     }
     //X2-TDMA
@@ -300,16 +303,6 @@ processFrame (dsd_opts * opts, dsd_state * state)
              (state->synctype == 76) || (state->synctype == 77) || (state->synctype == 86) || (state->synctype == 87) ||
              (state->synctype == 99) || (state->synctype == 98) )
     {
-      if (state->synctype == 98 || state->synctype == 99) //preamble only
-        skipDibit(opts, state, 8); //skip dibits to prime the demodulator
-      else if (state->synctype == 16 || state->synctype == 17)
-        processM17STR(opts, state);
-      else if (state->synctype == 76 || state->synctype == 77) {} //Not available yet
-      //   processM17BRT(opts, state); //Not available yet
-      else if (state->synctype == 86 || state->synctype == 87)
-        processM17PKT(opts, state);
-      else
-        processM17LSF(opts, state);
       return;
     }
     //P25 P2

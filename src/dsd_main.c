@@ -14,6 +14,7 @@
  #include "git_ver.h"
  #include "avr_kv.h" 
  #include <signal.h>
+#include <ctype.h>
  
  #ifdef USE_RTLSDR
  #include <rtl-sdr.h>
@@ -208,7 +209,9 @@
    state->dibit_buf_p = state->dibit_buf + 200;
    memset (state->dibit_buf, 0, sizeof (int) * 200);
    //dmr buffer
-   state->dmr_payload_p = state->dibit_buf + 200;
+   // fix: correct dmr_payload_p buffer pointer assignment
+   //oldstate->dmr_payload_p = state->dibit_buf + 200;
+   state->dmr_payload_p = state->dmr_payload_buf + 200;
    memset (state->dmr_payload_buf, 0, sizeof (int) * 200);
    memset (state->dmr_stereo_payload, 1, sizeof(int) * 144);
    //dmr buffer end
@@ -576,6 +579,7 @@
    opts->errorbars = 1;
    opts->datascope = 0;
    opts->symboltiming = 0;
+   opts->verbose = 2; 
    opts->p25enc = 0;
    opts->p25lc = 0;
    opts->p25status = 0;
@@ -651,6 +655,7 @@
    opts->uvquality = 3;
    opts->inverted_x2tdma = 1;    // most transmitter + scanner + sound card combinations show inverted signals for this
    opts->inverted_dmr = 0;       // most transmitter + scanner + sound card combinations show non-inverted signals for this
+   opts->inverted_nxdn = 0;      //only seek pos by default to reduce false sync pattern detections 
    opts->inverted_m17 = 0;       //samples from M17_Education seem to all be positive polarity (same from m17-tools programs)
    opts->mod_threshold = 26;
    opts->ssize = 128; //36 default, max is 128, much cleaner data decodes on Phase 2 cqpsk at max
@@ -666,6 +671,7 @@
    //all RTL user options -- enabled AGC by default due to weak signal related issues
    opts->rtl_dev_index = 0;        //choose which device we want by index number
    opts->rtl_gain_value = 0;     //mid value, 0 - AGC - 0 to 49 acceptable values
+   opts->rtl_gain_actual = -100; //mirror dongle.gain actual values -100 is AUTO_GAIN, else nearest_gain(dongle.dev, dongle.gain);
    opts->rtl_squelch_level = 100; //100 by default, but only affects NXDN and dPMR during framesync test, compared to RMS value
    opts->rtl_volume_multiplier = 2; //sample multiplier; This multiplies the sample value to produce a higher 'inlvl' for the demodulator
    opts->rtl_udp_port = 0; //set UDP port for RTL remote -- 0 by default, will be making this optional for some external/legacy use cases (edacs-fm, etc)
@@ -816,7 +822,6 @@
    //Use P25p1 heuristics
    opts->use_heuristics = 0;
 
-   opts->verbose = 2;
    opts->kv_smooth = 0;
    opts->run_scout = 1;
 
@@ -826,7 +831,6 @@
  void
  initState (dsd_state * state)
  {
-   state->ngroups = 0;
    int i, j;
    // state->testcounter = 0;
    state->last_dibit = 0;
@@ -950,6 +954,9 @@
    state->firstframe = 0;
    sprintf (state->slot1light, "%s", "");
    sprintf (state->slot2light, "%s", "");
+   state->aout_gain = 25.0f;
+   state->aout_gainR = 25.0f;
+   state->aout_gainA = 0.0f; //use purely as a display or internal value, no user setting      
    memset (state->aout_max_buf, 0, sizeof (float) * 200);
    state->aout_max_buf_p = state->aout_max_buf;
    state->aout_max_buf_idx = 0;
@@ -1019,8 +1026,8 @@
    state->K2 = 0;
    state->K3 = 0;
    state->K4 = 0;
-   state->M = 0; //force key priority over settings from fid/so
- 
+   state->forced_alg_id = 0; //force key priority over settings from fid/so
+
    state->dmr_stereo = 0; //1, or 0?
    state->dmrburstL = 17; //initialize at higher value than possible
    state->dmrburstR = 17; //17 in char array is set for ERR
@@ -1043,6 +1050,8 @@
    state->tyt_bp = 0;
    state->tyt_ep = 0;
    state->retevis_ap = 0;
+   state->baofeng_ap = 0;
+   state->csi_ee = 0;  
 
    state->ken_sc = 0;
    state->any_bp = 0;
@@ -1184,7 +1193,7 @@
    state->tg_hold = 0;
  
    //new nxdn stuff
-   state->nxdn_part_of_frame = 0;
+   state->nxdn_part_of_frame = 3;
    state->nxdn_ran = 0;
    state->nxdn_sf = 0;
    memset (state->nxdn_sacch_frame_segcrc, 1, sizeof(state->nxdn_sacch_frame_segcrc)); //init on 1, bad CRC all
@@ -1192,7 +1201,8 @@
    memset (state->nxdn_sacch_frame_segment, 1, sizeof(state->nxdn_sacch_frame_segment));
    state->nxdn_alias_block_number = 0;
    memset (state->nxdn_alias_block_segment, 0, sizeof(state->nxdn_alias_block_segment));
- 
+   state->nxdn_pn95_seed = 228; //default value  
+
    //site/srv/cch info
    state->nxdn_location_site_code = 0;
    state->nxdn_location_sys_code = 0;
@@ -1313,10 +1323,18 @@
  
    state->m17_enc = 0;
    state->m17_enc_st = 0;
-   state->m17encoder_tx = 0;
-   state->m17encoder_eot = 0;
    memset(state->m17_meta, 0, sizeof(state->m17_meta));
- 
+   memset(state->m17_aes_iv, 0, sizeof(state->m17_aes_iv));
+
+   memset(state->m17_text_string, 0, sizeof(state->m17_text_string));
+   memset(state->m17_gnss_string, 0, sizeof(state->m17_gnss_string));
+   memset(state->m17_data_string, 0, sizeof(state->m17_data_string));
+   memset(state->m17_meta_string, 0, sizeof(state->m17_meta_string));
+   sprintf (state->m17_text_string, "%s", "");
+   sprintf (state->m17_gnss_string, "%s", "");
+   sprintf (state->m17_data_string, "%s", "");
+   sprintf (state->m17_meta_string, "%s", "");
+
  
    #ifdef USE_CODEC2
    state->codec2_3200 = codec2_create(CODEC2_MODE_3200);
@@ -1349,7 +1367,35 @@
        state->dmr_key_validation_status[s][k] = KEY_UNKNOWN;
        state->kv_key_probability[s][k] = 0;
    }
-   state->kv_prog_t0_ms = dsd_now_ms();
+  
+   state->straight_ks = 0;
+  state->straight_mod = 0;
+  state->kc_frames_total[0] = 0;
+  state->kc_frames_total[1] = 0;
+  state->kc_frames_ok[0] = 0;
+  state->kc_frames_ok[1] = 0;
+  state->kc_uncorrectable[0] = 0;
+  state->kc_uncorrectable[1] = 0;
+  memset(state->kv, 0, sizeof(state->kv));
+
+  state->kv_prog_t0_ms = 0;                 // старт программы (мс)
+  memset(state->kv_key_t0_ms, 0, sizeof(state->kv_key_t0_ms));
+
+  state->kv_prog_t0_ms = dsd_now_ms();
+  state->kv_enum_count = 0;
+  state->total_sf[0] = 0;
+  state->total_good[0] = 0;
+  state->total_sf[1] = 0;
+  state->total_good[1] = 0;
+
+  state->ngroups = 0;
+  state->flco_fec_err[0] = 0;
+  state->flco_fec_err[1] = 0;
+  state->analyzer = 0; 
+  state->Priority1 = 0;            
+  state->Priority2 = 0;            
+  state->Priority3 = 0; 
+  state->irr_err = 0;  
   // kc_reset(state);
  } //init_state
  
@@ -1539,7 +1585,7 @@
    printf ("                 -H '736B9A9C5645288B 243AD5CB8701EF8A' \n");
    printf ("                 -H '20029736A5D91042 C923EB0697484433 005EFC58A1905195 E28E9C7836AA2DB8' \n");
    printf ("\n");           //may move to using the rkey_array with an offset for additional key values
-   printf ("  -H <hex>      Manually Enter AES-128 or AES-256 Hex Key (see example below)\n");
+   printf ("  -H <hex>      Manually Enter AES-128, AES-256 or Kirisun-256 Hex Key Hex Key (see example below)\n");
    printf ("                 Encapulate in Single Quotation Marks; Space every 16 chars.\n");
    printf ("                 -H '736B9A9C5645288B 243AD5CB8701EF8A' \n");
    printf ("                 -H '20029736A5D91042 C923EB0697484433 005EFC58A1905195 E28E9C7836AA2DB8' \n");
@@ -1561,6 +1607,8 @@
    printf ("                    -S 49:123456789ABC80\n");
    printf ("                  For Example, enter 49-bit Keystream (MBP 70) as:\n");
    printf ("                    -S 49:ED0AED4AED4AED4A\n");
+   printf ("                  For Example, Baofeng 49-bit Keystream for 56-bit Custom Encryption as:\n");
+   printf ("                    -S 49:11AA22BB33CC44\n");   
    printf ("                 \n");
    printf ("  -k <file>     Import Key List from csv file (Decimal Format) -- Lower Case 'k'.\n");
    printf ("                  Only supports NXDN, DMR Basic Privacy (decimal value). \n");
@@ -1608,6 +1656,15 @@
    printf ("                    RC2 (“Ron's Code 2”) — симметричный блочный шифр Рона Ривеста (1987). Блок 64 бита, переменная длина ключа (обычно 40–128 бит).\n");      
    printf ("                   -@ '736B9A9C5645288B 243AD5CB8701EF8A' \n");
    printf ("                   -@ 'AAAAAAAAAAAAAAAF FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF' \n");
+   printf ("  -+ <hex>      Manually Enter and Enforce Baofeng Advanced Privacy (PC5-128 or PC5-256) AP Hex Key (see example below)\n");
+   printf ("                 Encapulate in Single Quotation Marks; Space every 16 chars.\n");
+   printf ("                 -+ 'ABCDABCDABCDABCD ABDCDABCDABCDABC' \n");
+   printf ("                 -+ 'ABCDABCDABCDABCD ABDCDABCDABCDABC EF01EF01EF01EF01 EF01EF01EF01EF01' \n");
+   printf ("                 \n");
+   printf ("  -^ <hex>      Manually Enter and Enforce Connect Systems 72-bit (9-byte) Extended Encryption Hex Key (see example below)\n");
+   printf ("                 -^  3BBE782C0430008271\n");
+   printf ("                 \n");      
+   printf ("  -M <hex>      Force Entered Alg ID Value over Missing PI header/LE Encryption Identifiers (DMR) \n");
    printf ("                 \n");
 
   printf ("  -ja <alg>      Filter by alg (arc4|aes128|aes192|aes256)\n");
@@ -1836,7 +1893,7 @@
    if (opts->mbe_out_fR != NULL) closeMbeOutFileR (opts, state);
  
        // финализируем скаута (если используется)
-  fprintf(stderr, "[scout] opts.run_scout %d, state.ngroups %d", opts->run_scout, state->ngroups);
+  fprintf(stderr, "[SCOUT] opts.run_scout %d, state.ngroups %d", opts->run_scout, state->ngroups);
   if (opts->run_scout) {
     // если у вас уже есть вызов avr_scout_flush — оставьте его:
         avr_scout_flush(opts, state, state->ms_mode);
@@ -1948,8 +2005,9 @@
   }
    exitflag = 0;
    opts.run_scout = 1;
-
-   while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:M:G:D:L:V:U:YK:b:H:X:NQ:WrlZTF@:!:01:2:345:6:7:89:Ek:I:J:j:O")) != -1)
+ 
+ //while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:M:G:D:L:V:U:YK:b:H:X:NQ:WrlZTF@:!:01:2:345:6:7:89:Ek:I:J:j:O")) != -1)
+   while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:G:D:L:V:U:YK:b:H:X:M:NQ:WrlZTF@:!:01:2:345:6:^:7:8_:9:Ek:I:J:j:O+:")) != -1)
      {
  
        switch (c)
@@ -2030,12 +2088,34 @@
             fprintf(stderr, "Key id:%d.\n", opts.curr_ord);
           }
           break;
-        case 'k':   // -jk <KID> → фильтр по KID
+        case 'k':   // -jk <KID> → dec или hex (0x)
+        {
           if (optind < argc) {
-            opts.kv_filter_kid = atoi(argv[optind++]);
-            fprintf(stderr, "Key validation: filter KID=%d.\n", opts.kv_filter_kid);
+              const char *arg = argv[optind++];
+              char *end = NULL;
+              int base = 10;
+
+              if (arg[0] == '0' && (arg[1] == 'x' || arg[1] == 'X')) {
+              base = 16;
+            } else if (arg[0] == '0' && arg[1] != '\0') {
+              fprintf(stderr, "Invalid KID (octal not allowed): %s\n", arg);
+              exit(1);
+            }
+
+            opts.kv_filter_kid = (int)strtol(arg, &end, base);
+
+            if (end == arg || *end != '\0') {
+              fprintf(stderr, "Invalid KID value: %s\n", arg);
+              exit(1);
+            }
+
+            fprintf(stderr,
+                "Key validation: filter KID=%d (0x%X).\n",
+                opts.kv_filter_kid,
+                opts.kv_filter_kid);
           }
           break;
+        }
         case 'p':   // -jp <dir> → каталог для результатов
           if (optind < argc) {
             strncpy(opts.kv_results_dir, argv[optind++], sizeof(opts.kv_results_dir)-1);
@@ -2109,20 +2189,6 @@
            exit(0);
            break;
  
-         //Specify M17 encoder User Data (CAN, DST, SRC values)
-         //NOTE: Disabled QPSK settings by borrowing these switches (nobody probalby used them anyways)
-         case 'M':
-           strncpy(state.m17dat, optarg, 49);
-           state.m17dat[49] = '\0';
-           break;
- 
-        //  //Specify M17 encoder SMS Message (truncates at 772)
-        //  case 'S':
-        //    strncpy(state.m17sms, optarg, 772);
-        //    state.m17sms[772] = '\0';
-        //    state.m17_str_dt = 3; //flip this so that STR encoder knows to use 1600 voice + data
-        //    break;
- 
          //specify TG Hold value
          case 'I':
            sscanf (optarg, "%d", &state.tg_hold);
@@ -2137,10 +2203,15 @@
  
          //rc4 enforcement on DMR (due to missing the PI header)
          case '0':
-           state.M = 0x21;
+           state.forced_alg_id = 0x21;
            fprintf (stderr,"Force RC4 Key over Missing PI header/LE Encryption Identifiers (DMR)\n");
            break;
  
+          case 'M':
+          sscanf (optarg, "%hhX", &state.forced_alg_id);
+          fprintf (stderr,"Force DMR ALG ID 0x%02X over Missing PI header/LE Encryption Identifiers (DMR)\n", state.forced_alg_id);
+          break;
+
          //load single rc4/des key
          case '1':
            sscanf (optarg, "%llX", &state.R);
@@ -2173,6 +2244,13 @@
            tyt_ep_aes_keystream_creation(&state, optarg);
            break;
 
+         //get user CSI EE Key and Force Its application
+         case '^':
+           parse_raw_user_string(optarg, state.static_ks_bits[0]);
+           fprintf (stderr,"DMR CS Extended 72-bit Key with Forced Application\n");
+           state.csi_ee = 1;
+           break;   
+
          //get user Kenwood DMR Scrambler Key and Force Its application
          case '9':
            ken_dmr_scrambler_keystream_creation(&state, optarg);
@@ -2183,6 +2261,11 @@
            anytone_bp_keystream_creation(&state, optarg);
            break;
 
+          //get user Baofeng AP Key and Force Its application
+         case '+':
+           baofeng_ap_pc5_keystream_creation(&state, optarg);
+           break;
+                                       
          //Straight KS Generation
          case 'S':
            straight_mod_xor_keystream_creation(&state, optarg);
@@ -2417,7 +2500,7 @@
            break;
  
          case '4':
-           state.M = 1;
+           state.forced_alg_id = 1;
            fprintf (stderr,"Force Privacy Key over Encryption Identifiers (DMR BP and NXDN Scrambler) \n");
            break;
  
@@ -3287,6 +3370,15 @@
              opts.inverted_dpmr = 1;
              fprintf (stderr, "Expecting inverted ICOM dPMR signals.\n");
            }
+           else if (optarg[0] == 'n')
+           {
+             opts.inverted_nxdn = 1;
+             #ifdef NXDN_OLD_SYNC
+             //
+             #else
+             fprintf (stderr, "Expecting inverted NXDN/DCR/IDAS signals.\n");
+             #endif
+           }             
            else if (optarg[0] == 'z')
            {
              opts.inverted_m17 = 1;
@@ -3867,7 +3959,7 @@
        //open any outputs, if not already opened
        if (opts.audio_out_type == 0) openPulseOutput(&opts);
        //All input and output now opened and handled correctly, so let's not break things by tweaking
-       encodeM17STR(&opts, &state);
+       // encodeM17STR(&opts, &state);
      }
  
      else if (opts.m17encoderbrt == 1)
@@ -3875,7 +3967,7 @@
        opts.pulse_digi_rate_out = 8000;
        //open any outputs, if not already opened
        if (opts.audio_out_type == 0) openPulseOutput(&opts);
-       encodeM17BRT(&opts, &state);
+       // (&opts, &state);
      }
  
      else if (opts.m17encoderpkt == 1)
@@ -3886,7 +3978,7 @@
        opts.pulse_digi_rate_out = 8000;
        //open any outputs, if not already opened
        if (opts.audio_out_type == 0) openPulseOutput(&opts);
-       encodeM17PKT(&opts, &state);
+       // encodeM17PKT(&opts, &state);
      }
  
      else if (opts.m17decoderip == 1)
@@ -3894,7 +3986,7 @@
        opts.pulse_digi_rate_out = 8000;
        //open any outputs, if not already opened
        if (opts.audio_out_type == 0) openPulseOutput(&opts);
-       processM17IPF(&opts, &state);
+       // processM17IPF(&opts, &state);
      }
  
      else

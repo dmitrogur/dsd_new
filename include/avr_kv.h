@@ -11,7 +11,8 @@
 #include "dsd.h"
 #include "mbelib.h"
 
-#define DEBUG 2
+#define DEBUG 1
+#define AVR_SCOUT_VC_PER_SF 6
 
 // -------------------- Defaults (sane fallbacks) --------------------
 #ifndef AVR_KV_NUM_BANDS
@@ -35,7 +36,7 @@
 #define AVR_SCOUT_MIN_SF 2 // минимум 2 SF подряд
 #endif
 #ifndef AVR_SCOUT_MAX_SF
-#define AVR_SCOUT_MAX_SF 6 // максимум 6 SF подряд
+#define AVR_SCOUT_MAX_SF AVR_SCOUT_VC_PER_SF  // максимум 6 SF подряд
 #endif
 /*#ifndef AVR_SCOUT_MIN_SF
 #define AVR_SCOUT_MIN_SF AVR_SCOUT_MIN_SF*18 // максимум 8 SF подряд
@@ -59,7 +60,6 @@
 // #ifndef AVR_SCOUT_SF_HISTORY
 // #define AVR_SCOUT_SF_HISTORY 64 // хватит для окон 2..8 SF с запасом
 // #endif
-#define AVR_SCOUT_VC_PER_SF 6
 
 typedef struct
 {
@@ -84,7 +84,11 @@ typedef struct
   // Два уровня «годности» (оставляем для чёткой семантики)
   uint8_t good_scan; // мягкий критерий (учёт в SCAN-статистике)
   uint8_t good_kv;   // строгий критерий (учёт в KV-окнах)
+
+  uint32_t mi32;       // ДЛЯ RC4/DES
 } scout_sf_entry_t;
+
+int avr_scout_get_mi_by_sf(uint8_t slot, uint32_t sf_idx, uint32_t *mi_out);
 
 typedef struct
 {
@@ -152,6 +156,19 @@ typedef struct
   // Короткие служебные строки статуса
   // char reason[32];
   // char notes[64];
+  
+  uint16_t Priority; 
+  uint16_t irr_err;   
+  uint16_t Synctype;
+  /* 10	DMR Data / Non-Voice / CACH / LC	Любые не-голосовые DMR sync фреймы, включая LC, CSBK, Data Header
+     11	DMR MS Voice	Mobile Station Voice (uplink)
+     12	DMR BS Voice	Base Station Voice (downlink)
+     13	DMR Data Sync (иногда не используется)	Некоторые билды FME задействуют
+     32	DMR MS Voice — Mono / Dual-Slot	Используется при mono / repeater bridging
+     33	DMR MS Data	Mobile Station Data (payload, RC data)
+     34	DMR RC Data	Repeater Control / RC signalling (служебный канал)  */
+
+
 } avr_scout_group_t;
 //----------------------------------------------------
 
@@ -211,17 +228,6 @@ typedef struct
   int csv_index;   // порядковый номер строки в CSV (для keyOK_<id>.txt)
   uint8_t key[36]; // максимум для AES-256
 } kv_csv_row_t;
-
-/*
-typedef struct {
-  int ngroups;
-  avr_scout_group_t groups[AVR_SCOUT_MAX_GROUPS];
-  // diagnostic/last series flags (or provide function instead)
-  uint8_t last_series_len_valid;
-  uint32_t last_series_len[2];
-  uint8_t last_slot;
-} avr_scout_export_t;
-*/
 
 typedef struct
 {

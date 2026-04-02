@@ -15,7 +15,8 @@ void dmr_late_entry_mi_fragment (dsd_opts * opts, dsd_state * state, uint8_t vc,
   //enforce RC4 due to missing PI header, but with valid SVC Opts
   //ideally, this would be handled by VC-F single burst, but its not fully reliable compared to this
   //due to multiple signalling occurring inside of it, depending on system type
-  if (state->M == 0x21)
+  /*
+  if (state->forced_alg_id == 0x21)
   {
     if (slot == 0 && state->dmr_so & 0x40)
     {
@@ -28,7 +29,7 @@ void dmr_late_entry_mi_fragment (dsd_opts * opts, dsd_state * state, uint8_t vc,
       state->payload_keyidR = 0xFF;
     }
   }
-
+  */
   //collect our fragments and place them into storage
   state->late_entry_mi_fragment[slot][vc][0] = (uint64_t)ConvertBitIntoBytes(&ambe_fr[3][0], 4);
   state->late_entry_mi_fragment[slot][vc][1] = (uint64_t)ConvertBitIntoBytes(&ambe_fr2[3][0], 4);
@@ -118,8 +119,6 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
         fprintf (stderr, "%s", KNRM);
       }
       
-      // const int slot = (state->currentslot & 1);
-      // state->kv_pi_pending[slot] = 1;  // сообщаем "на границе SF можно применять"
       //run expansions afterwards, or le verification won't match up properly
 
       //DES1
@@ -422,6 +421,15 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
       }
       if (opts->payload == 0) fprintf (stderr, "\n");
       fprintf (stderr, "%s SLOT %d SB/RC (FEC ERR) E:%d; I:%08X D:%03X; %s ", KRED, slot+1, irr_err, sbrcpl, sbrc_hex, KNRM);
+      fprintf(stderr, "FEC ERR %d. Power %d\n", irr_err, power);
+      
+      if(irr_err>7) {
+         if (opts->fb_csv_path[0] == '\0') {
+           fprintf (stderr, " irr_err %d;", irr_err);
+         }  
+         state->irr_err++;
+      }   
+
       if (opts->payload == 1) fprintf (stderr, "\n");
     }
     if (irr_err == 0)
@@ -486,7 +494,7 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
           if (state->dmr_so & 0x40 && key != 0 && alg != 0)
           {
             //if we aren't forcing a particular alg or privacy key set
-            if (state->M == 0)
+            if (state->forced_alg_id == 0)
             {
               fprintf (stderr, "\n");
               fprintf (stderr, "%s", KCYN);
@@ -520,7 +528,7 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
           if (state->dmr_soR & 0x40 && key != 0 && alg != 0)
           {
             //if we aren't forcing a particular alg or privacy key set
-            if (state->M == 0)
+            if (state->forced_alg_id == 0)
             {
               fprintf (stderr, "\n");
               fprintf (stderr, "%s", KCYN);

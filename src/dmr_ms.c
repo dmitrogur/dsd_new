@@ -348,6 +348,13 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     tyt16_ambe2_codeword_keystream(state, ambe_fr3, 0);
   }
 
+  if (state->csi_ee == 1)
+  {
+    csi72_ambe2_codeword_keystream(state, ambe_fr);
+    csi72_ambe2_codeword_keystream(state, ambe_fr2);
+    csi72_ambe2_codeword_keystream(state, ambe_fr3);
+  }
+
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
   ambe2_codeword_print_i(opts, ambe_fr2);
@@ -392,7 +399,7 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
         }
     }    
   
-  if (opts->kv_csv_path[0])    // Покадровый тикер перебора: реагирует на KEY_SET_NEXT/KEY_FAILED/KEY_VALIDATED
+  if (opts->kv_csv_path[0] != '\0')    // Покадровый тикер перебора: реагирует на KEY_SET_NEXT/KEY_FAILED/KEY_VALIDATED
     kv_enum_on_frame(opts, state);    
 
   //if ((state->payload_algid == 0x24   || state->payload_algid == 0x23 || state->payload_algid == 0x25) &&  
@@ -405,13 +412,13 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     const int slot = (state->currentslot & 1);
     if (state->dmr_key_validation_status[slot][kid] == KEY_VALIDATED)
     {
-      long now_ms   = dsd_now_ms();
-      long t_key_ms   = 0;
-      long t_total_ms = 0;
-      if (state->kv_key_t0_ms[slot][kid] > 0) t_key_ms  = now_ms - state->kv_key_t0_ms[slot][kid];
-      if (state->kv_prog_t0_ms          > 0) t_total_ms = now_ms - state->kv_prog_t0_ms;
+      time_ms_t now_ms    = dsd_now_ms();
+      time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+      time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+      if (t_key_ms   < 0) t_key_ms = 0;
+      if (t_total_ms < 0) t_total_ms = 0;
 
-      fprintf(stderr, "\nKEY_VALIDATED (MS) alg=0x%02X keyid=%02X (t_key=%ld ms, t_total=%ld ms)\n",
+      fprintf(stderr, "\nKEY_VALIDATED (MS) alg=0x%02X keyid=%02X (t_key=%" PRId64 " ms, t_total=%" PRId64 " ms)\n",
           (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms);
 
       // kv_result.txt с учётом -jp
@@ -419,7 +426,7 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
       kv_build_result_path(opts, "kv_result.txt", kvpath, sizeof(kvpath));
       FILE *f = fopen(kvpath, "a");
       if (f) {
-        fprintf(f, "KEY_VALIDATED (MS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+        fprintf(f, "KEY_VALIDATED (MS) alg=0x%02X keyid=%d t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
             (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms, (unsigned) state->kv_key_probability[slot][kid]);
       fclose(f);
       } 
@@ -435,19 +442,19 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     }        
     else if (state->dmr_key_validation_status[slot][kid] == KEY_FAILED) {
         // ключ явно признан неверным → выход
-        long now_ms   = dsd_now_ms();
         const int slot = state->currentslot & 1;
-        long t_key_ms   = 0;
-        long t_total_ms = 0;
-        if (state->kv_key_t0_ms[slot][kid] > 0) t_key_ms   = now_ms - state->kv_key_t0_ms[slot][kid];
-        if (state->kv_prog_t0_ms          > 0) t_total_ms = now_ms - state->kv_prog_t0_ms;
+        time_ms_t now_ms    = dsd_now_ms();
+        time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+        time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+        if (t_key_ms   < 0) t_key_ms = 0;
+        if (t_total_ms < 0) t_total_ms = 0;
 
         // kv_result.txt с учётом -jp
         char kvpath[600];
         kv_build_result_path(opts, "kv_result.txt", kvpath, sizeof(kvpath));
         FILE *f = fopen(kvpath, "a");
         if (f) {
-        fprintf(f, "KEY_FAILED alg=0x%02X keyid=%02X t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+        fprintf(f, "KEY_FAILED alg=0x%02X keyid=%02X t_key_ms=%" PRId64 ", t_total_ms=%" PRId64 " prob=%u\n",
             (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms, (unsigned) state->kv_key_probability[slot][kid]);
         fclose(f);
         } 
@@ -895,6 +902,14 @@ if (opts->run_scout)
     tyt16_ambe2_codeword_keystream(state, ambe_fr, 0);
     tyt16_ambe2_codeword_keystream(state, ambe_fr2, 1);
     tyt16_ambe2_codeword_keystream(state, ambe_fr3, 0);
+  }
+
+
+  if (state->csi_ee == 1)
+  {
+    csi72_ambe2_codeword_keystream(state, ambe_fr);
+    csi72_ambe2_codeword_keystream(state, ambe_fr2);
+    csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
   #ifdef PRINT_AMBE72

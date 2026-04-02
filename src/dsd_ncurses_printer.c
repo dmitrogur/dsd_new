@@ -223,9 +223,6 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
     printw ("| Symbol Float Input: %s \n", opts->audio_in_dev);
   }
 
-  if (opts->m17decoderip == 1 && opts->udp_sockfd)
-    printw ("| M17 UDP IP Frame Input: %s:%d \n", opts->m17_hostname, opts->m17_portno);
-
   if (opts->audio_in_type == 8)
   {
     printw ("| TCP Signal Input: %s:%d; %d kHz; 1 Ch; ", opts->tcp_hostname, opts->tcp_portno, opts->wav_sample_rate/1000);
@@ -248,10 +245,10 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
   if (opts->audio_in_type == 3)
   {
     printw ("| RTL: %d;", opts->rtl_dev_index);
-    if (opts->rtl_gain_value == 0)
+    if (opts->rtl_gain_actual == -100)
       printw (" G: AGC;");
     else
-      printw (" G: %idB;", opts->rtl_gain_value);
+      printw (" G: %i/%i;", opts->rtl_gain_value, opts->rtl_gain_actual);
     printw (" V: %iX;", opts->rtl_volume_multiplier);
     printw (" PPM: %i;", opts->rtlsdr_ppm_error); //Adjust manually now with { and }
     printw (" SQ: %i;", opts->rtl_squelch_level);
@@ -336,25 +333,6 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
     }
   }
 
-  if (opts->m17encoder == 1)
-  {
-    printw ("| M17 Encoder:");
-    if (state->m17encoder_tx == 1 && state->m17_vox == 0) printw (" Toggle TX (\\) ON ;");
-    if (state->m17encoder_tx == 0 && state->m17_vox == 0) printw (" Toggle TX (\\) OFF;");
-    if (state->m17_vox == 1) printw (" Vox Mode;");
-    printw (" Input Gain (/|*): %02.0f%% ", opts->audio_gainA);
-
-    if (opts->use_lpf == 1) printw ("F: |LP|"); else printw ("F: |  |");
-    if (opts->use_hpf == 1) printw ("HP|");     else printw ("  |");
-    if (opts->use_pbf == 1) printw ("PB|");     else printw ("  |");
-    if (opts->audio_in_type != 3 && state->m17_vox == 1) printw ( " SQL: %04ld : %04d;", opts->rtl_rms, opts->rtl_squelch_level);
-    printw ("\n");
-
-  }
-
-  if (opts->m17_use_ip == 1)
-    printw ("| M17 UDP IP Frame Output: %s:%d \n", opts->m17_hostname, opts->m17_portno);
-
   if (opts->mbe_out_dir[0] != 0 && opts->dmr_stereo == 0)
   {
     printw ("| Writing MBE data files to directory %s\n", opts->mbe_out_dir);
@@ -385,7 +363,7 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
   {
     printw ("| Trunking -");
     if (opts->trunk_tune_group_calls == 0) attron(COLOR_PAIR(2));
-    printw (" Group(g)");
+    printw (" Group(T)");
     attron(COLOR_PAIR(4));
     if (opts->trunk_tune_private_calls == 0) attron(COLOR_PAIR(2));
     printw (" Private(u)");
@@ -404,8 +382,8 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
   if (opts->p25_trunk == 1 && (opts->use_rigctl == 1 || opts->audio_in_type == 3) )
   {
     printw ("| Trunking -");
-    if (opts->trunk_tune_group_calls == 0) printw (" group(g)");
-    else printw (" GROUP(g)");
+    if (opts->trunk_tune_group_calls == 0) printw (" group(T)");
+    else printw (" GROUP(T)");
     if (opts->trunk_tune_private_calls == 0) printw (" private(u)");
     else printw (" PRIVATE(u)");
     if (opts->trunk_tune_data_calls == 0) printw (" data(d)");
@@ -517,18 +495,18 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
   }
   #endif
   // if (opts->aggressive_framesync == 0) printw ("| Selective CRC ERR Bypass Enabled (RAS) \n");
-  if (state->M == 1)
+  if (state->forced_alg_id == 1)
   {
     if (state->R != 0)  printw ("| Forcing Key Priority -- NXDN Sc Key: %05lld \n", state->R);
     if (state->K != 0)  printw ("| Forcing Key Priority -- Moto BP Key: %03lld \n", state->K);
     if (state->K1 != 0) printw ("| Forcing Key Priority -- Hytera BP Key: %016llX \n", state->K1);
     if (state->K != 0 && state->K1 != 0) printw ("| Warning! Multiple DMR Key Types Loaded! \n"); //warning may not be required
   }
-  if (state->M == 0x21)
+  if (state->forced_alg_id == 0x21)
   {
     if (state->R != 0)  printw ("| Forcing Key Priority -- RC4 Key: %010llX \n", state->R);
   }
-  if (state->M == 0x16) printw ("| Forcing Key Priority -- TYT 16-bit Key: %04llX \n", state->H);
+  if (state->forced_alg_id == 0x16) printw ("| Forcing Key Priority -- TYT 16-bit Key: %04llX \n", state->H);
 
   if (opts->scanner_mode == 1)
   {
@@ -561,7 +539,6 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
   if (opts->mod_c4fm == 1) printw ("[C4FM]");
   if (opts->mod_gfsk == 1) printw ("[GFSK]");
   printw ( "[%d] \n", (48000*opts->wav_interpolator)/state->samplesPerSymbol);
-  if (opts->m17encoder == 1) printw ("| Encoding:    [%s] \n", opts->output_name);
   printw ("| Decoding:    [%s] ", opts->output_name);
   if (opts->aggressive_framesync == 0) printw ("CRC/(RAS) ");
   //debug -- troubleshoot voice tuning after grant on DMR CC, subsequent grant may not tune because tuner isn't available
@@ -654,26 +631,52 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
     printw ("\n");
     printw ("| ");
 
-
     //fill in any extra info, like Meta (IV, etc)
     if (state->m17_enc == 1)
     {
-      printw (" Scrambler - Type: %d", state->m17_enc_st);
+      attron(COLOR_PAIR(1));
+      printw ("Scrambler - Type: %d", state->m17_enc_st);
+      attron(COLOR_PAIR(3));
     }
 
     if (state->m17_enc == 2)
     {
       attron(COLOR_PAIR(1));
-      printw ("AES-CTR - IV: ");
-      //display packed meta as IV
+      printw ("AES-CTR IV: ");
+      //display AES IV
       for (i = 0; i < 16; i++)
-        printw ("%02X", state->m17_meta[i]);
+        printw ("%02X", state->m17_aes_iv[i]);
+      attron(COLOR_PAIR(3));
     }
 
     if (state->m17_enc == 3)
     {
       printw (" Reserved Enc - Type: %d", state->m17_enc_st);
     }
+
+    printw ("\n");
+    printw ("| ");
+
+    //decoded elements from stream
+    char shortm17[72];
+    memset(shortm17, 0, sizeof(shortm17));
+    strncpy (shortm17, state->m17_text_string, 70);
+    shortm17[71] = 0;
+    printw ("META TEXT: %s", shortm17);
+
+    printw ("\n");
+    printw ("| ");
+    memset(shortm17, 0, sizeof(shortm17));
+    strncpy (shortm17, state->m17_gnss_string, 70);
+    shortm17[71] = 0;
+    printw ("META GNSS: %s", shortm17);
+
+    printw ("\n");
+    printw ("| ");
+    memset(shortm17, 0, sizeof(shortm17));
+    strncpy (shortm17, state->m17_data_string, 70);
+    shortm17[71] = 0;
+    printw ("MISC DATA: %s", shortm17);
 
     printw ("\n");
 
@@ -1100,7 +1103,7 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
       printw("AES-192 ");
       if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A3[0]); }
       attron(COLOR_PAIR(3));
-    }    
+    }     
     if (state->payload_algid == 0x84 || state->payload_algid == 0x25 || state->payload_algid == 0x05)
     {
       attron(COLOR_PAIR(1));
@@ -1114,6 +1117,26 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
       printw("Hytera Enhanced");
       if (state->R != 0)
           printw(" Key: %010llX", state->R);
+      attron(COLOR_PAIR(3));
+    }
+    if (state->payload_algid == 0x36)
+    {
+      attron(COLOR_PAIR(1));
+      printw("Kirisun Advanced ");
+      if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A4[0]); }
+      attron(COLOR_PAIR(3));
+    }
+    if (state->payload_algid == 0x37)
+    {
+      attron(COLOR_PAIR(1));
+      printw("Kirisun Universal ");
+      if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A4[0]); }
+      attron(COLOR_PAIR(3));
+    }
+    if (state->payload_algid == 0x35)
+    {
+      attron(COLOR_PAIR(1));
+      printw("Kirisun Encryption "); //0x35 is a placeholder if gained through late-entry method and alg is not known
       attron(COLOR_PAIR(3));
     }
 
@@ -1276,13 +1299,6 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
         if (state->aes_key_loaded[1] != 0) { printw("KS: %016llX ", state->A2[1]); }
         attron(COLOR_PAIR(3));
       }
-      if (state->payload_algidR == 0x23) //AES-192
-      {
-        attron(COLOR_PAIR(1));
-        printw("AES-192 ");
-        if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A3[0]); }
-        attron(COLOR_PAIR(3));
-      }          
       if (state->payload_algidR == 0x84 || state->payload_algidR == 0x25 || state->payload_algidR == 0x05)
       {
         attron(COLOR_PAIR(1));
@@ -1296,6 +1312,26 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
         printw("Hytera Enhanced");
         if (state->RR != 0)
           printw(" Key: %010llX", state->RR);
+        attron(COLOR_PAIR(3));
+      }
+      if (state->payload_algidR == 0x36)
+      {
+        attron(COLOR_PAIR(1));
+        printw("Kirisun Advanced ");
+        if (state->aes_key_loaded[1] != 0) { printw("KS: %016llX ", state->A4[1]); }
+        attron(COLOR_PAIR(3));
+      }
+      if (state->payload_algidR == 0x37)
+      {
+        attron(COLOR_PAIR(1));
+        printw("Kirisun Universal ");
+        if (state->aes_key_loaded[1] != 0) { printw("KS: %016llX ", state->A4[1]); }
+        attron(COLOR_PAIR(3));
+      }
+      if (state->payload_algidR == 0x35)
+      {
+        attron(COLOR_PAIR(1));
+        printw("Kirisun Encryption "); //0x35 is a placeholder if gained through late-entry method and alg is not known
         attron(COLOR_PAIR(3));
       }
 

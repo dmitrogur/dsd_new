@@ -465,27 +465,27 @@ void dc_block_filter(struct demod_state *fm)
 }
 
 long int rms(int16_t *samples, int len, int step)
-/* largely lifted from rtl_power */
 {
 	int i;
-	long int rms;
-	long p, t, s;
-	double dc, err;
+	long int rms_val;
+	int64_t p = 0, t = 0;
+	int64_t s;
 
-	p = t = 0L;
-	for (i=0; i<len; i+=step) {
-		s = (long)samples[i];
+	for (i = 0; i < len; i += step) {
+		s = samples[i];
 		t += s;
 		p += s * s;
 	}
-	/* correct for dc offset in squares */
-	dc = (double)(t*step) / (double)len;
-	err = t * 2 * dc - dc * dc * len;
 
-	rms = (long int)sqrt((p-err) / len);
-	//going with a value that's easy to figure out when its done the thing
-	if (rms < 0){ rms = 999; }
-	return rms;
+	double dc = (double)(t * (int64_t)step) / (double)len;
+	double err = (double)t * 2.0 * dc - dc * dc * (double)len;
+
+	double val = ((double)p - err) / (double)len;
+	if (val < 0.0) val = 0.0;
+
+	rms_val = (long int)sqrt(val);
+	if (rms_val < 0) rms_val = 999;
+	return rms_val;
 }
 
 void full_demod(struct demod_state *d)
@@ -1031,10 +1031,11 @@ void open_rtlsdr_stream(dsd_opts *opts)
 
 	//this needs to be initted first, then we set the parameters
   dongle_init(&dongle);
+
 	//init with low pass if decoding P25 or EDACS/Provoice
 	if (opts->frame_p25p1 == 1 || opts->frame_p25p2 == 1 || opts->frame_provoice == 1)
   	demod_init_ro2(&demod);
-	else if (opts->analog_only == 1 || opts->m17encoder == 1)
+	else if (opts->analog_only == 1)
 		demod_init_analog(&demod);
 	else demod_init(&demod);
   output_init(&output);
@@ -1089,7 +1090,7 @@ void open_rtlsdr_stream(dsd_opts *opts)
 		verbose_auto_gain(dongle.dev);
 		fprintf (stderr, "Setting RTL Autogain. \n");
 	} else {
-		dongle.gain = nearest_gain(dongle.dev, dongle.gain);
+		opts->rtl_gain_actual = dongle.gain = nearest_gain(dongle.dev, dongle.gain);
 		verbose_gain_set(dongle.dev, dongle.gain);
 		// fprintf (stderr, "Setting RTL Nearest Gain to %d. \n", dongle.gain); //seems to be working now
 	}
@@ -1151,6 +1152,26 @@ int get_rtlsdr_sample(int16_t *sample, dsd_opts * opts, dsd_state * state)
 		verbose_ppm_set(dongle.dev, dongle.ppm_error);
 	}
 
+	//if Gain or AGC Value is Manually Changed, Change it here now
+	if (opts->rtl_gain_actual != dongle.gain && opts->rtl_gain_value != 0)
+	{
+		dongle.gain = (opts->rtl_gain_value * 10);
+		opts->rtl_gain_actual = dongle.gain = nearest_gain(dongle.dev, dongle.gain);
+		verbose_gain_set(dongle.dev, dongle.gain);
+
+		//debug
+		// fprintf (stderr, "\n Dongle Gain Set: %d; \n", dongle.gain);
+	}
+
+	else if (opts->rtl_gain_value == 0 && dongle.gain != AUTO_GAIN)
+	{
+		opts->rtl_gain_actual = dongle.gain = AUTO_GAIN;
+		verbose_auto_gain(dongle.dev);
+
+		//debug
+		// fprintf (stderr, "\n AGC Set; \n");
+	}
+
 	while (output.queue.empty())
 	{
 		struct timespec ts;
@@ -1193,20 +1214,18 @@ void rtl_dev_tune(dsd_opts * opts, long int frequency)
 
 }
 
-//return RMS value (root means square) power level -- used as soft squelch inside of framesync
+static long int prev_rms = 0;
+
 long int rtl_return_rms()
 {
-	long int sr = 0;
-	// #ifdef __arm__
-	// sr = 100;
-	// #else
-	//debug -- on main machine, lp_len is around 6420, so this probably contributes to very high CPU usage
-	// fprintf (stderr, "LP_LEN: %d \n", demod.lp_len);
-	//I've found that just using a sample size of 160 will give us a good approximation without killing the CPU
-	// sr = rms(demod.lowpassed, demod.lp_len, 1);
-	sr = rms(demod.lowpassed, 160, 1); //I wonder what a reasonable value would be for #2 (input len) there
-	// #endif
-	return (sr);
+
+	long int sr = rms(demod.lowpassed, 512, 1); //change 512 to 160 if using too much CPU
+
+	// simple 4-block IIR average for stability
+	sr = (prev_rms * 3 + sr) / 4;
+	prev_rms = sr;
+
+	return sr;
 }
 
 //simple function to clear the rtl sample queue when tuning and during other events (ncurses menu open/close)

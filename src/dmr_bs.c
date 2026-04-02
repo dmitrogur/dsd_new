@@ -313,8 +313,9 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
       }
 
       // === SCOUT: закрыть активные серии при переходе на DATA ===
-      if (opts->run_scout)
-        avr_scout_finalize_series(opts, state);
+      if (opts->run_scout) {
+        // avr_scout_finalize_series(opts, state);
+      }  
 
       dmr_data_sync(opts, state);
       skipcount++;
@@ -566,6 +567,12 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
         tyt16_ambe2_codeword_keystream(state, ambe_fr3, 0);
       }
 
+      if (state->csi_ee == 1)
+      {
+        csi72_ambe2_codeword_keystream(state, ambe_fr);
+        csi72_ambe2_codeword_keystream(state, ambe_fr2);
+        csi72_ambe2_codeword_keystream(state, ambe_fr3);
+      }      
 #ifdef PRINT_AMBE72
       ambe2_codeword_print_i(opts, ambe_fr);
       ambe2_codeword_print_i(opts, ambe_fr2);
@@ -648,7 +655,7 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
         memcpy(state->s_r4u[2], state->s_ru, sizeof(state->s_ru));
       }
 
-      if (opts->kv_csv_path[0])
+      if (opts->kv_csv_path[0] != '\0')
       {
         const uint8_t kid = (uint8_t)state->payload_keyid;
         const int slot = (state->currentslot & 1);
@@ -668,11 +675,13 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
         {
           if (state->dmr_key_validation_status[slot][kid] == KEY_VALIDATED)
           {
-            long now_ms = dsd_now_ms();
-            long t_key_ms = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-            long t_total_ms = (state->kv_prog_t0_ms > 0) ? now_ms - state->kv_prog_t0_ms : 0;
+            time_ms_t now_ms    = dsd_now_ms();
+            time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+            time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+            if (t_key_ms   < 0) t_key_ms = 0;
+            if (t_total_ms < 0) t_total_ms = 0;
 
-            fprintf(stderr, "\nKEY_VALIDATED (BS) alg=0x%02X keyid=%02X (t_key=%ld ms, t_total=%ld ms)\n",
+            fprintf(stderr, "\nKEY_VALIDATED (BS) alg=0x%02X keyid=%02X (t_key=%" PRId64 " ms, t_total=%" PRId64 " ms)\n",
                     (unsigned)alg, kid, t_key_ms, t_total_ms);
 
             // kv_result.txt
@@ -681,7 +690,7 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
             FILE *pFile; // file pointer
             if ((pFile = fopen(kvpath, "a")) != NULL)
             {
-              fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+              fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
                       (unsigned)alg, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid]);
               fclose(pFile);
             }
@@ -696,9 +705,11 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
           }
           else if (state->dmr_key_validation_status[slot][kid] == KEY_FAILED)
           {
-            long now_ms = dsd_now_ms();
-            long t_key_ms = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-            long t_total_ms = (state->kv_prog_t0_ms > 0) ? now_ms - state->kv_prog_t0_ms : 0;
+            time_ms_t now_ms    = dsd_now_ms();
+            time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+            time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+            if (t_key_ms   < 0) t_key_ms = 0;
+            if (t_total_ms < 0) t_total_ms = 0;
 
             // kv_result.txt
             char kvpath[600];
@@ -706,7 +717,7 @@ void dmrBS(dsd_opts *opts, dsd_state *state)
             FILE *pFile; // file pointer
             if ((pFile = fopen(kvpath, "a")) != NULL)
             {
-              fprintf(pFile, "KEY_FAILED (BS) alg=0x%02X keyid=%02X t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+              fprintf(pFile, "KEY_FAILED (BS) alg=0x%02X keyid=%02X t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
                       (unsigned)alg, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid]);
               fclose(pFile);
             }
@@ -937,8 +948,8 @@ END:
     }
     else if (state->payload_algid == 0x02)
     {
-      hytera_enhanced_alg_refresh(state);
       state->currentslot = 0;
+      hytera_enhanced_alg_refresh(state);
       dmr_alg_refresh(opts, state);
     }
     if (state->payload_algidR >= 0x21)
@@ -948,8 +959,8 @@ END:
     }
     else if (state->payload_algidR == 0x02)
     {
-      hytera_enhanced_alg_refresh(state);
       state->currentslot = 1;
+      hytera_enhanced_alg_refresh(state);
       dmr_alg_refresh(opts, state);
     }
 
@@ -1225,6 +1236,13 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
     tyt16_ambe2_codeword_keystream(state, ambe_fr3, 0);
   }
 
+  if (state->csi_ee == 1)
+  {
+    csi72_ambe2_codeword_keystream(state, ambe_fr);
+    csi72_ambe2_codeword_keystream(state, ambe_fr2);
+    csi72_ambe2_codeword_keystream(state, ambe_fr3);
+  }  
+
 #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
   ambe2_codeword_print_i(opts, ambe_fr2);
@@ -1284,7 +1302,7 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
     exitflag = 1;
   } 
 
-  if (opts->kv_csv_path[0])
+  if (opts->kv_csv_path[0] != '\0')
   {
     const int slot = (state->currentslot & 1);
     const uint8_t kid = (uint8_t)state->payload_keyid;
@@ -1304,11 +1322,13 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
     {
       if (state->dmr_key_validation_status[slot][kid] == KEY_VALIDATED)
       {
-        long now_ms = dsd_now_ms();
-        long t_key_ms = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-        long t_total_ms = (state->kv_prog_t0_ms > 0) ? now_ms - state->kv_prog_t0_ms : 0;
+        time_ms_t now_ms    = dsd_now_ms();
+        time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+        time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+        if (t_key_ms   < 0) t_key_ms = 0;
+        if (t_total_ms < 0) t_total_ms = 0;
 
-        fprintf(stderr, "\nKEY_VALIDATED (BS) alg=0x%02X keyid=%02X (t_key=%ld ms, t_total=%ld ms)\n",
+        fprintf(stderr, "\nKEY_VALIDATED (BS) alg=0x%02X keyid=%02X (t_key=%" PRId64 " ms, t_total=%" PRId64 " ms)\n",
                 (unsigned)alg, kid, t_key_ms, t_total_ms);
 
         // kv_result.txt
@@ -1317,7 +1337,7 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
         FILE *pFile; // file pointer
         if ((pFile = fopen(kvpath, "a")) != NULL)
         {
-          fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+          fprintf(pFile, "KEY_VALIDATED (BS) alg=0x%02X keyid=%d t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
                   (unsigned)alg, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid]);
           fclose(pFile);
         }
@@ -1332,9 +1352,11 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
       }
       else if (state->dmr_key_validation_status[slot][kid] == KEY_FAILED)
       {
-        long now_ms = dsd_now_ms();
-        long t_key_ms = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-        long t_total_ms = (state->kv_prog_t0_ms > 0) ? now_ms - state->kv_prog_t0_ms : 0;
+        time_ms_t now_ms    = dsd_now_ms();
+        time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
+        time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
+        if (t_key_ms   < 0) t_key_ms = 0;
+        if (t_total_ms < 0) t_total_ms = 0;
 
         // kv_result.txt
         char kvpath[600];
@@ -1342,7 +1364,7 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
         FILE *pFile; // file pointer
         if ((pFile = fopen(kvpath, "a")) != NULL)
         {
-          fprintf(pFile, "KEY_FAILED (BS) alg=0x%02X keyid=%02X t_key_ms=%ld t_total_ms=%ld prob=%u\n",
+          fprintf(pFile, "KEY_FAILED (BS) alg=0x%02X keyid=%02X t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
                   (unsigned)alg, kid, t_key_ms, t_total_ms, (unsigned)state->kv_key_probability[slot][kid]);
           fclose(pFile);
         }
@@ -1404,7 +1426,7 @@ END:
       state->currentslot = 1;
       dmr_alg_refresh(opts, state);
     }
-    else if (state->payload_algid == 0x02)
+    else if (state->payload_algidR == 0x02)
     {
       hytera_enhanced_alg_refresh(state);
       state->currentslot = 1;
