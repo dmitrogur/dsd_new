@@ -2037,23 +2037,35 @@
    exitflag = 0;
    opts.run_scout = 1;
  
-    for (int ai = 1; ai < argc; ai++)
-   {
-     if (strcmp(argv[ai], "--veda") == 0)
-     {
-       opts.isVEDA = 1;
-       opts.veda_debug = 0;
-       state.veda_debug = 0;
-       continue;
-     }
-     if (strcmp(argv[ai], "--veda-debug") == 0)
-     {
-       opts.isVEDA = 1;
-       opts.veda_debug = 1;
-       state.veda_debug = 1;
-       continue;
-     }
-   }
+{
+  int src = 1;
+  int dst = 1;
+
+  while (src < argc)
+  {
+    if (strcmp(argv[src], "--veda") == 0)
+    {
+      opts.isVEDA = 1;
+      src++;
+      continue;
+    }
+
+    if (strcmp(argv[src], "--veda-debug") == 0)
+    {
+      opts.isVEDA = 1;
+      opts.veda_debug = 1;
+      src++;
+      continue;
+    }
+
+    argv[dst++] = argv[src++];
+  }
+
+  argc = dst;
+  argv[argc] = NULL;
+}
+
+state.veda_debug = opts.veda_debug;
 
   if (opts.isVEDA)
      fprintf(stderr, "VEDA mode enabled.\n");

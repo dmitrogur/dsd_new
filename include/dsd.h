@@ -1897,6 +1897,7 @@ int isch_lookup (uint64_t isch); //isch map lookup
 // VEDA mode 
 void veda_reset_slot(dsd_state *state, int slot);
 void veda_reset_profile(dsd_state *state, int slot);
+void veda_dump_state(dsd_state *state, int slot);
 void veda_log_subst(dsd_state *state, int slot, int chng);
 void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target);
 int  veda_try_build_tx_subst_frame(dsd_state *state, int slot);

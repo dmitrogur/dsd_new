@@ -122,22 +122,11 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
     if (!state || !hdr || slot < 0 || slot > 1)
         return -1;
 
-    /*
-      Нас интересует только "семейство" заголовков,
-      которое в extract уходит в ветку:
-        sub_80008BA / sub_8000968 / sub_8000E44
-      то есть (b0 & 0x60) == 0x20.
-    */
     if ((hdr->b0 & 0x60) != 0x20)
         return 0;
 
     switch (hdr->b1)
     {
-    /*
-      Аналог sub_80008BA():
-      - если w6 == 0 и state в {2,5} -> переход в 6
-      - если w6 != 0 и state в {2,5} -> сохранить w2/w6 и перейти в 3
-    */
     case 1:
         if (hdr->w6 == 0)
         {
@@ -167,11 +156,6 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
 
         return 1;
 
-    /*
-      Аналог sub_8000968() в упрощённом виде:
-      тут не строим substitution frame,
-      а только обновляем state/len.
-    */
     case 2:
         if (hdr->w6 == 0)
         {
@@ -202,12 +186,6 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
 
         return 1;
 
-    /*
-      Аналог sub_8000E44():
-      - при sm == 3 и len_hi != 0 -> переход в 4 и попытка собрать 6-байтный buf
-      - при sm == 3 и len_hi == 0 -> переход в 5
-      - при sm == 6 -> переход в 7
-    */
     case 3:
         if (state->veda_sm[slot] == 3)
         {
@@ -221,14 +199,6 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
                 return 1;
             }
 
-            /*
-              Упрощённый селектор:
-              exact-логика в прошивке ещё зависит от текущего шаблона команды
-              (0x41 / 0x91 / 0xD5 / 0xB4 / 0xB3 / 0xB2 и т.д.).
-              Пока берём:
-                len_lo == 0 -> sel=1
-                иначе       -> sel=0
-            */
             state->veda_last_sel[slot] = (state->veda_len_lo[slot] == 0) ? 1 : 0;
             state->veda_sm[slot] = 4;
 
@@ -259,22 +229,22 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
     default:
         return 0;
     }
+}
 
-    void veda_dump_state(dsd_state * state, int slot)
-    {
-        if (!state || slot < 0 || slot > 1)
-            return;
+void veda_dump_state(dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return;
 
-        fprintf(stderr,
-                "\nVEDA STATE slot=%d sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u id_a=0x%06X id_b=0x%06X subst=%u",
-                slot + 1,
-                state->veda_sm[slot],
-                state->veda_len_lo[slot],
-                state->veda_len_hi[slot],
-                state->veda_raw_src[slot],
-                state->veda_raw_tgt[slot],
-                state->veda_id24_a[slot] & 0xFFFFFFu,
-                state->veda_id24_b[slot] & 0xFFFFFFu,
-                state->veda_subst_active[slot]);
-    }
+    fprintf(stderr,
+            "\nVEDA STATE slot=%d sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u id_a=0x%06X id_b=0x%06X subst=%u",
+            slot + 1,
+            state->veda_sm[slot],
+            state->veda_len_lo[slot],
+            state->veda_len_hi[slot],
+            state->veda_raw_src[slot],
+            state->veda_raw_tgt[slot],
+            state->veda_id24_a[slot] & 0xFFFFFFu,
+            state->veda_id24_b[slot] & 0xFFFFFFu,
+            state->veda_subst_active[slot]);
 }
