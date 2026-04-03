@@ -37,6 +37,8 @@ void dmr_dheader (dsd_opts * opts, dsd_state * state, uint8_t dheader[], uint8_t
 
     uint32_t target = (uint32_t)ConvertBitIntoBytes(&dheader_bits[16], 24); //destination llid
     uint32_t source = (uint32_t)ConvertBitIntoBytes(&dheader_bits[40], 24); //source llid
+    if(opts->isVEDA)
+      veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
     //extra tgt/src handling for XPT
     uint8_t target_hash[24];
@@ -570,6 +572,8 @@ void dmr_udt_decoder (dsd_opts * opts, dsd_state * state, uint8_t * block_bytes,
   UNUSED4(udt_padnib, udt_zero, udt_sf, udt_pf);
   UNUSED(udt_op);
 
+  if(opts->isVEDA)
+    veda_note_raw_src_tgt(state, state->currentslot, udt_source, udt_target);  
   //number of repititions required in various bit grabs
   int end = 3; UNUSED(end);
 

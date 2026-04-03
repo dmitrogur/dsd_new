@@ -7,6 +7,7 @@
 
 #include "dsd.h"
 #include "avr_kv.h"
+#include "dsd_veda.h"
 
 //combined flco handler (vlc, tlc, emb), minus the superfluous structs and strings
 void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t CRCCorrect, uint32_t * IrrecoverableErrors, uint8_t type)
@@ -55,6 +56,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
   
+  if(opts->isVEDA) 
+    veda_note_raw_src_tgt(state, slot, source, target);
+
   if (opts->run_scout) {
     if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
       avr_scout_on_lc_update(state, state->currentslot, target, source);

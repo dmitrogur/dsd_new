@@ -101,6 +101,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED2(st1, st3);
 
+        if(opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
         //broadcast calls show no tgt/src info in ETSI manaual, but seem to correspond with same values in embedded link control
         // if (csbk_o == 50)
         // {

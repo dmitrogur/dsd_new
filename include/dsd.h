@@ -644,6 +644,11 @@ typedef struct
   char kv_batch_scout_dir[512];
   int kv_batch_enable;
   uint64_t curr_index; 
+
+  /* VEDA mode */
+  uint8_t isVEDA;   // 1 = включить VEDA-ветку
+  uint8_t veda_debug;    // 1 = подробные VEDA-логи
+
 } dsd_opts;
 
 typedef struct
@@ -1180,7 +1185,28 @@ typedef struct
   int total_sf[2];
   int total_good[2];
   bool analyzer;    
-  // VEDA
+  // VEDA ================
+  bool veda_debug;
+  /* VEDA runtime */
+  uint32_t veda_raw_tgt[2];
+  uint32_t veda_raw_src[2];
+
+  uint32_t veda_id24_a[2];
+  uint32_t veda_id24_b[2];
+  uint8_t  veda_id24_valid[2];
+
+  uint8_t  veda_sm[2];
+  uint16_t veda_len_lo[2];
+  uint16_t veda_len_hi[2];
+
+  uint8_t  veda_tx_buf[2][6];
+  uint8_t  veda_last_sel[2];
+  uint8_t  veda_subst_active[2];  
+
+  uint8_t veda_cmd0[2];
+  uint8_t veda_cmd1[2];
+
+
   uint16_t Priority1;            
   uint16_t Priority2;            
   uint16_t Priority3; 
@@ -1863,14 +1889,28 @@ long int rtl_return_rms();
 void rtl_clean_queue();
 #endif
 
-
-
-
 //Phase 2 RS/FEC Functions
 int ez_rs28_ess (int payload[96], int parity[168]); //ezpwd bridge for FME
 int ez_rs28_facch (int payload[156], int parity[114]); //ezpwd bridge for FME
 int ez_rs28_sacch (int payload[180], int parity[132]); //ezpwd bridge for FME
 int isch_lookup (uint64_t isch); //isch map lookup
+// VEDA mode 
+void veda_reset_slot(dsd_state *state, int slot);
+void veda_reset_profile(dsd_state *state, int slot);
+void veda_log_subst(dsd_state *state, int slot, int chng);
+void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target);
+int  veda_try_build_tx_subst_frame(dsd_state *state, int slot);
+
+typedef struct
+{
+  uint8_t  b0;
+  uint8_t  b1;
+  uint16_t w2;
+  uint16_t w4;
+  uint16_t w6;
+} veda_air_header_t;
+
+int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, const veda_air_header_t *hdr);
 
 #ifdef __cplusplus
 }

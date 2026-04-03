@@ -81,10 +81,14 @@
  void
  noCarrier (dsd_opts * opts, dsd_state * state)
  {
-
+   if (opts->isVEDA)
+   {
+     veda_reset_slot(state, 0);
+     veda_reset_slot(state, 1);
+   }
 
     //when no carrier sync, rotate the symbol out file every hour, if enabled
-    rotate_symbol_out_file(opts, state); //this should handle any conventional system where no sync conditions occur when no activity
+   rotate_symbol_out_file(opts, state); //this should handle any conventional system where no sync conditions occur when no activity
  
    if (opts->floating_point == 1)
    {
@@ -826,6 +830,9 @@
    opts->run_scout = 1;
 
    opts->kv_results_dir[0] = 0;   // по умолчанию — текущая директория
+
+   opts->isVEDA = 0;
+   opts->veda_debug  = 0;
  } //initopts
  
  void
@@ -1397,6 +1404,24 @@
   state->Priority3 = 0; 
   state->irr_err = 0;  
   // kc_reset(state);
+  // === VEDA ====
+   memset(state->veda_raw_src, 0, sizeof(state->veda_raw_src));
+   memset(state->veda_raw_tgt, 0, sizeof(state->veda_raw_tgt));
+
+   memset(state->veda_id24_a, 0, sizeof(state->veda_id24_a));
+   memset(state->veda_id24_b, 0, sizeof(state->veda_id24_b));
+   memset(state->veda_id24_valid, 0, sizeof(state->veda_id24_valid));
+
+   memset(state->veda_sm, 0, sizeof(state->veda_sm));
+   memset(state->veda_len_lo, 0, sizeof(state->veda_len_lo));
+   memset(state->veda_len_hi, 0, sizeof(state->veda_len_hi));
+
+   memset(state->veda_last_sel, 0, sizeof(state->veda_last_sel));
+   memset(state->veda_subst_active, 0, sizeof(state->veda_subst_active));
+   memset(state->veda_tx_buf, 0, sizeof(state->veda_tx_buf));
+
+   state->veda_debug = 0;
+
  } //init_state
  
  void
@@ -1682,6 +1707,12 @@
    printf (" Trunking Example TCP: dsd-fme -fs -i tcp -U 4532 -T -C dmr_t3_chan.csv -G group.csv -N 2> log.txt\n");
    printf (" Trunking Example RTL: dsd-fme -fs -i rtl:0:450M:26:-2:8 -T -C connect_plus_chan.csv -G group.csv -N 2> log.txt\n");
    printf ("\n");
+
+   printf (" VEDA options:\n");
+   printf ("  --veda         Enable VEDA-specific control/header processing\n");
+   printf ("  --veda-debug   Enable VEDA-specific verbose debug logging\n");
+   printf ("\n");
+
    exit (0);
  }
  
@@ -2006,6 +2037,30 @@
    exitflag = 0;
    opts.run_scout = 1;
  
+    for (int ai = 1; ai < argc; ai++)
+   {
+     if (strcmp(argv[ai], "--veda") == 0)
+     {
+       opts.isVEDA = 1;
+       opts.veda_debug = 0;
+       state.veda_debug = 0;
+       continue;
+     }
+     if (strcmp(argv[ai], "--veda-debug") == 0)
+     {
+       opts.isVEDA = 1;
+       opts.veda_debug = 1;
+       state.veda_debug = 1;
+       continue;
+     }
+   }
+
+  if (opts.isVEDA)
+     fprintf(stderr, "VEDA mode enabled.\n");
+
+   if (opts.veda_debug)
+     fprintf(stderr, "VEDA debug enabled.\n");
+   
  //while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:M:G:D:L:V:U:YK:b:H:X:NQ:WrlZTF@:!:01:2:345:6:7:89:Ek:I:J:j:O")) != -1)
    while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:G:D:L:V:U:YK:b:H:X:M:NQ:WrlZTF@:!:01:2:345:6:^:7:8_:9:Ek:I:J:j:O+:")) != -1)
      {
