@@ -245,6 +245,11 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
                 return rc;
             }
         }
+        if (state->veda_debug)
+        {
+            fprintf(stderr, "\nVEDA HDR MISS slot=%d src=%u b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
+                slot + 1, src_kind, hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6);
+        }        
     }
 
     if (state->veda_debug && rc != 0)

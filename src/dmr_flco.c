@@ -92,14 +92,6 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
   
-  if (opts->isVEDA && target && source)
-  {
-    uint8_t src_kind = (type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC;
-    veda_note_raw_src_tgt_ex(state, slot, source, target, src_kind);
-  }
-
-  veda_try_handle_lc_header(opts, state, slot, lc_bits, type, CRCCorrect, *IrrecoverableErrors);
-
   if (opts->run_scout) {
     if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
       avr_scout_on_lc_update(state, state->currentslot, target, source);
@@ -602,6 +594,14 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
         }  
       };
 
+    if (opts->isVEDA && target && source)
+    {
+      uint8_t src_kind = (type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC;
+      veda_note_raw_src_tgt_ex(state, slot, source, target, src_kind);
+    }
+
+    veda_try_handle_lc_header(opts, state, slot, lc_bits, type, CRCCorrect, *IrrecoverableErrors);
+  
     //IPP
     ippl_addu("kTGT", target); 
     ippl_addu("kSRC", source);
