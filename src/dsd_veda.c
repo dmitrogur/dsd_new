@@ -2,8 +2,6 @@
 
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
 static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
-static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
-static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
 
 void veda_reset_slot(dsd_state *state, int slot)
 {
@@ -50,7 +48,7 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
     {
     case 2:
         fprintf(stderr,
-                "\nVEDA SM slot=%d sm=%u len_lo=%u len_hi=%u",
+                "\nVEDA SM slot=%d sm=%u len_lo=%u len_hi=%u\n",
                 slot + 1,
                 state->veda_sm[slot],
                 state->veda_len_lo[slot],
@@ -59,7 +57,7 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
 
     case 3:
         fprintf(stderr,
-                "\nVEDA IDS slot=%d id_a=0x%06X id_b=0x%06X",
+                "\nVEDA IDS slot=%d id_a=0x%06X id_b=0x%06X\n",
                 slot + 1,
                 state->veda_id24_a[slot] & 0xFFFFFFu,
                 state->veda_id24_b[slot] & 0xFFFFFFu);
@@ -67,7 +65,7 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
 
     case 4:
         fprintf(stderr,
-                "\nVEDA SUBST slot=%d sel=%u raw_src=%u raw_tgt=%u id24=0x%06X buf=%02X %02X %02X %02X %02X %02X",
+                "\nVEDA SUBST slot=%d sel=%u raw_src=%u raw_tgt=%u id24=0x%06X buf=%02X %02X %02X %02X %02X %02X\n",
                 slot + 1,
                 state->veda_last_sel[slot],
                 state->veda_raw_src[slot],
@@ -83,7 +81,7 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
 
     case 5:
         fprintf(stderr,
-                "\nVEDA WARN slot=%d subst-build-skipped sm=%u len_hi=%u",
+                "\nVEDA WARN slot=%d subst-build-skipped sm=%u len_hi=%u\n",
                 slot + 1,
                 state->veda_sm[slot],
                 state->veda_len_hi[slot]);
@@ -116,8 +114,8 @@ static int veda_src_prio(uint8_t src_kind)
 {
     switch (src_kind)
     {
-    case VEDA_HDRSRC_TLC:     return 50;
-    case VEDA_HDRSRC_VLC:     return 50;
+    case VEDA_HDRSRC_VLC:     return 60;
+    case VEDA_HDRSRC_TLC:     return 30;
     case VEDA_HDRSRC_CSBK:    return 40;
     case VEDA_HDRSRC_DHEADER: return 20;
     case VEDA_HDRSRC_UDT:     return 10;
@@ -210,6 +208,11 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
                            uint8_t src_kind)
 {
     int rc;
+    int can_norm = 0;
+    int norm_attempted = 0;
+    int norm_changed = 0;
+    int norm_rc = 0;
+    veda_air_header_t norm;
 
     if (!opts || !state || !hdr || slot < 0 || slot > 1)
         return -1;
@@ -221,23 +224,29 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
 
     rc = veda_control_header_handler(opts, state, slot, hdr);
 
-    if (rc == 0 && veda_can_try_normalized_b0(src_kind, hdr))
-    {
-        veda_air_header_t norm = *hdr;
-        norm.b0 = (uint8_t)((norm.b0 & 0x9Fu) | 0x20u);
+    can_norm = veda_can_try_normalized_b0(src_kind, hdr);
 
-        if (norm.b0 != hdr->b0)
+    if (rc == 0 && can_norm)
+    {
+        norm = *hdr;
+        norm.b0 = (uint8_t)((norm.b0 & 0x9Fu) | 0x20u);
+        norm_changed = (norm.b0 != hdr->b0);
+
+        if (norm_changed)
         {
-            int rc2 = veda_control_header_handler(opts, state, slot, &norm);
-            if (rc2 != 0)
+            norm_attempted = 1;
+            norm_rc = veda_control_header_handler(opts, state, slot, &norm);
+
+            if (norm_rc != 0)
             {
                 veda_store_last_hdr(state, slot, &norm, src_kind);
-                rc = rc2;
+                rc = norm_rc;
 
                 if (state->veda_debug)
                 {
                     fprintf(stderr,
-                            "\nVEDA HDR slot=%d src=%u rc=%d norm=1 b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
+                            "\nVEDA HDR slot=%d src=%u rc=%d norm=1 "
+                            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
                             slot + 1, src_kind, rc,
                             norm.b0, norm.b1, norm.w2, norm.w4, norm.w6);
                 }
@@ -245,19 +254,34 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
                 return rc;
             }
         }
-        if (state->veda_debug)
-        {
-            fprintf(stderr, "\nVEDA HDR MISS slot=%d src=%u b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
-                slot + 1, src_kind, hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6);
-        }        
     }
 
-    if (state->veda_debug && rc != 0)
+    if (state->veda_debug)
     {
-        fprintf(stderr,
-                "\nVEDA HDR slot=%d src=%u rc=%d norm=0 b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
-                slot + 1, src_kind, rc,
-                hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6);
+        if (rc != 0)
+        {
+            fprintf(stderr,
+                    "\nVEDA HDR slot=%d src=%u rc=%d norm=0 "
+                    "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
+                    slot + 1, src_kind, rc,
+                    hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6);
+        }
+        else
+        {
+            fprintf(stderr,
+                    "\nVEDA HDR MISS slot=%d src=%u "
+                    "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
+                    "can_norm=%d norm_attempted=%d norm_changed=%d norm_rc=%d "
+                    "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u",
+                    slot + 1, src_kind,
+                    hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6,
+                    can_norm, norm_attempted, norm_changed, norm_rc,
+                    state->veda_sm[slot],
+                    state->veda_len_lo[slot],
+                    state->veda_len_hi[slot],
+                    state->veda_raw_src[slot],
+                    state->veda_raw_tgt[slot]);
+        }
     }
 
     return rc;
