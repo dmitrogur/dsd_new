@@ -82,6 +82,19 @@ void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t
     state->veda_raw_tgt[slot] = target;
 }
 
+void veda_set_profile_ids(dsd_state *state, int slot, uint32_t id24_a, uint32_t id24_b)
+{
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    state->veda_id24_a[slot] = id24_a & 0xFFFFFFu;
+    state->veda_id24_b[slot] = id24_b & 0xFFFFFFu;
+    state->veda_id24_valid[slot] = 1;
+
+    if (state->veda_debug)
+        veda_log_subst(state, slot, 3);
+}
+
 int veda_try_build_tx_subst_frame(dsd_state *state, int slot)
 {
     uint32_t id24;

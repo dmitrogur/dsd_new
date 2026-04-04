@@ -1901,7 +1901,7 @@ void veda_dump_state(dsd_state *state, int slot);
 void veda_log_subst(dsd_state *state, int slot, int chng);
 void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target);
 int  veda_try_build_tx_subst_frame(dsd_state *state, int slot);
-
+void veda_set_profile_ids(dsd_state *state, int slot, uint32_t id24_a, uint32_t id24_b);
 typedef struct
 {
   uint8_t  b0;

@@ -1182,6 +1182,10 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+
+        if (opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
 
@@ -1192,6 +1196,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
       }
@@ -1209,6 +1215,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
       }
@@ -1220,6 +1229,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         //Inbound CSBK only from MS source to 'wake' the repeater up (best that I understand)
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);        
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
 

@@ -2066,6 +2066,11 @@
 }
 
 state.veda_debug = opts.veda_debug;
+if (opts.isVEDA)
+{
+  veda_set_profile_ids(&state, 0, 0x112233, 0x445566);
+  veda_set_profile_ids(&state, 1, 0xA1B2C3, 0xD4E5F6);
+}
 
   if (opts.isVEDA)
      fprintf(stderr, "VEDA mode enabled.\n");
