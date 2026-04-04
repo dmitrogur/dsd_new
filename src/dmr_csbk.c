@@ -650,7 +650,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED(reserved);
-        if (opts->isVEDA)
+        if (opts->isVEDA && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         if (gi)  fprintf (stderr, " Group");
@@ -1017,7 +1017,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint8_t svc_kind = (uint8_t)ConvertBitIntoBytes(&cs_pdu_bits[28], 4); //'Call' Type
         uint32_t ahoy_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t ahoy_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-        if (opts->isVEDA)
+        if (opts->isVEDA && ahoy_target && ahoy_source)
           veda_note_raw_src_tgt(state, state->currentslot, ahoy_source, ahoy_target);
         
           UNUSED(ahoy_bf);
@@ -1111,7 +1111,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint8_t  pm_res2 = cs_pdu_bits[31];
         uint32_t pm_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24); //should be TSI (clear the call)
         uint32_t pm_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-        if (opts->isVEDA)
+        if (opts->isVEDA && pm_target && pm_source)
           veda_note_raw_src_tgt(state, state->currentslot, pm_source, pm_target);
 
         if (pm_kind == 0) fprintf (stderr, "Disconnect; ");
@@ -1151,7 +1151,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
           uint32_t ack_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
           uint32_t ack_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-          if (opts->isVEDA)
+          if (opts->isVEDA && ack_target && ack_source)
             veda_note_raw_src_tgt(state, state->currentslot, ack_source, ack_target);
           //response_info and reason_code start to get really convoluted on decoding them
           //for each opcode, so I am just going to put the values out to the console,
@@ -1183,7 +1183,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
 
-        if (opts->isVEDA)
+         && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
@@ -1196,7 +1196,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-        if (opts->isVEDA)
+         && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
@@ -1215,7 +1215,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-        if (opts->isVEDA)
+        if (opts->isVEDA && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
@@ -1229,7 +1229,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         //Inbound CSBK only from MS source to 'wake' the repeater up (best that I understand)
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-        if (opts->isVEDA)
+         && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);        
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
@@ -1245,7 +1245,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED2(res, blocks);
-        if (opts->isVEDA)
+         && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         uint8_t target_hash[24];
@@ -1282,7 +1282,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
           if (gi == 0) target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[40], 16);
           source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[64], 16);
           int rest = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[60], 4);
-          if (opts->isVEDA)
+          if (opts->isVEDA && target && source)
             veda_note_raw_src_tgt(state, state->currentslot, source, target);
           fprintf (stderr, "Source: %d - Target: %d - Rest LSN: %d", source, target, rest);
         }

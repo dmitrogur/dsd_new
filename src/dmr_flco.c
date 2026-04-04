@@ -9,6 +9,21 @@
 #include "avr_kv.h"
 #include "dsd_veda.h"
 
+static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state, int slot, const uint8_t *lc_bytes)
+{
+  if (!opts || !state || !lc_bytes) return;
+  if (!opts->isVEDA) return;
+
+  veda_air_header_t hdr;
+  hdr.b0 = lc_bytes[0];
+  hdr.b1 = lc_bytes[1];
+  hdr.w2 = (uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8);
+  hdr.w4 = (uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8);
+  hdr.w6 = (uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8);
+
+  veda_control_header_handler(opts, state, slot, &hdr);
+}
+
 //combined flco handler (vlc, tlc, emb), minus the superfluous structs and strings
 void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t CRCCorrect, uint32_t * IrrecoverableErrors, uint8_t type)
 {
@@ -778,6 +793,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, "Private ");
       state->gi[slot] = 1;
       ippl_adds("flco_info", "Private");//IPP
+      // veda_try_handle_lc_header(opts, state, slot, ...);
     }
 
     if (is_kenwood_sc) {

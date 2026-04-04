@@ -11,7 +11,7 @@
 #include "dsd.h"
 #include "mbelib.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define AVR_SCOUT_VC_PER_SF 6
 
 // -------------------- Defaults (sane fallbacks) --------------------
