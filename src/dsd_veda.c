@@ -1,5 +1,8 @@
 #include "dsd_veda.h"
 
+static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
+static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
+
 void veda_reset_slot(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
@@ -73,13 +76,36 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
     }
 }
 
+static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot)
+{
+    uint32_t id24_a = 0;
+    uint32_t id24_b = 0;
+
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    if (!veda_get_live_ids(state, slot, &id24_a, &id24_b))
+        return;
+
+    if (state->veda_id24_valid[slot] &&
+        state->veda_id24_a[slot] == id24_a &&
+        state->veda_id24_b[slot] == id24_b)
+    {
+        return;
+    }
+
+    veda_set_profile_ids(state, slot, id24_a, id24_b);
+}
+
 void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target)
 {
     if (!state || slot < 0 || slot > 1)
         return;
 
-    state->veda_raw_src[slot] = source;
-    state->veda_raw_tgt[slot] = target;
+    state->veda_raw_src[slot] = source & 0xFFFFFFu;
+    state->veda_raw_tgt[slot] = target & 0xFFFFFFu;
+
+    veda_refresh_profile_from_live_ids(state, slot);
 }
 
 void veda_set_profile_ids(dsd_state *state, int slot, uint32_t id24_a, uint32_t id24_b)
@@ -102,6 +128,8 @@ int veda_try_build_tx_subst_frame(dsd_state *state, int slot)
 
     if (!state || slot < 0 || slot > 1)
         return 0;
+    
+    veda_refresh_profile_from_live_ids(state, slot); 
 
     buf = state->veda_tx_buf[slot];
 
@@ -261,3 +289,54 @@ void veda_dump_state(dsd_state *state, int slot)
             state->veda_id24_b[slot] & 0xFFFFFFu,
             state->veda_subst_active[slot]);
 }
+
+static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b)
+{
+    uint32_t src = 0;
+    uint32_t tgt = 0;
+
+    if (!state || !id24_a || !id24_b || slot < 0 || slot > 1)
+        return 0;
+
+    /* 1) Самый приоритетный источник — уже собранная VEDA raw-карта */
+    src = state->veda_raw_src[slot] & 0xFFFFFFu;
+    tgt = state->veda_raw_tgt[slot] & 0xFFFFFFu;
+
+    /* 2) Фолбэк на обычные оперативные lastsrc/lasttg */
+    if (src == 0 || tgt == 0)
+    {
+        if (slot == 0)
+        {
+            src = ((uint32_t)state->lastsrc) & 0xFFFFFFu;
+            tgt = ((uint32_t)state->lasttg)  & 0xFFFFFFu;
+        }
+        else
+        {
+            src = ((uint32_t)state->lastsrcR) & 0xFFFFFFu;
+            tgt = ((uint32_t)state->lasttgR)  & 0xFFFFFFu;
+        }
+    }
+
+    /* 3) Фолбэк на data/PDU адреса */
+    if (src == 0 || tgt == 0)
+    {
+        src = (uint32_t)(state->dmr_lrrp_source[slot] & 0xFFFFFFu);
+        tgt = (uint32_t)(state->dmr_lrrp_target[slot] & 0xFFFFFFu);
+    }
+
+    if (src == 0 || tgt == 0)
+        return 0;
+
+    /*
+      Храним как абстрактную пару a/b.
+      Пока не доказано жёстко, что +28=Target, +32=Source или наоборот.
+      Но для практики берём:
+        a = target
+        b = source
+      Если окажется наоборот — меняется только это место.
+    */
+    *id24_a = tgt & 0xFFFFFFu;
+    *id24_b = src & 0xFFFFFFu;
+    return 1;
+}
+

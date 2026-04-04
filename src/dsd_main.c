@@ -2065,18 +2065,13 @@
   argv[argc] = NULL;
 }
 
-state.veda_debug = opts.veda_debug;
-if (opts.isVEDA)
-{
-  veda_set_profile_ids(&state, 0, 0x112233, 0x445566);
-  veda_set_profile_ids(&state, 1, 0xA1B2C3, 0xD4E5F6);
-}
+  state.veda_debug = opts.veda_debug;
 
   if (opts.isVEDA)
-     fprintf(stderr, "VEDA mode enabled.\n");
+    fprintf(stderr, "VEDA mode enabled.\n");
 
-   if (opts.veda_debug)
-     fprintf(stderr, "VEDA debug enabled.\n");
+  if (opts.veda_debug)
+    fprintf(stderr, "VEDA debug enabled.\n");
    
  //while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:M:G:D:L:V:U:YK:b:H:X:NQ:WrlZTF@:!:01:2:345:6:7:89:Ek:I:J:j:O")) != -1)
    while ((c = getopt (argc, argv, "~yhaepPqs:t:v:z:i:o:d:c:g:n:w:B:C:R:f:m:u:x:A:S:G:D:L:V:U:YK:b:H:X:M:NQ:WrlZTF@:!:01:2:345:6:^:7:8_:9:Ek:I:J:j:O+:")) != -1)
