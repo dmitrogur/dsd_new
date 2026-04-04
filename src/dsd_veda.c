@@ -57,10 +57,11 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
 
     case 3:
         fprintf(stderr,
-                "\nVEDA IDS slot=%d id_a=0x%06X id_b=0x%06X\n",
+                "\nVEDA IDS slot=%d id_a=0x%06X (%d) id_b=0x%06X (%d)\n",
                 slot + 1,
-                state->veda_id24_a[slot] & 0xFFFFFFu,
-                state->veda_id24_b[slot] & 0xFFFFFFu);
+                state->veda_id24_a[slot] & 0xFFFFFFu, state->veda_id24_a[slot] & 0xFFFFFFu,
+                state->veda_id24_b[slot] & 0xFFFFFFu, state->veda_id24_b[slot] & 0xFFFFFFu
+            );
         break;
 
     case 4:
@@ -246,7 +247,7 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
                 {
                     fprintf(stderr,
                             "\nVEDA HDR slot=%d src=%u rc=%d norm=1 "
-                            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
+                            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X\n",
                             slot + 1, src_kind, rc,
                             norm.b0, norm.b1, norm.w2, norm.w4, norm.w6);
                 }
@@ -262,7 +263,7 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
         {
             fprintf(stderr,
                     "\nVEDA HDR slot=%d src=%u rc=%d norm=0 "
-                    "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
+                    "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X\n",
                     slot + 1, src_kind, rc,
                     hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6);
         }
@@ -272,7 +273,7 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
                     "\nVEDA HDR MISS slot=%d src=%u "
                     "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
                     "can_norm=%d norm_attempted=%d norm_changed=%d norm_rc=%d "
-                    "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u",
+                    "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u\n",
                     slot + 1, src_kind,
                     hdr->b0, hdr->b1, hdr->w2, hdr->w4, hdr->w6,
                     can_norm, norm_attempted, norm_changed, norm_rc,
@@ -444,7 +445,7 @@ void veda_dump_state(dsd_state *state, int slot)
         return;
 
     fprintf(stderr,
-            "\nVEDA STATE slot=%d sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u id_a=0x%06X id_b=0x%06X subst=%u",
+            "\nVEDA STATE slot=%d sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u id_a=0x%06X id_b=0x%06X subst=%u\n",
             slot + 1,
             state->veda_sm[slot],
             state->veda_len_lo[slot],

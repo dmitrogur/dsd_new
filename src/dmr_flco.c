@@ -92,6 +92,51 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
   
+  if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
+  {
+  uint8_t lc_bytes[9];
+  uint32_t alt_tgt_be_24 = 0;
+  uint32_t alt_src_be_24 = 0;
+  uint32_t alt_tgt_le_24 = 0;
+  uint32_t alt_src_le_24 = 0;
+  int i;
+
+  for (i = 0; i < 9; i++)
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+
+  /* стандартный DMR-разбор уже в target/source */
+
+  /* альтернативные кандидаты из сырых байт */
+  alt_tgt_be_24 = ((uint32_t)lc_bytes[3] << 16) |
+                  ((uint32_t)lc_bytes[4] << 8)  |
+                  ((uint32_t)lc_bytes[5]);
+
+  alt_src_be_24 = ((uint32_t)lc_bytes[6] << 16) |
+                  ((uint32_t)lc_bytes[7] << 8)  |
+                  ((uint32_t)lc_bytes[8]);
+
+  alt_tgt_le_24 = ((uint32_t)lc_bytes[5] << 16) |
+                  ((uint32_t)lc_bytes[4] << 8)  |
+                  ((uint32_t)lc_bytes[3]);
+
+  alt_src_le_24 = ((uint32_t)lc_bytes[8] << 16) |
+                  ((uint32_t)lc_bytes[7] << 8)  |
+                  ((uint32_t)lc_bytes[6]);
+
+  fprintf(stderr,
+    "\nVEDA LC RAW slot=%d type=%u flco=%02X fid=%02X so=%02X "
+    "b=[%02X %02X %02X %02X %02X %02X %02X %02X %02X] "
+    "std_tgt=%u std_src=%u "
+    "be_tgt24=%u be_src24=%u "
+    "le_tgt24=%u le_src24=%u\n",
+    slot + 1, type, flco, fid, so,
+    lc_bytes[0], lc_bytes[1], lc_bytes[2], lc_bytes[3], lc_bytes[4],
+    lc_bytes[5], lc_bytes[6], lc_bytes[7], lc_bytes[8],
+    target, source,
+    alt_tgt_be_24, alt_src_be_24,
+    alt_tgt_le_24, alt_src_le_24);
+  }
+
   if (opts->run_scout) {
     if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
       avr_scout_on_lc_update(state, state->currentslot, target, source);
