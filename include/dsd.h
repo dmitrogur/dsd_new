@@ -371,7 +371,70 @@ typedef struct
   unsigned int  ColorCode[NB_OF_DPMR_VOICE_FRAME_TO_DECODE / 2];
 } dPMRVoiceFS2Frame_t;
 
-//
+//============================= 
+// VEDA
+typedef struct
+{
+  uint8_t  b0;
+  uint8_t  b1;
+  uint16_t w2;
+  uint16_t w4;
+  uint16_t w6;
+} veda_air_header_t;
+
+typedef enum
+{
+  VEDA_HDRSRC_NONE    = 0,
+  VEDA_HDRSRC_CSBK    = 1,
+  VEDA_HDRSRC_VLC     = 2,
+  VEDA_HDRSRC_TLC     = 3,
+  VEDA_HDRSRC_DHEADER = 4,
+  VEDA_HDRSRC_UDT     = 5
+} veda_hdrsrc_t;
+
+typedef struct {
+  uint8_t valid;
+  uint8_t slot;
+  uint8_t b0;
+  uint8_t b1;
+  uint16_t w2;
+  uint16_t w4;
+  uint16_t w6;
+  uint8_t raw8[8];
+  uint8_t crc_ok;
+  uint8_t fec_ok;
+  veda_hdrsrc_t src_kind;
+} veda_hdr_obs_t;
+
+typedef enum {
+  VEDA_IDS_NONE = 0,
+  VEDA_IDS_CSBK,
+  VEDA_IDS_FLCO,
+  VEDA_IDS_TLC,
+  VEDA_IDS_DHEADER,
+  VEDA_IDS_UDT,
+  VEDA_IDS_LASTSRC_TG,
+  VEDA_IDS_LRRP
+} veda_ids_source_t;
+
+typedef struct {
+  uint8_t valid;
+  uint32_t src;
+  uint32_t tgt;
+  veda_ids_source_t src_kind;
+} veda_ids_obs_t;
+
+typedef struct {
+  uint8_t valid;
+  uint32_t dmr_src;
+  uint32_t dmr_tgt;
+  uint32_t veda_id24_a;
+  uint32_t veda_id24_b;
+  uint8_t swapped;   // 0: a=tgt,b=src; 1: a=src,b=tgt
+  uint8_t source_kind;
+} veda_id_map_t;
+
+//=====================================================
 typedef struct
 {
   int onesymbol;
@@ -1185,11 +1248,37 @@ typedef struct
   int total_sf[2];
   int total_good[2];
   bool analyzer;    
+  //===================================
   // VEDA ================
+  veda_hdr_obs_t veda_hdr_obs[2];
+  
+  veda_ids_obs_t veda_ids_csbk[2];
+  veda_ids_obs_t veda_ids_flco[2];
+  veda_ids_obs_t veda_ids_tlc[2];
+  veda_ids_obs_t veda_ids_dhdr[2];
+  veda_ids_obs_t veda_ids_udt[2];
+
+  veda_id_map_t veda_map[2];
+  uint8_t veda_have_candidate_hdr[2];
+  uint8_t veda_subst_mask[2][6];
+  
+  uint32_t veda_sbrc_i[2];
+  uint16_t veda_sbrc_d[2];
+  uint8_t  veda_sbrc_valid[2];
+
   bool veda_debug;
   /* VEDA runtime */
   uint32_t veda_raw_tgt[2];
   uint32_t veda_raw_src[2];
+  uint8_t  veda_raw_src_kind[2];
+
+  uint8_t  veda_last_hdr_valid[2];
+  uint8_t  veda_last_hdr_src[2];
+  uint8_t  veda_last_b0[2];
+  uint8_t  veda_last_b1[2];
+  uint16_t veda_last_w2[2];
+  uint16_t veda_last_w4[2];
+  uint16_t veda_last_w6[2];
 
   uint32_t veda_id24_a[2];
   uint32_t veda_id24_b[2];
@@ -1894,7 +1983,17 @@ int ez_rs28_ess (int payload[96], int parity[168]); //ezpwd bridge for FME
 int ez_rs28_facch (int payload[156], int parity[114]); //ezpwd bridge for FME
 int ez_rs28_sacch (int payload[180], int parity[132]); //ezpwd bridge for FME
 int isch_lookup (uint64_t isch); //isch map lookup
-// VEDA mode 
+//=========================================================================
+// VEDA mode
+
+void veda_note_raw_src_tgt_ex(dsd_state *state, int slot,
+                              uint32_t source, uint32_t target,
+                              uint8_t src_kind);
+
+int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
+                           const veda_air_header_t *hdr,
+                           uint8_t src_kind);
+
 void veda_reset_slot(dsd_state *state, int slot);
 void veda_reset_profile(dsd_state *state, int slot);
 void veda_dump_state(dsd_state *state, int slot);
@@ -1902,14 +2001,6 @@ void veda_log_subst(dsd_state *state, int slot, int chng);
 void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target);
 int  veda_try_build_tx_subst_frame(dsd_state *state, int slot);
 void veda_set_profile_ids(dsd_state *state, int slot, uint32_t id24_a, uint32_t id24_b);
-typedef struct
-{
-  uint8_t  b0;
-  uint8_t  b1;
-  uint16_t w2;
-  uint16_t w4;
-  uint16_t w6;
-} veda_air_header_t;
 
 int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, const veda_air_header_t *hdr);
 

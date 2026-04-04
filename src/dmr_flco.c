@@ -9,19 +9,40 @@
 #include "avr_kv.h"
 #include "dsd_veda.h"
 
-static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state, int slot, const uint8_t *lc_bytes)
+static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
+                                      int slot, const uint8_t *lc_bits,
+                                      uint8_t lc_type,
+                                      uint32_t crc_ok,
+                                      uint32_t irrecoverable_errors)
 {
-  if (!opts || !state || !lc_bytes) return;
-  if (!opts->isVEDA) return;
-
+  uint8_t lc_bytes[8];
   veda_air_header_t hdr;
+  int i;
+
+  if (!opts || !state || !lc_bits)
+    return;
+
+  if (!opts->isVEDA)
+    return;
+
+  if (irrecoverable_errors != 0 || crc_ok != 1)
+    return;
+
+  /* Пока даём второй вход только из VLC/TLC */
+  if (lc_type != 1 && lc_type != 2)
+    return;
+
+  for (i = 0; i < 8; i++)
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+
   hdr.b0 = lc_bytes[0];
   hdr.b1 = lc_bytes[1];
   hdr.w2 = (uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8);
   hdr.w4 = (uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8);
   hdr.w6 = (uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8);
 
-  veda_control_header_handler(opts, state, slot, &hdr);
+  (void)veda_try_handle_header(opts, state, slot, &hdr,
+                               (lc_type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC);
 }
 
 //combined flco handler (vlc, tlc, emb), minus the superfluous structs and strings
@@ -71,8 +92,13 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
   
-  // if(opts->isVEDA) 
-  //  veda_note_raw_src_tgt(state, slot, source, target);
+  if (opts->isVEDA && target && source)
+  {
+    uint8_t src_kind = (type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC;
+    veda_note_raw_src_tgt_ex(state, slot, source, target, src_kind);
+  }
+
+  veda_try_handle_lc_header(opts, state, slot, lc_bits, type, CRCCorrect, *IrrecoverableErrors);
 
   if (opts->run_scout) {
     if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    

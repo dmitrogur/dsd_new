@@ -8,33 +8,23 @@
 
 static void veda_try_handle_csbk_header(dsd_opts *opts, dsd_state *state, const uint8_t *cs_pdu)
 {
+  veda_air_header_t hdr;
+
   if (!opts || !state || !cs_pdu)
     return;
 
   if (!opts->isVEDA)
     return;
 
-  veda_air_header_t hdr;
-
   hdr.b0 = cs_pdu[0];
   hdr.b1 = cs_pdu[1];
-
-  /* little-endian packing to match ARM-style WORD fields at +2/+4/+6 */
   hdr.w2 = (uint16_t)cs_pdu[2] | ((uint16_t)cs_pdu[3] << 8);
   hdr.w4 = (uint16_t)cs_pdu[4] | ((uint16_t)cs_pdu[5] << 8);
   hdr.w6 = (uint16_t)cs_pdu[6] | ((uint16_t)cs_pdu[7] << 8);
 
-  int rc = veda_control_header_handler(opts, state, state->currentslot, &hdr);
-
-  if (opts->veda_debug && rc != 0)
-  {
-    fprintf(stderr,
-      "\nVEDA HDR slot=%d rc=%d b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X",
-      state->currentslot + 1,
-      rc,
-      hdr.b0, hdr.b1, hdr.w2, hdr.w4, hdr.w6);
-  }
+  (void)veda_try_handle_header(opts, state, state->currentslot, &hdr, VEDA_HDRSRC_CSBK);
 }
+
 #define PCLEAR_TUNE_AWAY //disable if slower return is preferred
 //function for handling Control Signalling PDUs (CSBK, MBC) messages
 
@@ -1183,7 +1173,7 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
 
-         && target && source)
+        if (opts->isVEDA && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
@@ -1196,8 +1186,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-         && target && source)
+        if (opts->isVEDA && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
+        
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
       }
@@ -1229,8 +1220,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         //Inbound CSBK only from MS source to 'wake' the repeater up (best that I understand)
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-         && target && source)
-          veda_note_raw_src_tgt(state, state->currentslot, source, target);        
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
 
@@ -1245,9 +1237,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED2(res, blocks);
-         && target && source)
+        if (opts->isVEDA && target && source)
           veda_note_raw_src_tgt(state, state->currentslot, source, target);
-
+          
         uint8_t target_hash[24];
         uint8_t tg_hash = 0;
 
