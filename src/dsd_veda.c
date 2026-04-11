@@ -195,6 +195,89 @@ uint64_t veda_get_effective_mi(dsd_state *state, int slot)
     return 0;
 }
 
+
+int veda_session_key_valid(const dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return 0;
+
+    /*
+      ВАЖНО:
+      По дампу session_key_valid и stream-init логически разделены.
+      В текущем dsd_new пока нет отдельного флага "session key present",
+      поэтому на этом этапе используем текущий runtime-ready флаг.
+      Это слой терминов, а не смена логики.
+    */
+    return state->veda_state_valid[slot] ? 1 : 0;
+}
+
+int veda_stream_ctx_valid(const dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return 0;
+
+    return state->veda_state_valid[slot] ? 1 : 0;
+}
+
+uint8_t *veda_session_material_ptr(dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return NULL;
+
+    return state->veda_session_key[slot];
+}
+
+const uint8_t *veda_session_material_cptr(const dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return NULL;
+
+    return state->veda_session_key[slot];
+}
+
+void veda_trace_baseline(dsd_opts *opts,
+                         dsd_state *state,
+                         int slot,
+                         const char *tag)
+{
+    uint64_t eff_mi;
+
+    if (!opts || !state || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->veda_debug)
+        return;
+
+    eff_mi = veda_get_effective_mi(state, slot);
+
+    fprintf(stderr,
+        "\n[VEDA BASE] tag=%s slot=%d "
+        "sess_valid=%u stream_valid=%u kx_pos=%d "
+        "vendor_mi_valid=%u vendor_mi32=%08X eff_mi=%016llX "
+        "last_hdr_valid=%u last_hdr_src=%u "
+        "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
+        "sm=%u len_lo=%u len_hi=%u f9_count=%u\n",
+        tag ? tag : "?",
+        slot + 1,
+        (unsigned)veda_session_key_valid(state, slot),
+        (unsigned)veda_stream_ctx_valid(state, slot),
+        state->veda_kx_pos[slot],
+        (unsigned)state->veda_vendor_mi_valid[slot],
+        (unsigned)state->veda_vendor_mi32[slot],
+        (unsigned long long)eff_mi,
+        (unsigned)state->veda_last_hdr_valid[slot],
+        (unsigned)state->veda_last_hdr_src[slot],
+        (unsigned)state->veda_last_b0[slot],
+        (unsigned)state->veda_last_b1[slot],
+        (unsigned)state->veda_last_w2[slot],
+        (unsigned)state->veda_last_w4[slot],
+        (unsigned)state->veda_last_w6[slot],
+        (unsigned)state->veda_sm[slot],
+        (unsigned)state->veda_len_lo[slot],
+        (unsigned)state->veda_len_hi[slot],
+        (unsigned)state->veda_f9_lc_count[slot]);
+}
+
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)

@@ -22,7 +22,17 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
 
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
 
-// Твои инлайны
+int veda_session_key_valid(const dsd_state *state, int slot);
+int veda_stream_ctx_valid(const dsd_state *state, int slot);
+uint8_t *veda_session_material_ptr(dsd_state *state, int slot);
+const uint8_t *veda_session_material_cptr(const dsd_state *state, int slot);
+
+void veda_trace_baseline(dsd_opts *opts,
+                         dsd_state *state,
+                         int slot,
+                         const char *tag);
+
+// инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {
     return ((uint32_t)p[0]) | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);
 }
@@ -36,6 +46,7 @@ static inline uint32_t veda_pick_profile_id24(const dsd_state *state, int slot, 
     if (sel & 1) return state->veda_id24_a[slot] & 0xFFFFFFu;
     else return state->veda_id24_b[slot] & 0xFFFFFFu;
 }
+
 
 #ifdef __cplusplus
 }

@@ -719,6 +719,15 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 
     veda_try_handle_lc_header(opts, state, slot, lc_bits, type, CRCCorrect, *IrrecoverableErrors);
   
+if (opts->isVEDA && opts->veda_debug)
+{
+    if (type == 1)
+        veda_trace_baseline(opts, state, slot, "VLC");
+    else if (type == 2 && fid == 0xF9)
+        veda_trace_baseline(opts, state, slot, "TLC-F9");
+    else if (type == 2)
+        veda_trace_baseline(opts, state, slot, "TLC");
+}    
     //IPP
     ippl_addu("kTGT", target); 
     ippl_addu("kSRC", source);

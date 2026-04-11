@@ -1066,27 +1066,7 @@ if (opts->isVEDA)
                 (unsigned long long)state->payload_mi,
                 (unsigned long long)eff_mi);
 
-        fprintf(stderr,
-                "[VEDA PREVOICE] slot=%d "
-                "kx_pos=%u vendor_mi_valid=%u vendor_mi32=%08X "
-                "last_hdr_valid=%u last_hdr_src=%u "
-                "last_b0=%02X last_b1=%02X last_w2=%04X last_w4=%04X last_w6=%04X "
-                "sm=%u len_lo=%u len_hi=%u f9_count=%u\n",
-                slot + 1,
-                (unsigned)state->veda_kx_pos[slot],
-                (unsigned)state->veda_vendor_mi_valid[slot],
-                (unsigned)state->veda_vendor_mi32[slot],
-                (unsigned)state->veda_last_hdr_valid[slot],
-                (unsigned)state->veda_last_hdr_src[slot],
-                (unsigned)state->veda_last_b0[slot],
-                (unsigned)state->veda_last_b1[slot],
-                (unsigned)state->veda_last_w2[slot],
-                (unsigned)state->veda_last_w4[slot],
-                (unsigned)state->veda_last_w6[slot],
-                (unsigned)state->veda_sm[slot],
-                (unsigned)state->veda_len_lo[slot],
-                (unsigned)state->veda_len_hi[slot],
-                (unsigned)state->veda_f9_lc_count[slot]);
+        veda_trace_baseline(opts, state, slot, "PREVOICE");
 
         if (state->veda_kx_pos[slot] > 0)
         {
