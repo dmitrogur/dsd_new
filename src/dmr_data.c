@@ -16,6 +16,7 @@
  */
 
 #include "dsd.h"
+#include "dsd_veda.h"
 
 void
 dmr_data_sync (dsd_opts * opts, dsd_state * state)
@@ -350,5 +351,6 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
       state->last_vc_sync_time = 0;
     }
   }
+  
   #endif
 }

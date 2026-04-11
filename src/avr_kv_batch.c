@@ -1602,6 +1602,7 @@ void avr_kv_batch_run(dsd_opts *opts, dsd_state *st)
     fprintf(stderr,
             "\n MS group[%d] slot=%d alg=0x%02X kid=%u tg=%u src=%u. windows=%d (keys=%zu)\n",
             gi, G->slot, G->alg_id, (unsigned)G->key_id, G->tg, G->src, G->nwins, gKS.n);
+            
 
     for (int wi = 0; wi < G->nwins; ++wi)
     {

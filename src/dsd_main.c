@@ -13,6 +13,7 @@
  #include "provoice_const.h"
  #include "git_ver.h"
  #include "avr_kv.h" 
+ #include "dsd_veda.h"
  #include <signal.h>
 #include <ctype.h>
  
@@ -1421,6 +1422,11 @@
    memset(state->veda_tx_buf, 0, sizeof(state->veda_tx_buf));
 
    state->veda_debug = 0;
+   memset(state->veda_session_key, 0, sizeof(state->veda_session_key));
+   memset(state->veda_crypto_state, 0, sizeof(state->veda_crypto_state));
+   memset(state->veda_state_valid, 0, sizeof(state->veda_state_valid));
+   memset(state->veda_kx_pos, 0, sizeof(state->veda_kx_pos));
+   memset(state->veda_kx_buffer, 0, sizeof(state->veda_kx_buffer));
 
  } //init_state
  
@@ -2036,7 +2042,7 @@
   }
    exitflag = 0;
    opts.run_scout = 1;
- 
+//  VEDA 
 {
   int src = 1;
   int dst = 1;
@@ -2057,10 +2063,50 @@
       src++;
       continue;
     }
+    
+    if (strcmp(argv[src], "--veda-session") == 0) {
+      src++;
+      if (src < argc) {
+        char *key_str = argv[src];
+        if (strlen(key_str) == 64) {
+          for (int i = 0; i < 32; i++) {
+            sscanf(key_str + 2*i, "%02hhx", &opts.veda_manual_session_key[i]);
+          }
+          opts.veda_manual_set = 1;
+          opts.isVEDA = 1;
+          fprintf(stderr, "VEDA: Manual Session Key stored.\n");
+        }
+        src++;
+        continue;
+      }
+    }
+
+    // НОВОЕ: Обработка ключа --veda-key <64 символа HEX>
+    if (strcmp(argv[src], "--veda-key") == 0)
+    {
+      src++;
+      if (src < argc) {
+        char *key_str = argv[src];
+        int len = strlen(key_str);
+        if (len == 32 || len == 64) {
+          memset(opts.veda_master_key, 0, 32);
+          for (int i = 0; i < len / 2; i++) {
+            sscanf(key_str + 2*i, "%02hhx", &opts.veda_master_key[i]);
+          }
+          opts.veda_key_set = 1;
+          opts.isVEDA = 1;
+          fprintf(stderr, "VEDA Master Key (%d bits) loaded.\n", len * 4);
+        } else {
+          fprintf(stderr, "Error: VEDA key must be 32 or 64 hex chars.\n");
+          exit(1);
+        }
+        src++;
+        continue;
+      }
+    }
 
     argv[dst++] = argv[src++];
   }
-
   argc = dst;
   argv[argc] = NULL;
 }

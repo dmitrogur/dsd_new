@@ -12,6 +12,7 @@
 //TODO: Test UDT NMEA and LIP Decoders with Real World Samples (if/when available)
 
 #include "dsd.h"
+#include "dsd_veda.h"
 
 void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196], uint8_t databurst)
 {
@@ -375,6 +376,7 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
 
   }
 
+  
   //Embedded Signalling will use BPTC 128x77
   if (is_emb)
   {
@@ -598,6 +600,36 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
     else if (usbd_st > 8) fprintf (stderr, "Manufacturer Specific Service %d ", usbd_st);
     else fprintf (stderr, "Reserved %d ", usbd_st);
   }
+
+    // По анализу VEDA, Case 6 (KX) пролетает как пакет данных.
+    // Обычно это burst тип 6 (Confirmed Data) или 7 (Unconfirmed Data).
+// === VEDA KX ASSEMBLY ===
+if (opts->isVEDA) {
+        if (databurst >= 0x03 && databurst <= 0x07) {
+            uint8_t chunk[12];
+            for (int b = 0; b < 12; b++) {
+                chunk[b] = 0;
+                for (int bit = 0; bit < 8; bit++) {
+                    chunk[b] |= (info[b * 8 + bit] << (7 - bit));
+                }
+            }
+
+            // Если заголовок - начинаем с нуля
+            if (databurst == 0x03 || databurst == 0x04 || databurst == 0x06) {
+                state->veda_kx_pos[slot] = 0;
+            }
+
+            // Накопление (только если pos в адекватных пределах)
+            if (state->veda_kx_pos[slot] >= 0 && state->veda_kx_pos[slot] <= 36) {
+                memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], chunk, 12);
+                state->veda_kx_pos[slot] += 12;
+
+                if (state->veda_kx_pos[slot] == 48) {
+                    handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+                }
+            }
+        }
+    }
 
   //set the original CRCCorrect back to its original value if the RAS flag was tripped
   if (is_ras == 1) CRCCorrect = crc_original_validity;

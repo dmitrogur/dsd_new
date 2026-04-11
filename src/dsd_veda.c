@@ -3,6 +3,162 @@
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
 static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
 
+
+// Ротация вправо (из вашего реверса sub_8005DE4)
+#define ROR32(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+
+// Основная перестановка VEDA-Permute-384 (sub_8005DE4)
+void veda_permute_384(uint32_t *state, uint8_t domain) {
+    ((uint8_t*)state)[47] ^= domain;
+    for (int round = 24; round > 0; --round) {
+        for (int i = 0; i < 4; ++i) {
+            uint32_t v5 = state[i];
+            uint32_t v6 = state[i + 8];
+            uint32_t v7 = ROR32(state[i + 4], 23);
+            state[i]     = v6 ^ v7 ^ (8 * (v7 & ROR32(v5, 8)));
+            state[i + 8] = (2 * v6) ^ ROR32(v5, 8) ^ (4 * (v6 & v7));
+            state[i + 4] = v7 ^ ROR32(v5, 8) ^ (2 * (v6 | ROR32(v5, 8)));
+        }
+        uint32_t mod4 = round & 3;
+        if (mod4 == 1 || mod4 == 2) {
+            uint32_t v8 = state[0], v9 = state[1], v10 = state[3];
+            state[0] = state[2]; state[1] = v10; state[2] = v8; state[3] = v9;
+        } else if (mod4 == 3) {
+            uint32_t v11 = state[0], v12 = state[1], v13 = state[2], v14 = state[3];
+            state[0] = v14; state[1] = v13; state[2] = v12; state[3] = v11;
+        } else {
+            uint32_t v11 = state[0], v12 = state[1];
+            state[0] = v12 ^ (round | 0x9E377900);
+            state[1] = v11;
+            uint32_t tmp = state[2]; state[2] = state[3]; state[3] = tmp;
+        }
+    }
+}
+
+// Инициализация шифра сессионным ключом (аналог sub_8006372)
+void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key) {
+    uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
+    memset(state->veda_crypto_state[slot], 0, 48);
+    memcpy(s8, "\x06sbx256\x08PrssEntr", 16);
+
+    veda_permute_384(state->veda_crypto_state[slot], 1);
+    for(int i=0; i<4; i++) state->veda_crypto_state[slot][i] ^= ((uint32_t*)session_key)[i];
+    veda_permute_384(state->veda_crypto_state[slot], 253);
+    for(int i=0; i<4; i++) state->veda_crypto_state[slot][i] ^= ((uint32_t*)session_key)[i+4];
+    veda_permute_384(state->veda_crypto_state[slot], 253);
+    
+    state->veda_pos[slot] = 0;
+    state->veda_state_valid[slot] = 1;
+}
+
+// Применение Tweak (MI)
+void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
+    state->veda_crypto_state[slot][0] ^= (uint32_t)(mi & 0xFFFFFFFF);
+    state->veda_crypto_state[slot][1] ^= (uint32_t)(mi >> 32);
+    veda_permute_384(state->veda_crypto_state[slot], 2);
+    state->veda_pos[slot] = 0;
+}
+
+
+void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
+    hydro_kx_session_keypair kp; // Структура из твоего grep (содержит rx и tx)
+    hydro_kx_keypair static_kp;  // Нам нужен объект для ключа
+
+    // Инициализация библиотеки (обязательно один раз)
+    static int hydro_ready = 0;
+    if (!hydro_ready) {
+        if (hydro_init() != 0) return;
+        hydro_ready = 1;
+    }
+
+    // Готовим наш мастер-ключ. 
+    // В протоколе "N" мастер-ключ из CPS используется и как PSK, и как Static Secret Key.
+    memcpy(static_kp.sk, opts->veda_master_key, 32);
+    // Генерируем публичную часть из секретной (нужно для библиотеки)
+    hydro_kx_keygen_deterministic(&static_kp, opts->veda_master_key);
+
+    // ВЫЗОВ ПРАВИЛЬНОЙ ФУНКЦИИ ИЗ ТВОЕГО GREP: hydro_kx_n_2
+    // kp - куда писать ключи
+    // payload - 48 байт из эфира
+    // PSK - наш мастер ключ
+    // &static_kp - наш объект ключа
+    if (hydro_kx_n_2(&kp, payload, opts->veda_master_key, &static_kp) == 0) {
+        int slot = state->currentslot & 1;
+        
+        // Копируем RX ключ (первые 32 байта из сессионной пары)
+        memcpy(state->veda_session_key[slot], kp.rx, 32);
+        
+        // Инициализируем поток дешифрования
+        veda_stream_init(state, slot, state->veda_session_key[slot]);
+        
+        if (opts->veda_debug) {
+            fprintf(stderr, "\n[VEDA] Session Key Derived for Slot %d: ", slot + 1);
+            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
+            fprintf(stderr, "\n");
+        }
+    } else if (opts->veda_debug) {
+        fprintf(stderr, "\n[VEDA] KX Handshake Failed (Bad Master Key or Packet)\n");
+    }
+}
+
+// Само дешифрование AMBE фрейма (XOR)
+void veda_decrypt_bits(dsd_state *state, int slot, uint8_t *bits, int count) {
+    if (!state->veda_state_valid[slot]) return;
+
+    for (int i = 0; i < count; i++) {
+        // Если буфер гаммы кончился (16 байт = 128 бит), генерируем новый
+        if (state->veda_pos[slot] >= 128) {
+            veda_permute_384(state->veda_crypto_state[slot], 2);
+            state->veda_pos[slot] = 0;
+        }
+
+        // Извлекаем бит из состояния
+        uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
+        uint8_t gamma_bit = (s8[state->veda_pos[slot] >> 3] >> (state->veda_pos[slot] & 7)) & 1;
+        
+        bits[i] ^= gamma_bit;
+        state->veda_pos[slot]++;
+    }
+}
+
+// Единая функция получения бита гаммы с Feedback
+static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint8_t cipher_bit) {
+    if (state->veda_pos[slot] >= 128) { // 16 байт
+        veda_permute_384(state->veda_crypto_state[slot], 2);
+        state->veda_pos[slot] = 0;
+    }
+
+    uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
+    int byte_idx = state->veda_pos[slot] >> 3;
+    int bit_idx = 7 - (state->veda_pos[slot] & 7); // MSB First
+
+    uint8_t gamma_bit = (s8[byte_idx] >> bit_idx) & 1;
+    uint8_t plain_bit = cipher_bit ^ gamma_bit;
+
+    // ОБРАТНАЯ СВЯЗЬ (Feedback): 
+    // В режиме дешифрования состояние обновляется ВХОДНЫМ битом (cipher_bit)
+    if (cipher_bit) s8[byte_idx] |= (1 << bit_idx);
+    else s8[byte_idx] &= ~(1 << bit_idx);
+
+    state->veda_pos[slot]++;
+    return plain_bit;
+}
+
+// Дешифрование ровно 72 бит фрейма (DMR TCH стандарт)
+void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24]) {
+    if (!state->veda_state_valid[slot]) return;
+
+    // Проходим по 72 битам (3 блока по 24 бита в матрице ambe_fr)
+    // dsd-fme использует 4x24, но DMR Voice - это 72 бита. 
+    // Обычно это ambe_fr[0], [1], [2].
+    for (int i = 0; i < 3; i++) { // Используем 3 строки по 24 бита = 72
+        for (int j = 0; j < 24; j++) {
+            ambe_fr[i][j] = veda_get_gamma_bit_with_feedback(state, slot, ambe_fr[i][j] & 1);
+        }
+    }
+}
+//======================================================================================
+
 void veda_reset_slot(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
@@ -412,6 +568,16 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
 
             if (state->veda_debug)
                 veda_log_subst(state, slot, 2);
+
+fprintf(stderr,
+  "\nVEDA CMP slot=%d raw_src=%u raw_tgt=%u id_a=%u id_b=%u sel=%u subst=%u\n",
+  slot + 1,
+  state->veda_raw_src[slot],
+  state->veda_raw_tgt[slot],
+  state->veda_id24_a[slot],
+  state->veda_id24_b[slot],
+  state->veda_last_sel[slot],
+  state->veda_subst_active[slot]);                
 
             if (veda_try_build_tx_subst_frame(state, slot))
                 return 2;

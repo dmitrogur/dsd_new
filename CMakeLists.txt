@@ -57,10 +57,22 @@ find_package(RTLSDR)
 find_package(Curses REQUIRED)
 find_package(PulseAudio REQUIRED)
 find_package(CODEC2)
+# Поиск библиотеки hydrogen
+# Настройка путей поиска для библиотек в /usr/local
+link_directories(/usr/local/lib)
+include_directories(/usr/local/include)
 
-include_directories(SYSTEM ${LIBSNDFILE_INCLUDE_DIR} ${MBE_INCLUDE_DIR} ${ITPP_INCLUDE_DIR} ${PULSEAUDIO_INCLUDE_DIRS} ${CURSES_INCLUDE_DIRS})
-set(LIBS ${MBE_LIBRARY} ${LIBSNDFILE_LIBRARY} ${ITPP_LIBRARY} ${PULSEAUDIO_SIMPLE_LIBRARY} ${PULSEAUDIO_LIBRARY} ${CURSES_LIBRARIES})
+# Поиск библиотеки hydrogen
+find_path(HYDROGEN_INCLUDE_DIR hydrogen.h PATHS /usr/local/include /usr/include)
+find_library(HYDROGEN_LIBRARY NAMES hydrogen PATHS /usr/local/lib /usr/lib)
 
+if(NOT HYDROGEN_LIBRARY)
+    message(FATAL_ERROR "libhydrogen not found! Install it: git clone https://github.com/jedisct1/libhydrogen.git && make && sudo make install")
+endif()
+
+include_directories(SYSTEM ${LIBSNDFILE_INCLUDE_DIR} ${MBE_INCLUDE_DIR} ${ITPP_INCLUDE_DIR} ${PULSEAUDIO_INCLUDE_DIRS} ${CURSES_INCLUDE_DIRS} ${HYDROGEN_INCLUDE_DIR})
+set(LIBS ${MBE_LIBRARY} ${LIBSNDFILE_LIBRARY} ${ITPP_LIBRARY} ${PULSEAUDIO_SIMPLE_LIBRARY} ${PULSEAUDIO_LIBRARY} ${CURSES_LIBRARIES} ${HYDROGEN_LIBRARY}  m pthread)
+#${HYDROGEN_LIBRARY} 
 if(RTLSDR_FOUND)
     find_package(Threads)
     include_directories(SYSTEM ${RTLSDR_INCLUDE_DIRS})
@@ -83,6 +95,7 @@ endif(NOT RTLSDR_FOUND)
 
 configure_file("src/git_ver.c.in" "${CMAKE_CURRENT_BINARY_DIR}/git_ver.c" @ONLY)
 list(APPEND SRCS "${CMAKE_CURRENT_BINARY_DIR}/git_ver.c")
+
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
 

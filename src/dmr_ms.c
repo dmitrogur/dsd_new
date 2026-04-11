@@ -8,6 +8,7 @@
 #include "dsd.h"
 #include "dmr_const.h"
 #include "avr_kv.h"
+#include "dsd_veda.h"
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
 
 //A subroutine for processing MS voice
@@ -361,6 +362,25 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   ambe2_codeword_print_i(opts, ambe_fr3);
   #endif
 
+      // === VEDA DECRYPTION START ===
+  if (opts->isVEDA && state->veda_state_valid[0]) {
+          // Применяем MI только если он изменился (Tweak)
+          static uint64_t last_mi = 0xFFFFFFFFFFFFFFFF;
+          if (state->payload_mi != last_mi) {
+              veda_apply_mi(state, 0, state->payload_mi);
+              last_mi = state->payload_mi;
+              if (opts->veda_debug) fprintf(stderr, "VEDA: New Tweak/MI applied: %016llX\n", last_mi);
+          }
+
+          veda_decrypt_ambe(state, 0, ambe_fr);
+          veda_decrypt_ambe(state, 0, ambe_fr2);
+          veda_decrypt_ambe(state, 0, ambe_fr3);
+  }
+
+  if (opts->veda_debug) {
+    //fprintf(stderr, "DEBUG: Slot 0 Valid: %d, Key Set: %d\n", 
+    //         state->veda_state_valid[0], opts->veda_key_set);
+  }
   processMbeFrame (opts, state, NULL, ambe_fr, NULL);
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[0], state->s_l, sizeof(state->s_l));
@@ -917,6 +937,21 @@ if (opts->run_scout)
   ambe2_codeword_print_i(opts, ambe_fr2);
   ambe2_codeword_print_i(opts, ambe_fr3);
   #endif
+
+      // === VEDA DECRYPTION START ===
+  if (opts->isVEDA && state->veda_state_valid[0]) {
+          // Применяем MI только если он изменился (Tweak)
+          static uint64_t last_mi = 0xFFFFFFFFFFFFFFFF;
+          if (state->payload_mi != last_mi) {
+              veda_apply_mi(state, 0, state->payload_mi);
+              last_mi = state->payload_mi;
+              if (opts->veda_debug) fprintf(stderr, "VEDA: New Tweak/MI applied: %016llX\n", last_mi);
+          }
+
+          veda_decrypt_ambe(state, 0, ambe_fr);
+          veda_decrypt_ambe(state, 0, ambe_fr2);
+          veda_decrypt_ambe(state, 0, ambe_fr3);
+  }
 
   processMbeFrame (opts, state, NULL, ambe_fr, NULL);
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
