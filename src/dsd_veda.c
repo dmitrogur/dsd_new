@@ -238,9 +238,13 @@ const uint8_t *veda_session_material_cptr(const dsd_state *state, int slot)
 void veda_trace_baseline(dsd_opts *opts,
                          dsd_state *state,
                          int slot,
-                         const char *tag)
+                         const char *tag,
+                         int sf_cur,
+                         int sf_total)
 {
     uint64_t eff_mi;
+    uint32_t tg = 0;
+    uint32_t src = 0;
 
     if (!opts || !state || slot < 0 || slot > 1)
         return;
@@ -250,8 +254,20 @@ void veda_trace_baseline(dsd_opts *opts,
 
     eff_mi = veda_get_effective_mi(state, slot);
 
+    if (slot == 0)
+    {
+        tg  = (uint32_t)state->lasttg;
+        src = (uint32_t)state->lastsrc;
+    }
+    else
+    {
+        tg  = (uint32_t)state->lasttgR;
+        src = (uint32_t)state->lastsrcR;
+    }
+
     fprintf(stderr,
         "\n[VEDA BASE] tag=%s slot=%d "
+        "sf=%d/%d tg=%u src=%u "
         "sess_valid=%u stream_valid=%u kx_pos=%d "
         "vendor_mi_valid=%u vendor_mi32=%08X eff_mi=%016llX "
         "last_hdr_valid=%u last_hdr_src=%u "
@@ -259,6 +275,10 @@ void veda_trace_baseline(dsd_opts *opts,
         "sm=%u len_lo=%u len_hi=%u f9_count=%u\n",
         tag ? tag : "?",
         slot + 1,
+        sf_cur,
+        sf_total,
+        tg,
+        src,
         (unsigned)veda_session_key_valid(state, slot),
         (unsigned)veda_stream_ctx_valid(state, slot),
         state->veda_kx_pos[slot],

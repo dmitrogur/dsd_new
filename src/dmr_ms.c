@@ -1066,7 +1066,9 @@ if (opts->isVEDA)
                 (unsigned long long)state->payload_mi,
                 (unsigned long long)eff_mi);
 
-        veda_trace_baseline(opts, state, slot, "PREVOICE");
+        veda_trace_baseline(opts, state, slot, "PREVOICE",
+                    state->indx_SF,
+                    state->total_sf[slot]);
 
         if (state->veda_kx_pos[slot] > 0)
         {

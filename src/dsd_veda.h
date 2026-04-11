@@ -30,7 +30,9 @@ const uint8_t *veda_session_material_cptr(const dsd_state *state, int slot);
 void veda_trace_baseline(dsd_opts *opts,
                          dsd_state *state,
                          int slot,
-                         const char *tag);
+                         const char *tag,
+                         int sf_cur,
+                         int sf_total);
 
 // инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {
