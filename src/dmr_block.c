@@ -1414,6 +1414,26 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
     lb = block_bytes[0] >> 7; //last block flag
     pf = (block_bytes[0] >> 6) & 1;
 
+    if (opts->isVEDA && opts->veda_debug)
+    {
+      fprintf(stderr,
+              "\n[VEDA MBC BLK] slot=%d databurst=0x%02X blockcounter=%u blocks=%d lb=%u pf=%u hdr_valid=%u hdr_crc=%u first=%02X bytes=",
+              slot + 1,
+              databurst,
+              blockcounter,
+              blocks,
+              lb,
+              pf,
+              (unsigned)state->data_header_valid[slot],
+              (unsigned)state->data_block_crc_valid[slot][0],
+              block_bytes[0]);
+
+      for (int x = 0; x < block_len; x++)
+        fprintf(stderr, "%02X", block_bytes[x]);
+
+      fprintf(stderr, "\n");
+    }    
+
     if (is_udt)
     {
       lb = 0; //set to zero, data header may erroneously the lb flag check above (IG)
