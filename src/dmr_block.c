@@ -1434,6 +1434,16 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
       fprintf(stderr, "\n");
     }    
 
+    if (opts->isVEDA && databurst == 0x05 && block_len > 0)
+    {
+      veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_MBC05,
+                        block_bytes,
+                        block_len,
+                        state->indx_SF);
+    }
     if (is_udt)
     {
       lb = 0; //set to zero, data header may erroneously the lb flag check above (IG)
