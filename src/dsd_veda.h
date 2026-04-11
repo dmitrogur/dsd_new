@@ -16,8 +16,9 @@ void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key);
 void veda_apply_mi(dsd_state *state, int slot, uint64_t mi);
 void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24]);
 void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload);
-void veda_decrypt_bits(dsd_state *state, int slot, uint8_t *bits, int count);
-void veda_decrypt_ambe_matrix(dsd_opts *opts, dsd_state *state, int slot, char ambe_fr[4][24]);
+// void veda_decrypt_bits(dsd_state *state, int slot, uint8_t *bits, int count);
+// void veda_decrypt_ambe_matrix(dsd_opts *opts, dsd_state *state, int slot, char ambe_fr[4][24]);
+void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t mi);
 
 // Твои инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {

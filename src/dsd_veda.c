@@ -101,26 +101,8 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
     }
 }
 
-// Само дешифрование AMBE фрейма (XOR)
-void veda_decrypt_bits(dsd_state *state, int slot, uint8_t *bits, int count) {
-    if (!state->veda_state_valid[slot]) return;
 
-    for (int i = 0; i < count; i++) {
-        // Если буфер гаммы кончился (16 байт = 128 бит), генерируем новый
-        if (state->veda_pos[slot] >= 128) {
-            veda_permute_384(state->veda_crypto_state[slot], 2);
-            state->veda_pos[slot] = 0;
-        }
-
-        // Извлекаем бит из состояния
-        uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
-        uint8_t gamma_bit = (s8[state->veda_pos[slot] >> 3] >> (state->veda_pos[slot] & 7)) & 1;
-        
-        bits[i] ^= gamma_bit;
-        state->veda_pos[slot]++;
-    }
-}
-
+// Единая функция получения бита гаммы с Feedback
 // Единая функция получения бита гаммы с Feedback
 static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint8_t cipher_bit) {
     if (state->veda_pos[slot] >= 128) { // 16 байт
@@ -157,6 +139,40 @@ void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24]) {
         }
     }
 }
+
+void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t mi)
+{
+    if (!opts || !state || slot < 0 || slot > 1)
+        return;
+
+    if (mi == 0)
+        return;
+
+    if (!state->veda_state_valid[slot])
+        return;
+
+    if (state->veda_mi_applied[slot] && state->veda_last_applied_mi[slot] == mi)
+        return;
+
+    /*
+      Важно:
+      tweak надо применять к свежему stream context,
+      а не наслаивать поверх уже идущего keystream.
+    */
+    veda_stream_init(state, slot, state->veda_session_key[slot]);
+    veda_apply_mi(state, slot, mi);
+
+    state->veda_last_applied_mi[slot] = mi;
+    state->veda_mi_applied[slot] = 1;
+
+    if (opts->veda_debug)
+    {
+        fprintf(stderr,
+                "\n[VEDA] MI APPLIED slot=%d mi=%016llX\n",
+                slot + 1,
+                (unsigned long long)mi);
+    }
+}
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)
@@ -182,7 +198,10 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_last_w6[slot] = 0;
 
     state->veda_cmd0[slot] = 0;
-    state->veda_cmd1[slot] = 0;    
+    state->veda_cmd1[slot] = 0;  
+    
+    state->veda_last_applied_mi[slot] = 0;
+    state->veda_mi_applied[slot] = 0;
 }
 
 void veda_reset_profile(dsd_state *state, int slot)

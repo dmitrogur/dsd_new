@@ -1315,6 +1315,8 @@ typedef struct
   uint8_t veda_kx_buffer[2][48]; // Буфер для сборки KX пакета (по слотам)
   int     veda_kx_pos[2];        // Текущий индекс сборки
 
+  uint64_t veda_last_applied_mi[2];
+  uint8_t  veda_mi_applied[2];
 } dsd_state;
 
 /*

@@ -1428,6 +1428,9 @@
    memset(state->veda_kx_pos, 0, sizeof(state->veda_kx_pos));
    memset(state->veda_kx_buffer, 0, sizeof(state->veda_kx_buffer));
 
+   memset(state->veda_last_applied_mi, 0, sizeof(state->veda_last_applied_mi));
+   memset(state->veda_mi_applied, 0, sizeof(state->veda_mi_applied));
+
  } //init_state
  
  void

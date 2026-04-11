@@ -362,25 +362,6 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   ambe2_codeword_print_i(opts, ambe_fr3);
   #endif
 
-      // === VEDA DECRYPTION START ===
-  if (opts->isVEDA && state->veda_state_valid[0]) {
-          // Применяем MI только если он изменился (Tweak)
-          static uint64_t last_mi = 0xFFFFFFFFFFFFFFFF;
-          if (state->payload_mi != last_mi) {
-              veda_apply_mi(state, 0, state->payload_mi);
-              last_mi = state->payload_mi;
-              if (opts->veda_debug) fprintf(stderr, "VEDA: New Tweak/MI applied: %016llX\n", last_mi);
-          }
-
-          veda_decrypt_ambe(state, 0, ambe_fr);
-          veda_decrypt_ambe(state, 0, ambe_fr2);
-          veda_decrypt_ambe(state, 0, ambe_fr3);
-  }
-
-  if (opts->veda_debug) {
-    //fprintf(stderr, "DEBUG: Slot 0 Valid: %d, Key Set: %d\n", 
-    //         state->veda_state_valid[0], opts->veda_key_set);
-  }
   processMbeFrame (opts, state, NULL, ambe_fr, NULL);
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[0], state->s_l, sizeof(state->s_l));
@@ -608,6 +589,33 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, vc, m1, m2, m3);
 
+if (opts->isVEDA)
+{
+    const int slot = 0; /* MS/DM mono path uses slot 0 */
+
+    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
+    {
+        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
+        veda_stream_init(state, slot, state->veda_session_key[slot]);
+    }
+
+    if (state->veda_state_valid[slot] && state->payload_mi != 0)
+    {
+        veda_prepare_voice_ctx(opts, state, slot, state->payload_mi);
+
+        veda_decrypt_ambe(state, slot, ambe_fr);
+        veda_decrypt_ambe(state, slot, ambe_fr2);
+        veda_decrypt_ambe(state, slot, ambe_fr3);
+    }
+    else if (opts->veda_debug)
+    {
+        fprintf(stderr,
+                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX\n",
+                slot + 1,
+                state->veda_state_valid[slot],
+                (unsigned long long)state->payload_mi);
+    }
+}    
   //errors in ms/mono since we skip the other slot
   // cach_err = dmr_cach (opts, state, cachdata);
 
@@ -938,21 +946,6 @@ if (opts->run_scout)
   ambe2_codeword_print_i(opts, ambe_fr3);
   #endif
 
-      // === VEDA DECRYPTION START ===
-  if (opts->isVEDA && state->veda_state_valid[0]) {
-          // Применяем MI только если он изменился (Tweak)
-          static uint64_t last_mi = 0xFFFFFFFFFFFFFFFF;
-          if (state->payload_mi != last_mi) {
-              veda_apply_mi(state, 0, state->payload_mi);
-              last_mi = state->payload_mi;
-              if (opts->veda_debug) fprintf(stderr, "VEDA: New Tweak/MI applied: %016llX\n", last_mi);
-          }
-
-          veda_decrypt_ambe(state, 0, ambe_fr);
-          veda_decrypt_ambe(state, 0, ambe_fr2);
-          veda_decrypt_ambe(state, 0, ambe_fr3);
-  }
-
   processMbeFrame (opts, state, NULL, ambe_fr, NULL);
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[0], state->s_l, sizeof(state->s_l));
@@ -1036,6 +1029,42 @@ if (opts->run_scout)
   //collect the mi fragment
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, 1, m1, m2, m3);
+
+if (opts->isVEDA)
+{
+    const int slot = 0; /* MS/DM mono path uses slot 0 */
+
+    /*
+      Если session key задан вручную и stream еще не поднят —
+      поднимаем базовый контекст один раз.
+    */
+    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
+    {
+        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
+        veda_stream_init(state, slot, state->veda_session_key[slot]);
+    }
+
+    /*
+      После dmr_late_entry_mi_fragment() payload_mi уже может быть собран.
+      Применяем MI только если он не нулевой и ещё не применялся.
+    */
+    if (state->veda_state_valid[slot] && state->payload_mi != 0)
+    {
+        veda_prepare_voice_ctx(opts, state, slot, state->payload_mi);
+
+        veda_decrypt_ambe(state, slot, ambe_fr);
+        veda_decrypt_ambe(state, slot, ambe_fr2);
+        veda_decrypt_ambe(state, slot, ambe_fr3);
+    }
+    else if (opts->veda_debug)
+    {
+        fprintf(stderr,
+                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX\n",
+                slot + 1,
+                state->veda_state_valid[slot],
+                (unsigned long long)state->payload_mi);
+    }
+}
 
   //errors due to skipping other slot
   // cach_err = dmr_cach (opts, state, cachdata);
