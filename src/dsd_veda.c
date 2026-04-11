@@ -303,9 +303,10 @@ static const char *veda_candidate_source_name(uint8_t source_type)
 {
     switch (source_type)
     {
-    case VEDA_CAND_MBC05: return "MBC05";
-    case VEDA_CAND_VLC01: return "VLC01";
-    default:              return "NONE";
+    case VEDA_CAND_MBC05:  return "MBC05";
+    case VEDA_CAND_VLC01:  return "VLC01";
+    case VEDA_CAND_VC_EMB: return "VC_EMB";
+    default:               return "NONE";
     }
 }
 

@@ -384,9 +384,10 @@ typedef struct
 
 typedef enum
 {
-  VEDA_CAND_NONE  = 0,
-  VEDA_CAND_MBC05 = 1,
-  VEDA_CAND_VLC01 = 2
+  VEDA_CAND_NONE   = 0,
+  VEDA_CAND_MBC05  = 1,
+  VEDA_CAND_VLC01  = 2,
+  VEDA_CAND_VC_EMB = 3
 } veda_candidate_source_t;
 
 typedef struct
@@ -1344,7 +1345,7 @@ typedef struct
 
   veda_session_candidate_t veda_candidate[2];
   uint16_t veda_candidate_seq[2];
-  
+
 } dsd_state;
 
 /*
