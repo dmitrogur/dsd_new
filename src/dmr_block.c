@@ -8,6 +8,7 @@
 
 #include "dsd.h"
 #include "bp.h"
+#include "dsd_veda.h"
 
 #define DMR_PDU_DECRYPTION //disable to skip attempting to decrypt DMR PDUs
 
@@ -1495,6 +1496,51 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
         fprintf (stderr, " %X - %X", CRCExtracted, CRCComputed);
         // fprintf (stderr, " Len: %d", ((blocks+0)*96)-16);
         fprintf (stderr, "%s", KNRM);
+      }
+
+      /* === VEDA MBC SUPERFRAME TRACE / KX TRY === */
+      if (opts->isVEDA && !is_udt)
+      {
+        int total_bytes = (blocks + 1) * block_len;
+
+        if (opts->veda_debug)
+        {
+          fprintf(stderr,
+                  "\n[VEDA MBC SF] slot=%d blocks=%d total=%d lb=%u pf=%u crc=%u hdr_ok=%u bytes=",
+                  slot + 1,
+                  blocks,
+                  total_bytes,
+                  lb,
+                  pf,
+                  (unsigned)CRCCorrect,
+                  (unsigned)state->data_block_crc_valid[slot][0]);
+
+          for (int x = 0; x < total_bytes; x++)
+            fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+
+          fprintf(stderr, "\n");
+        }
+
+        /*
+         * Пробуем KX только на полном MBC superframe:
+         *   - не UDT
+         *   - не protected
+         *   - CRC ок
+         *   - длина ровно 48 байт
+         */
+        if (!pf && CRCCorrect && total_bytes == 48)
+        {
+          if (opts->veda_debug)
+          {
+            fprintf(stderr, "\n[VEDA KX MBC] TRY slot=%d payload=",
+                    slot + 1);
+            for (int x = 0; x < 48; x++)
+              fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+            fprintf(stderr, "\n");
+          }
+
+          handle_veda_kx_packet(opts, state, state->dmr_pdu_sf[slot]);
+        }
       }
 
       //cspdu will only act on any fid/opcodes if good CRC to prevent falsing on control signalling
