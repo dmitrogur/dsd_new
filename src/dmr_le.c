@@ -423,6 +423,8 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
       fprintf (stderr, "%s SLOT %d SB/RC (FEC ERR) E:%d; I:%08X D:%03X; %s ", KRED, slot+1, irr_err, sbrcpl, sbrc_hex, KNRM);
       fprintf(stderr, "FEC ERR %d. Power %d\n", irr_err, power);
 
+      
+
       fprintf(stderr,"\nVEDA SBRC slot=%d I=%08X D=%03X I_hi16=%u I_lo16=%u "
         "I_b0=%02X I_b1=%02X I_b2=%02X I_b3=%02X "
         "I_24_a=%u I_24_b=%u",
@@ -433,6 +435,20 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
         (sbrcpl >> 8) & 0xFF, sbrcpl & 0xFF,
         sbrcpl & 0xFFFFFF,
         (sbrcpl >> 8) & 0xFFFFFF);      
+      if (opts->isVEDA && sbrcpl != 0)
+      {
+        int vslot = state->currentslot & 1;
+        state->veda_vendor_mi32[vslot] = sbrcpl;
+        state->veda_vendor_mi_valid[vslot] = 1;
+
+        if (opts->veda_debug)
+        {
+          fprintf(stderr,
+                "\n[VEDA] SBRC-MI slot=%d I=%08X\n",
+                vslot + 1,
+                sbrcpl);
+        }
+      }      
       
       if(irr_err>7) {
          if (opts->fb_csv_path[0] == '\0') {

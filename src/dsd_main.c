@@ -1431,6 +1431,9 @@
    memset(state->veda_last_applied_mi, 0, sizeof(state->veda_last_applied_mi));
    memset(state->veda_mi_applied, 0, sizeof(state->veda_mi_applied));
 
+   memset(state->veda_vendor_mi32, 0, sizeof(state->veda_vendor_mi32));
+   memset(state->veda_vendor_mi_valid, 0, sizeof(state->veda_vendor_mi_valid));
+
  } //init_state
  
  void

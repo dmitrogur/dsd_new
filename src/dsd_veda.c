@@ -173,6 +173,28 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
                 (unsigned long long)mi);
     }
 }
+
+// static 
+uint64_t veda_get_effective_mi(dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return 0;
+
+    if (state->payload_mi != 0 && slot == 0)
+        return state->payload_mi;
+
+    if (state->payload_miR != 0 && slot == 1)
+        return state->payload_miR;
+
+    if (state->veda_vendor_mi_valid[slot])
+    {
+        uint64_t x = (uint64_t)state->veda_vendor_mi32[slot];
+        return (x << 32) | x;   /* первая рабочая гипотеза */
+    }
+
+    return 0;
+}
+
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)
@@ -202,6 +224,9 @@ void veda_reset_slot(dsd_state *state, int slot)
     
     state->veda_last_applied_mi[slot] = 0;
     state->veda_mi_applied[slot] = 0;
+
+    state->veda_vendor_mi32[slot] = 0;
+    state->veda_vendor_mi_valid[slot] = 0;
 }
 
 void veda_reset_profile(dsd_state *state, int slot)

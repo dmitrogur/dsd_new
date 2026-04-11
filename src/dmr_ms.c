@@ -592,6 +592,7 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
 if (opts->isVEDA)
 {
     const int slot = 0; /* MS/DM mono path uses slot 0 */
+    uint64_t eff_mi;
 
     if (!state->veda_state_valid[slot] && opts->veda_manual_set)
     {
@@ -599,9 +600,11 @@ if (opts->isVEDA)
         veda_stream_init(state, slot, state->veda_session_key[slot]);
     }
 
-    if (state->veda_state_valid[slot] && state->payload_mi != 0)
+    eff_mi = veda_get_effective_mi(state, slot);
+
+    if (state->veda_state_valid[slot] && eff_mi != 0)
     {
-        veda_prepare_voice_ctx(opts, state, slot, state->payload_mi);
+        veda_prepare_voice_ctx(opts, state, slot, eff_mi);
 
         veda_decrypt_ambe(state, slot, ambe_fr);
         veda_decrypt_ambe(state, slot, ambe_fr2);
@@ -610,12 +613,13 @@ if (opts->isVEDA)
     else if (opts->veda_debug)
     {
         fprintf(stderr,
-                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX\n",
+                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX eff_mi=%016llX\n",
                 slot + 1,
                 state->veda_state_valid[slot],
-                (unsigned long long)state->payload_mi);
+                (unsigned long long)state->payload_mi,
+                (unsigned long long)eff_mi);
     }
-}    
+}   
   //errors in ms/mono since we skip the other slot
   // cach_err = dmr_cach (opts, state, cachdata);
 
@@ -1033,24 +1037,19 @@ if (opts->run_scout)
 if (opts->isVEDA)
 {
     const int slot = 0; /* MS/DM mono path uses slot 0 */
+    uint64_t eff_mi;
 
-    /*
-      Если session key задан вручную и stream еще не поднят —
-      поднимаем базовый контекст один раз.
-    */
     if (!state->veda_state_valid[slot] && opts->veda_manual_set)
     {
         memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
         veda_stream_init(state, slot, state->veda_session_key[slot]);
     }
 
-    /*
-      После dmr_late_entry_mi_fragment() payload_mi уже может быть собран.
-      Применяем MI только если он не нулевой и ещё не применялся.
-    */
-    if (state->veda_state_valid[slot] && state->payload_mi != 0)
+    eff_mi = veda_get_effective_mi(state, slot);
+
+    if (state->veda_state_valid[slot] && eff_mi != 0)
     {
-        veda_prepare_voice_ctx(opts, state, slot, state->payload_mi);
+        veda_prepare_voice_ctx(opts, state, slot, eff_mi);
 
         veda_decrypt_ambe(state, slot, ambe_fr);
         veda_decrypt_ambe(state, slot, ambe_fr2);
@@ -1059,10 +1058,11 @@ if (opts->isVEDA)
     else if (opts->veda_debug)
     {
         fprintf(stderr,
-                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX\n",
+                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX eff_mi=%016llX\n",
                 slot + 1,
                 state->veda_state_valid[slot],
-                (unsigned long long)state->payload_mi);
+                (unsigned long long)state->payload_mi,
+                (unsigned long long)eff_mi);
     }
 }
 

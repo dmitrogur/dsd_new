@@ -20,6 +20,8 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload);
 // void veda_decrypt_ambe_matrix(dsd_opts *opts, dsd_state *state, int slot, char ambe_fr[4][24]);
 void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t mi);
 
+uint64_t veda_get_effective_mi(dsd_state *state, int slot);
+
 // Твои инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {
     return ((uint32_t)p[0]) | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);
