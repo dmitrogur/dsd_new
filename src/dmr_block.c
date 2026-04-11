@@ -1540,6 +1540,16 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
 
           fprintf(stderr, "\n");
         }
+        if (total_bytes > 0)
+        {
+            veda_note_candidate(opts,
+                                state,
+                                slot,
+                                VEDA_CAND_MBC05,
+                                state->dmr_pdu_sf[slot],
+                                (uint8_t)total_bytes,
+                                state->indx_SF);
+        }        
 
         /*
          * Пробуем KX только на полном MBC superframe:

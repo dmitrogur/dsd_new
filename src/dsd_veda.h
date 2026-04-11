@@ -34,6 +34,16 @@ void veda_trace_baseline(dsd_opts *opts,
                          int sf_cur,
                          int sf_total);
 
+void veda_note_candidate(dsd_opts *opts,
+                         dsd_state *state,
+                         int slot,
+                         uint8_t source_type,
+                         const uint8_t *payload,
+                         uint8_t payload_len,
+                         int sf_cur);
+
+void veda_clear_candidate(dsd_state *state, int slot);                         
+
 // инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {
     return ((uint32_t)p[0]) | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);

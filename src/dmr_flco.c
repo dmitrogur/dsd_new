@@ -198,6 +198,17 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     alt_tgt_be_24, alt_src_be_24,
     alt_tgt_le_24, alt_src_le_24);
 
+  if (type == 1)
+  {
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_VLC01,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+  }    
+
   if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
   {
     if (fid == 0xF9)

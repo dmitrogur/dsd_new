@@ -298,6 +298,88 @@ void veda_trace_baseline(dsd_opts *opts,
         (unsigned)state->veda_f9_lc_count[slot]);
 }
 
+
+static const char *veda_candidate_source_name(uint8_t source_type)
+{
+    switch (source_type)
+    {
+    case VEDA_CAND_MBC05: return "MBC05";
+    case VEDA_CAND_VLC01: return "VLC01";
+    default:              return "NONE";
+    }
+}
+
+void veda_clear_candidate(dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    memset(&state->veda_candidate[slot], 0, sizeof(state->veda_candidate[slot]));
+}
+
+void veda_note_candidate(dsd_opts *opts,
+                         dsd_state *state,
+                         int slot,
+                         uint8_t source_type,
+                         const uint8_t *payload,
+                         uint8_t payload_len,
+                         int sf_cur)
+{
+    veda_session_candidate_t *cand;
+    uint8_t n;
+    int i;
+
+    if (!opts || !state || !payload || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->isVEDA)
+        return;
+
+    cand = &state->veda_candidate[slot];
+    n = payload_len;
+    if (n > sizeof(cand->raw_payload))
+        n = sizeof(cand->raw_payload);
+
+    /* не спамим лог одинаковым кандидатом подряд */
+    if (cand->valid &&
+        cand->source_type == source_type &&
+        cand->payload_len == n &&
+        memcmp(cand->raw_payload, payload, n) == 0)
+    {
+        return;
+    }
+
+    memset(cand, 0, sizeof(*cand));
+    cand->valid = 1;
+    cand->source_type = source_type;
+    cand->payload_len = n;
+    cand->timestamp_sf = (sf_cur < 0) ? 0 : (sf_cur > 0xFFFF ? 0xFFFF : (uint16_t)sf_cur);
+
+    state->veda_candidate_seq[slot]++;
+    if (state->veda_candidate_seq[slot] == 0)
+        state->veda_candidate_seq[slot] = 1;
+
+    cand->seq_in_session = state->veda_candidate_seq[slot];
+
+    memcpy(cand->raw_payload, payload, n);
+
+    if (opts->veda_debug)
+    {
+        fprintf(stderr,
+                "\n[VEDA CAND] slot=%d seq=%u src=%s sf=%u len=%u bytes=",
+                slot + 1,
+                (unsigned)cand->seq_in_session,
+                veda_candidate_source_name(source_type),
+                (unsigned)cand->timestamp_sf,
+                (unsigned)cand->payload_len);
+
+        for (i = 0; i < cand->payload_len; i++)
+            fprintf(stderr, "%02X", cand->raw_payload[i]);
+
+        fprintf(stderr, "\n");
+    }
+}
+
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)
@@ -334,6 +416,9 @@ void veda_reset_slot(dsd_state *state, int slot)
     memset(state->veda_f9_lc_bytes[slot], 0, sizeof(state->veda_f9_lc_bytes[slot]));
     memset(state->veda_f9_lc_type[slot], 0, sizeof(state->veda_f9_lc_type[slot]));
     state->veda_f9_lc_count[slot] = 0;
+
+    veda_clear_candidate(state, slot);
+    state->veda_candidate_seq[slot] = 0;
 }
 
 void veda_reset_profile(dsd_state *state, int slot)

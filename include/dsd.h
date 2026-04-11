@@ -384,6 +384,23 @@ typedef struct
 
 typedef enum
 {
+  VEDA_CAND_NONE  = 0,
+  VEDA_CAND_MBC05 = 1,
+  VEDA_CAND_VLC01 = 2
+} veda_candidate_source_t;
+
+typedef struct
+{
+  uint8_t  valid;
+  uint8_t  source_type;
+  uint8_t  raw_payload[64];
+  uint8_t  payload_len;
+  uint16_t seq_in_session;
+  uint16_t timestamp_sf;
+} veda_session_candidate_t;
+
+typedef enum
+{
   VEDA_HDRSRC_NONE    = 0,
   VEDA_HDRSRC_CSBK    = 1,
   VEDA_HDRSRC_VLC     = 2,
@@ -1325,6 +1342,9 @@ typedef struct
   uint8_t veda_f9_lc_type[2][4];
   uint8_t veda_f9_lc_count[2];   
 
+  veda_session_candidate_t veda_candidate[2];
+  uint16_t veda_candidate_seq[2];
+  
 } dsd_state;
 
 /*
