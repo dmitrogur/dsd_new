@@ -531,13 +531,6 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Unknown LC ");
       ippl_adds("flco_info", "Unknown LC");//IPP
-
-      if (fid == 0xF9)
-      { 
-        fprintf(stderr, "VEDA-F9 ");
-        ippl_adds("flco_info", "VEDA-F9");
-      }
-
       unk = 1;
       goto END_FLCO;
     }

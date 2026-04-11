@@ -1323,7 +1323,8 @@ typedef struct
 
   uint8_t veda_f9_lc_bytes[2][4][9];
   uint8_t veda_f9_lc_type[2][4];
-  uint8_t veda_f9_lc_count[2];  
+  uint8_t veda_f9_lc_count[2];   
+
 } dsd_state;
 
 /*

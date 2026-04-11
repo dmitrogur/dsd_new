@@ -1438,6 +1438,9 @@
    memset(state->veda_f9_lc_type, 0, sizeof(state->veda_f9_lc_type));
    memset(state->veda_f9_lc_count, 0, sizeof(state->veda_f9_lc_count));
 
+   memset(state->veda_f9_lc_bytes, 0, sizeof(state->veda_f9_lc_bytes));
+   memset(state->veda_f9_lc_type, 0, sizeof(state->veda_f9_lc_type));
+   memset(state->veda_f9_lc_count, 0, sizeof(state->veda_f9_lc_count));
  } //init_state
  
  void
