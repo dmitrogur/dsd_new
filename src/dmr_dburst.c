@@ -24,6 +24,17 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   uint32_t IrrecoverableErrors = 0;
   uint8_t slot = state->currentslot;
 
+if (opts->isVEDA && opts->veda_debug)
+{
+    fprintf(stderr,
+            "\n[VEDA DB] slot=%d databurst=0x%02X ms=%u stereo=%u payload_algid=0x%02X",
+            slot + 1,
+            databurst,
+            state->dmr_ms_mode,
+            state->dmr_stereo,
+            state->payload_algid);
+}
+
   //confirmed data
   uint8_t dbsn = 0; //data block serial number for confirmed data blocks
   uint8_t blockcounter = 0; //local block count
@@ -579,7 +590,7 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
 
   //control signalling types (CSBK, MBC)
   if (databurst == 0x03) dmr_cspdu (opts, state, DMR_PDU_bits, DMR_PDU, CRCCorrect, IrrecoverableErrors);
-
+  /*
   //both MBC header and MBC continuation will go to the block_assembler - type 2, and then to dmr_cspdu
   if (databurst == 0x04)
   {
@@ -588,7 +599,32 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
     dmr_block_assembler (opts, state, DMR_PDU, pdu_len, databurst, 2);
   }
   if (databurst == 0x05) dmr_block_assembler (opts, state, DMR_PDU, pdu_len, databurst, 2);
+  */
+ if (databurst == 0x04)
+{
+  if (opts->isVEDA && opts->veda_debug)
+  {
+    fprintf(stderr, "\n[VEDA MBC] H slot=%d pdu=", slot + 1);
+    for (int x = 0; x < pdu_len; x++) fprintf(stderr, "%02X", DMR_PDU[x]);
+    fprintf(stderr, "\n");
+  }
 
+  state->data_block_counter[slot] = 0;
+  state->data_header_valid[slot] = 1;
+  dmr_block_assembler(opts, state, DMR_PDU, pdu_len, databurst, 2);
+}
+
+if (databurst == 0x05)
+{
+  if (opts->isVEDA && opts->veda_debug)
+  {
+    fprintf(stderr, "\n[VEDA MBC] C slot=%d pdu=", slot + 1);
+    for (int x = 0; x < pdu_len; x++) fprintf(stderr, "%02X", DMR_PDU[x]);
+    fprintf(stderr, "\n");
+  }
+
+  dmr_block_assembler(opts, state, DMR_PDU, pdu_len, databurst, 2);
+}
   //Unified Single Data Block (USBD) -- Not to be confused with Unified Data Transport (UDT)
   if (databurst == 0x0B)
   {
