@@ -310,6 +310,23 @@ static const char *veda_candidate_source_name(uint8_t source_type)
     }
 }
 
+static int veda_mem_has_pattern(const uint8_t *buf, uint8_t buf_len,
+                                const uint8_t *pat, uint8_t pat_len)
+{
+    uint8_t i;
+
+    if (!buf || !pat || pat_len == 0 || buf_len < pat_len)
+        return 0;
+
+    for (i = 0; i <= (uint8_t)(buf_len - pat_len); i++)
+    {
+        if (memcmp(buf + i, pat, pat_len) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
 void veda_clear_candidate(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
@@ -327,8 +344,14 @@ void veda_note_candidate(dsd_opts *opts,
                          int sf_cur)
 {
     veda_session_candidate_t *cand;
+    veda_session_candidate_t prev;
+    static const uint8_t pat_sbx256[]   = {0x06, 0x73, 0x62, 0x78, 0x32, 0x35, 0x36, 0x08};
+    static const uint8_t pat_prssentr[] = {'P','r','s','s','E','n','t','r'};
     uint8_t n;
     int i;
+    int same_prev = 0;
+    int has_sbx256 = 0;
+    int has_prssentr = 0;
 
     if (!opts || !state || !payload || slot < 0 || slot > 1)
         return;
@@ -337,11 +360,13 @@ void veda_note_candidate(dsd_opts *opts,
         return;
 
     cand = &state->veda_candidate[slot];
+    prev = *cand;
+
     n = payload_len;
     if (n > sizeof(cand->raw_payload))
         n = sizeof(cand->raw_payload);
 
-    /* не спамим лог одинаковым кандидатом подряд */
+    /* не спамим полностью одинаковым кандидатом подряд */
     if (cand->valid &&
         cand->source_type == source_type &&
         cand->payload_len == n &&
@@ -349,6 +374,16 @@ void veda_note_candidate(dsd_opts *opts,
     {
         return;
     }
+
+    if (prev.valid &&
+        prev.payload_len == n &&
+        memcmp(prev.raw_payload, payload, n) == 0)
+    {
+        same_prev = 1;
+    }
+
+    has_sbx256 = veda_mem_has_pattern(payload, n, pat_sbx256, sizeof(pat_sbx256));
+    has_prssentr = veda_mem_has_pattern(payload, n, pat_prssentr, sizeof(pat_prssentr));
 
     memset(cand, 0, sizeof(*cand));
     cand->valid = 1;
@@ -367,12 +402,17 @@ void veda_note_candidate(dsd_opts *opts,
     if (opts->veda_debug)
     {
         fprintf(stderr,
-                "\n[VEDA CAND] slot=%d seq=%u src=%s sf=%u len=%u bytes=",
+                "\n[VEDA CAND] slot=%d seq=%u src=%s sf=%u len=%u "
+                "prev=%s same_prev=%u has_sbx256=%u has_prssentr=%u bytes=",
                 slot + 1,
                 (unsigned)cand->seq_in_session,
                 veda_candidate_source_name(source_type),
                 (unsigned)cand->timestamp_sf,
-                (unsigned)cand->payload_len);
+                (unsigned)cand->payload_len,
+                prev.valid ? veda_candidate_source_name(prev.source_type) : "NONE",
+                (unsigned)same_prev,
+                (unsigned)has_sbx256,
+                (unsigned)has_prssentr);
 
         for (i = 0; i < cand->payload_len; i++)
             fprintf(stderr, "%02X", cand->raw_payload[i]);
