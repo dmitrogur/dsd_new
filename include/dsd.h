@@ -1317,6 +1317,13 @@ typedef struct
 
   uint64_t veda_last_applied_mi[2];
   uint8_t  veda_mi_applied[2];
+
+  uint32_t veda_vendor_mi32[2];
+  uint8_t  veda_vendor_mi_valid[2];
+
+  uint8_t veda_f9_lc_bytes[2][4][9];
+  uint8_t veda_f9_lc_type[2][4];
+  uint8_t veda_f9_lc_count[2];  
 } dsd_state;
 
 /*

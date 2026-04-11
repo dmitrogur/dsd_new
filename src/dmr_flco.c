@@ -9,6 +9,68 @@
 #include "avr_kv.h"
 #include "dsd_veda.h"
 
+static void veda_note_f9_lc(dsd_opts *opts, dsd_state *state, int slot,
+                            uint8_t type, const uint8_t lc_bytes[9],
+                            uint8_t flco, uint8_t fid, uint8_t so)
+{
+  int pos;
+  int i, j;
+
+  if (!opts || !state || !lc_bytes)
+    return;
+
+  if (!opts->isVEDA)
+    return;
+
+  if (slot < 0 || slot > 1)
+    return;
+
+  pos = state->veda_f9_lc_count[slot];
+
+  if (pos >= 4)
+  {
+    for (i = 1; i < 4; i++)
+    {
+      memcpy(state->veda_f9_lc_bytes[slot][i - 1],
+             state->veda_f9_lc_bytes[slot][i], 9);
+      state->veda_f9_lc_type[slot][i - 1] =
+          state->veda_f9_lc_type[slot][i];
+    }
+    pos = 3;
+  }
+
+  memcpy(state->veda_f9_lc_bytes[slot][pos], lc_bytes, 9);
+  state->veda_f9_lc_type[slot][pos] = type;
+
+  if (state->veda_f9_lc_count[slot] < 4)
+    state->veda_f9_lc_count[slot]++;
+
+  if (opts->veda_debug)
+  {
+    fprintf(stderr,
+            "\n[VEDA F9] slot=%d idx=%d type=%u flco=%02X fid=%02X so=%02X bytes=",
+            slot + 1, pos, type, flco, fid, so);
+
+    for (i = 0; i < 9; i++)
+      fprintf(stderr, "%02X", lc_bytes[i]);
+
+    fprintf(stderr, "\n[VEDA F9 SEQ] slot=%d count=%u",
+            slot + 1, state->veda_f9_lc_count[slot]);
+
+    for (i = 0; i < state->veda_f9_lc_count[slot]; i++)
+    {
+      fprintf(stderr, "\n  [%d] type=%u ", i,
+              state->veda_f9_lc_type[slot][i]);
+
+      for (j = 0; j < 9; j++)
+        fprintf(stderr, "%02X",
+                state->veda_f9_lc_bytes[slot][i][j]);
+    }
+
+    fprintf(stderr, "\n");
+  }
+}
+
 static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
                                       int slot, const uint8_t *lc_bits,
                                       uint8_t lc_type,
@@ -135,7 +197,17 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     target, source,
     alt_tgt_be_24, alt_src_be_24,
     alt_tgt_le_24, alt_src_le_24);
+
+  if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
+  {
+    if (fid == 0xF9)
+    {
+      veda_note_f9_lc(opts, state, slot, type, lc_bytes, flco, fid, so);
+    }
   }
+
+  }
+
 
   if (opts->run_scout) {
     if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
@@ -449,6 +521,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     //unknown other manufacturer or OTA ENC, etc.
     //removed tait from the list, added hytera 0x08
     if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && is_kenwood_sc == 0)
+
+    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && fid != 0xF9 && is_kenwood_sc == 0)
+    
     {
       if (type == 1) fprintf (stderr, "%s \n", KYEL);
       if (type == 2) fprintf (stderr, "%s \n", KYEL);
@@ -456,6 +531,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Unknown LC ");
       ippl_adds("flco_info", "Unknown LC");//IPP
+
+      if (fid == 0xF9)
+      { 
+        fprintf(stderr, "VEDA-F9 ");
+        ippl_adds("flco_info", "VEDA-F9");
+      }
 
       unk = 1;
       goto END_FLCO;
@@ -659,7 +740,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     //0x20 on the Embedded Voice Burst Sync seems to indicate a Moto (non-specific) Group Call in progress
     //its possible that both EMB FID 0x10 FLCO 0x20 and 0x23 are just Moto but non-specific (observed 0x20 on Tier 2)
 
-    if (fid == 0x68) {
+    if (fid == 0xF9)
+    {
+      fprintf(stderr, "VEDA-F9  2");
+      ippl_adds("flco_info", "VEDA-F9");
+    }
+    else if (fid == 0x68) {
       sprintf (state->call_string[slot], " Hytera  ");
       ippl_adds("flco_info", "Hytera");//IPP   
       if (state->dmr_branding[0])

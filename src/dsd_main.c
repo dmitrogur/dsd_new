@@ -1434,6 +1434,10 @@
    memset(state->veda_vendor_mi32, 0, sizeof(state->veda_vendor_mi32));
    memset(state->veda_vendor_mi_valid, 0, sizeof(state->veda_vendor_mi_valid));
 
+   memset(state->veda_f9_lc_bytes, 0, sizeof(state->veda_f9_lc_bytes));
+   memset(state->veda_f9_lc_type, 0, sizeof(state->veda_f9_lc_type));
+   memset(state->veda_f9_lc_count, 0, sizeof(state->veda_f9_lc_count));
+
  } //init_state
  
  void

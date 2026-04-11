@@ -227,6 +227,10 @@ void veda_reset_slot(dsd_state *state, int slot)
 
     state->veda_vendor_mi32[slot] = 0;
     state->veda_vendor_mi_valid[slot] = 0;
+
+    memset(state->veda_f9_lc_bytes[slot], 0, sizeof(state->veda_f9_lc_bytes[slot]));
+    memset(state->veda_f9_lc_type[slot], 0, sizeof(state->veda_f9_lc_type[slot]));
+    state->veda_f9_lc_count[slot] = 0;
 }
 
 void veda_reset_profile(dsd_state *state, int slot)
