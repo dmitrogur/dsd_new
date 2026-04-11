@@ -603,39 +603,122 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
 
     // По анализу VEDA, Case 6 (KX) пролетает как пакет данных.
     // Обычно это burst тип 6 (Confirmed Data) или 7 (Unconfirmed Data).
-// === VEDA KX ASSEMBLY ===
-if (opts->isVEDA) {
-        // VEDA KX обычно идет как Data Header (0x06) с определенным SAP, 
-        // а затем 3 блока данных (0x07)
-        if (databurst == 0x06) {
-            state->veda_kx_pos[slot] = 0; // Сброс при каждом новом заголовке
+/* === VEDA KX ASSEMBLY ===
+ * Ищем только data-path:
+ *   0x06 = Data Header
+ *   0x07 = 1/2 Rate Data
+ *
+ * KX-кандидат собираем как:
+ *   12B header + 3 * 12B data = 48B
+ *
+ * Важно:
+ * - используем уже ДЕКОДИРОВАННЫЕ байты DMR_PDU, а не сырой info[]
+ * - копим только при хорошем CRC
+ * - любой неожиданный databurst во время сборки рвёт кандидат
+ */
+if (opts->isVEDA)
+{
+    /* если в процессе сборки прилетел не тот burst — сбрасываем кандидат */
+    if (state->veda_kx_pos[slot] > 0 &&
+        databurst != 0x06 &&
+        databurst != 0x07)
+    {
+        if (opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA KX] RESET slot=%d unexpected databurst=0x%02X pos=%u\n",
+                    slot + 1, databurst, state->veda_kx_pos[slot]);
         }
 
-        if (databurst == 0x06 || databurst == 0x07) {
-            uint8_t chunk[12];
-            // Упаковка байт (важен порядок!)
-            for (int b = 0; b < 12; b++) {
-                chunk[b] = 0;
-                for (int bit = 0; bit < 8; bit++) {
-                    chunk[b] |= (info[b * 8 + bit] << (7 - bit));
-                }
+        state->veda_kx_pos[slot] = 0;
+        memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
+    }
+
+    /* старт новой сборки только от валидного Data Header */
+    if (databurst == 0x06)
+    {
+        state->veda_kx_pos[slot] = 0;
+        memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
+
+        if (CRCCorrect && pdu_len == 12)
+        {
+            memcpy(&state->veda_kx_buffer[slot][0], DMR_PDU, 12);
+            state->veda_kx_pos[slot] = 12;
+
+            if (opts->veda_debug)
+            {
+                fprintf(stderr, "\n[VEDA KX] H slot=%d crc=%u pdu_len=%u hdr=",
+                        slot + 1, (unsigned)CRCCorrect, (unsigned)pdu_len);
+                for (int i = 0; i < 12; i++) fprintf(stderr, "%02X", DMR_PDU[i]);
+                fprintf(stderr, "\n");
+            }
+        }
+        else
+        {
+            if (opts->veda_debug)
+            {
+                fprintf(stderr,
+                        "\n[VEDA KX] DROP-H slot=%d crc=%u pdu_len=%u\n",
+                        slot + 1, (unsigned)CRCCorrect, (unsigned)pdu_len);
+            }
+        }
+    }
+    /* продолжаем только data block 0x07 */
+    else if (databurst == 0x07)
+    {
+        if (state->veda_kx_pos[slot] >= 12 &&
+            state->veda_kx_pos[slot] <= 36 &&
+            CRCCorrect &&
+            pdu_len == 12)
+        {
+            memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], DMR_PDU, 12);
+            state->veda_kx_pos[slot] += 12;
+
+            if (opts->veda_debug)
+            {
+                fprintf(stderr, "\n[VEDA KX] D slot=%d crc=%u pdu_len=%u pos=%u blk=",
+                        slot + 1, (unsigned)CRCCorrect, (unsigned)pdu_len,
+                        state->veda_kx_pos[slot]);
+                for (int i = 0; i < 12; i++) fprintf(stderr, "%02X", DMR_PDU[i]);
+                fprintf(stderr, "\n");
             }
 
-            if (state->veda_kx_pos[slot] <= 36) {
-                memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], chunk, 12);
-                state->veda_kx_pos[slot] += 12;
-
-                if (state->veda_kx_pos[slot] == 48) {
-                    // Дампим пакет для анализа, даже если ключ не подошел
-                    fprintf(stderr, "\n[VEDA] Found 48-byte KX candidate: ");
-                    for(int i=0; i<48; i++) fprintf(stderr, "%02X", state->veda_kx_buffer[slot][i]);
+            if (state->veda_kx_pos[slot] == 48)
+            {
+                if (opts->veda_debug)
+                {
+                    fprintf(stderr, "\n[VEDA KX] TRY slot=%d payload=",
+                            slot + 1);
+                    for (int i = 0; i < 48; i++)
+                        fprintf(stderr, "%02X", state->veda_kx_buffer[slot][i]);
                     fprintf(stderr, "\n");
-
-                    handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
                 }
+
+                handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+
+                /* после попытки — сброс, чтобы не слепить следующий кандидат поверх */
+                state->veda_kx_pos[slot] = 0;
+                memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
             }
         }
-  }
+        else if (state->veda_kx_pos[slot] > 0)
+        {
+            if (opts->veda_debug)
+            {
+                fprintf(stderr,
+                        "\n[VEDA KX] DROP-D slot=%d crc=%u pdu_len=%u pos=%u\n",
+                        slot + 1,
+                        (unsigned)CRCCorrect,
+                        (unsigned)pdu_len,
+                        state->veda_kx_pos[slot]);
+            }
+
+            state->veda_kx_pos[slot] = 0;
+            memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
+        }
+    }
+}
+
   //set the original CRCCorrect back to its original value if the RAS flag was tripped
   if (is_ras == 1) CRCCorrect = crc_original_validity;
 

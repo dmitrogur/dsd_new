@@ -741,7 +741,7 @@ static void avr_scout_report_summary(bool ms_mode, dsd_state *stat)
         else
             fprintf(stderr, " BS group[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u. sf=%u/%u windows=%u\n",
                     i, G->slot, G->alg_id, G->key_id, G->tg, G->src, (unsigned)G->sf_good, (unsigned)G->sf_total, G->nwins);
-
+        /*        
         for (uint8_t w = 0; w < G->nwins; ++w)
         {
             const avr_scout_window_ref_t *W = &G->win[w];
@@ -749,6 +749,7 @@ static void avr_scout_report_summary(bool ms_mode, dsd_state *stat)
                     "         win[%u]: start_sf=%u len=%u q=%u\n",
                     (unsigned)w, (unsigned)W->start_sf_idx, (unsigned)W->len_sf, (unsigned)W->quality);
         }
+        */
     }
     // fprintf(stderr, " END OF SUMMARY\n\n");
 }
