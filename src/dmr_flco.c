@@ -520,10 +520,8 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 
     //unknown other manufacturer or OTA ENC, etc.
     //removed tait from the list, added hytera 0x08
-    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && is_kenwood_sc == 0)
-
-    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && fid != 0xF9 && is_kenwood_sc == 0)
-    
+    // if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && is_kenwood_sc == 0)
+    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && fid != 0xF9 && is_kenwood_sc == 0)    
     {
       if (type == 1) fprintf (stderr, "%s \n", KYEL);
       if (type == 2) fprintf (stderr, "%s \n", KYEL);
