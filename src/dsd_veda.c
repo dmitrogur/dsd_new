@@ -306,6 +306,8 @@ static const char *veda_candidate_source_name(uint8_t source_type)
     case VEDA_CAND_MBC05:  return "MBC05";
     case VEDA_CAND_VLC01:  return "VLC01";
     case VEDA_CAND_VC_EMB: return "VC_EMB";
+    case VEDA_CAND_TLC02:  return "TLC02";
+    case VEDA_CAND_TLC_F9: return "TLC_F9";
     default:               return "NONE";
     }
 }
@@ -327,12 +329,76 @@ static int veda_mem_has_pattern(const uint8_t *buf, uint8_t buf_len,
     return 0;
 }
 
+static int veda_candidate_payload_eq(const veda_session_candidate_t *cand,
+                                     const uint8_t *payload,
+                                     uint8_t payload_len)
+{
+    if (!cand || !cand->valid || !payload)
+        return 0;
+
+    if (cand->payload_len != payload_len)
+        return 0;
+
+    return (memcmp(cand->raw_payload, payload, payload_len) == 0) ? 1 : 0;
+}
+
+static void veda_store_ref_candidate(veda_session_candidate_t *dst,
+                                     uint8_t source_type,
+                                     const uint8_t *payload,
+                                     uint8_t payload_len,
+                                     uint16_t seq_in_session,
+                                     uint16_t timestamp_sf)
+{
+    if (!dst || !payload)
+        return;
+
+    memset(dst, 0, sizeof(*dst));
+    dst->valid = 1;
+    dst->source_type = source_type;
+    dst->payload_len = payload_len;
+    dst->seq_in_session = seq_in_session;
+    dst->timestamp_sf = timestamp_sf;
+    memcpy(dst->raw_payload, payload, payload_len);
+}
+
+static const char *veda_candidate_role_name(uint8_t source_type,
+                                            int same_ref_mbc,
+                                            int same_ref_vlc)
+{
+    switch (source_type)
+    {
+    case VEDA_CAND_MBC05:
+        return "PREVOICE_MBC";
+
+    case VEDA_CAND_VLC01:
+        return "PREVOICE_VLC";
+
+    case VEDA_CAND_VC_EMB:
+        return same_ref_vlc ? "VOICE_MIRROR_VLC" : "VOICE_EMB_NEW";
+
+    case VEDA_CAND_TLC_F9:
+        return "TAIL_F9";
+
+    case VEDA_CAND_TLC02:
+        if (same_ref_vlc)
+            return "TAIL_EQ_VLC";
+        if (same_ref_mbc)
+            return "TAIL_EQ_MBC";
+        return "TAIL_TLC";
+
+    default:
+        return "OTHER";
+    }
+}
+
 void veda_clear_candidate(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
         return;
 
     memset(&state->veda_candidate[slot], 0, sizeof(state->veda_candidate[slot]));
+    memset(&state->veda_ref_mbc[slot], 0, sizeof(state->veda_ref_mbc[slot]));
+    memset(&state->veda_ref_vlc[slot], 0, sizeof(state->veda_ref_vlc[slot]));
 }
 
 void veda_note_candidate(dsd_opts *opts,
@@ -352,6 +418,9 @@ void veda_note_candidate(dsd_opts *opts,
     int same_prev = 0;
     int has_sbx256 = 0;
     int has_prssentr = 0;
+    int same_ref_mbc = 0;
+    int same_ref_vlc = 0;
+    const char *role = "OTHER";
 
     if (!opts || !state || !payload || slot < 0 || slot > 1)
         return;
@@ -385,6 +454,9 @@ void veda_note_candidate(dsd_opts *opts,
     has_sbx256 = veda_mem_has_pattern(payload, n, pat_sbx256, sizeof(pat_sbx256));
     has_prssentr = veda_mem_has_pattern(payload, n, pat_prssentr, sizeof(pat_prssentr));
 
+    same_ref_mbc = veda_candidate_payload_eq(&state->veda_ref_mbc[slot], payload, n);
+    same_ref_vlc = veda_candidate_payload_eq(&state->veda_ref_vlc[slot], payload, n);
+
     memset(cand, 0, sizeof(*cand));
     cand->valid = 1;
     cand->source_type = source_type;
@@ -396,14 +468,37 @@ void veda_note_candidate(dsd_opts *opts,
         state->veda_candidate_seq[slot] = 1;
 
     cand->seq_in_session = state->veda_candidate_seq[slot];
-
     memcpy(cand->raw_payload, payload, n);
+
+    /* запоминаем опорные объекты начала сеанса */
+    if (source_type == VEDA_CAND_MBC05 && !state->veda_ref_mbc[slot].valid)
+    {
+        veda_store_ref_candidate(&state->veda_ref_mbc[slot],
+                                 source_type,
+                                 payload,
+                                 n,
+                                 cand->seq_in_session,
+                                 cand->timestamp_sf);
+    }
+
+    if (source_type == VEDA_CAND_VLC01 && !state->veda_ref_vlc[slot].valid)
+    {
+        veda_store_ref_candidate(&state->veda_ref_vlc[slot],
+                                 source_type,
+                                 payload,
+                                 n,
+                                 cand->seq_in_session,
+                                 cand->timestamp_sf);
+    }
+
+    role = veda_candidate_role_name(source_type, same_ref_mbc, same_ref_vlc);
 
     if (opts->veda_debug)
     {
         fprintf(stderr,
                 "\n[VEDA CAND] slot=%d seq=%u src=%s sf=%u len=%u "
-                "prev=%s same_prev=%u has_sbx256=%u has_prssentr=%u bytes=",
+                "prev=%s same_prev=%u ref_mbc=%u ref_vlc=%u "
+                "role=%s has_sbx256=%u has_prssentr=%u bytes=",
                 slot + 1,
                 (unsigned)cand->seq_in_session,
                 veda_candidate_source_name(source_type),
@@ -411,6 +506,9 @@ void veda_note_candidate(dsd_opts *opts,
                 (unsigned)cand->payload_len,
                 prev.valid ? veda_candidate_source_name(prev.source_type) : "NONE",
                 (unsigned)same_prev,
+                (unsigned)same_ref_mbc,
+                (unsigned)same_ref_vlc,
+                role,
                 (unsigned)has_sbx256,
                 (unsigned)has_prssentr);
 
@@ -420,7 +518,6 @@ void veda_note_candidate(dsd_opts *opts,
         fprintf(stderr, "\n");
     }
 }
-
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)

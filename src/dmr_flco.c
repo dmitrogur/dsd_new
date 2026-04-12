@@ -208,6 +208,26 @@ if (type == 1)
                         9,
                         state->indx_SF);
 }
+else if (type == 2 && fid == 0xF9)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_TLC_F9,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
+else if (type == 2)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_TLC02,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
 else if (type == 3)
 {
     veda_note_candidate(opts,
