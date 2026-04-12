@@ -678,6 +678,7 @@ if (opts->isVEDA)
 
         if (CRCCorrect && pdu_len == 12)
         {
+            state->veda_seen_db06[slot] = 1;
             memcpy(&state->veda_kx_buffer[slot][0], DMR_PDU, 12);
             state->veda_kx_pos[slot] = 12;
 
@@ -707,6 +708,7 @@ if (opts->isVEDA)
             CRCCorrect &&
             pdu_len == 12)
         {
+            state->veda_seen_db06[slot] = 1;
             memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], DMR_PDU, 12);
             state->veda_kx_pos[slot] += 12;
 
@@ -729,7 +731,8 @@ if (opts->isVEDA)
                         fprintf(stderr, "%02X", state->veda_kx_buffer[slot][i]);
                     fprintf(stderr, "\n");
                 }
-
+                
+                state->veda_kx_try_count[slot]++;
                 handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
 
                 /* после попытки — сброс, чтобы не слепить следующий кандидат поверх */

@@ -542,19 +542,24 @@ static void veda_emit_path_summary(dsd_opts *opts,
         return;
 
     fprintf(stderr,
-            "\n[VEDA PATH] slot=%d sess=%u reason=%s pattern=%s "
-            "sf=%u..%u mbc_seq=%u vlc_seq=%u voice_seq=%u tail_seq=%u tail=%u\n",
-            slot + 1,
-            (unsigned)ps->session_no,
-            reason ? reason : "none",
-            veda_path_pattern_name(ps),
-            (unsigned)ps->start_sf,
-            (unsigned)ps->last_sf,
-            (unsigned)ps->mbc_seq,
-            (unsigned)ps->vlc_seq,
-            (unsigned)ps->voice_seq,
-            (unsigned)ps->tail_seq,
-            (unsigned)ps->tail_kind);
+        "\n[VEDA PATH] slot=%d sess=%u reason=%s pattern=%s "
+        "sf=%u..%u mbc_seq=%u vlc_seq=%u voice_seq=%u tail_seq=%u tail=%u "
+        "db06=%u db07=%u mbc48=%u kx_try=%u\n",
+        slot + 1,
+        (unsigned)ps->session_no,
+        reason ? reason : "none",
+        veda_path_pattern_name(ps),
+        (unsigned)ps->start_sf,
+        (unsigned)ps->last_sf,
+        (unsigned)ps->mbc_seq,
+        (unsigned)ps->vlc_seq,
+        (unsigned)ps->voice_seq,
+        (unsigned)ps->tail_seq,
+        (unsigned)ps->tail_kind,
+        (unsigned)state->veda_seen_db06[slot],
+        (unsigned)state->veda_seen_db07[slot],
+        (unsigned)state->veda_seen_mbc48[slot],
+        (unsigned)state->veda_kx_try_count[slot]);
 }
 
 static void veda_path_note_candidate(dsd_opts *opts,
@@ -805,6 +810,20 @@ void veda_reset_slot(dsd_state *state, int slot)
     memset(state->veda_f9_lc_bytes[slot], 0, sizeof(state->veda_f9_lc_bytes[slot]));
     memset(state->veda_f9_lc_type[slot], 0, sizeof(state->veda_f9_lc_type[slot]));
     state->veda_f9_lc_count[slot] = 0;
+
+    memset(state->veda_session_key[slot], 0, sizeof(state->veda_session_key[slot]));
+    memset(state->veda_crypto_state[slot], 0, sizeof(state->veda_crypto_state[slot]));
+    memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
+
+    state->veda_state_valid[slot] = 0;
+    state->veda_stream_valid[slot] = 0;
+    state->veda_kx_pos[slot] = 0;
+    state->veda_pos[slot] = 0;
+
+    state->veda_seen_db06[slot] = 0;
+    state->veda_seen_db07[slot] = 0;
+    state->veda_seen_mbc48[slot] = 0;
+    state->veda_kx_try_count[slot] = 0;    
 
     veda_clear_candidate(state, slot);
     state->veda_candidate_seq[slot] = 0;

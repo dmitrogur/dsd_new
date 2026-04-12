@@ -1570,6 +1570,8 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
          */
         if (!pf && CRCCorrect && total_bytes == 48)
         {
+          state->veda_seen_mbc48[slot] = 1;
+          state->veda_kx_try_count[slot]++;          
           if (opts->veda_debug)
           {
             fprintf(stderr, "\n[VEDA KX MBC] TRY slot=%d payload=",

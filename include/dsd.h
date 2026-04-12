@@ -1380,6 +1380,11 @@ typedef struct
   veda_path_state_t veda_path[2];
   uint16_t veda_path_counter[2];  
 
+  uint8_t  veda_seen_db06[2];
+  uint8_t  veda_seen_db07[2];
+  uint8_t  veda_seen_mbc48[2];
+  uint16_t veda_kx_try_count[2];
+
 } dsd_state;
 
 /*
