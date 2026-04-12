@@ -404,6 +404,31 @@ typedef struct
 
 typedef enum
 {
+  VEDA_PATH_IDLE     = 0,
+  VEDA_PATH_PREVOICE = 1,
+  VEDA_PATH_INVOICE  = 2,
+  VEDA_PATH_TAIL     = 3
+} veda_path_stage_t;
+
+typedef struct
+{
+  uint8_t  active;
+  uint8_t  stage;
+  uint8_t  saw_mbc;
+  uint8_t  saw_vlc;
+  uint8_t  saw_voice;
+  uint8_t  tail_kind;     /* 0=none, 1=F9, 2=TLC */
+  uint16_t session_no;
+  uint16_t start_sf;
+  uint16_t last_sf;
+  uint16_t mbc_seq;
+  uint16_t vlc_seq;
+  uint16_t voice_seq;
+  uint16_t tail_seq;
+} veda_path_state_t;
+
+typedef enum
+{
   VEDA_HDRSRC_NONE    = 0,
   VEDA_HDRSRC_CSBK    = 1,
   VEDA_HDRSRC_VLC     = 2,
@@ -1350,6 +1375,9 @@ typedef struct
 
   veda_session_candidate_t veda_ref_mbc[2];
   veda_session_candidate_t veda_ref_vlc[2];
+
+  veda_path_state_t veda_path[2];
+  uint16_t veda_path_counter[2];  
 
 } dsd_state;
 

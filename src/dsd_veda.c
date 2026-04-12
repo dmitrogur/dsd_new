@@ -399,6 +399,156 @@ void veda_clear_candidate(dsd_state *state, int slot)
     memset(&state->veda_candidate[slot], 0, sizeof(state->veda_candidate[slot]));
     memset(&state->veda_ref_mbc[slot], 0, sizeof(state->veda_ref_mbc[slot]));
     memset(&state->veda_ref_vlc[slot], 0, sizeof(state->veda_ref_vlc[slot]));
+    memset(&state->veda_path[slot], 0, sizeof(state->veda_path[slot]));
+}
+
+static const char *veda_path_pattern_name(const veda_path_state_t *ps)
+{
+    if (!ps)
+        return "NONE";
+
+    if (ps->saw_mbc && ps->saw_vlc && ps->saw_voice && ps->tail_kind == 1)
+        return "MBC_VLC_VOICE_TAIL_F9";
+
+    if (ps->saw_mbc && ps->saw_vlc && ps->saw_voice && ps->tail_kind == 2)
+        return "MBC_VLC_VOICE_TAIL_TLC";
+
+    if (!ps->saw_mbc && ps->saw_vlc && ps->saw_voice && ps->tail_kind == 1)
+        return "VLC_VOICE_TAIL_F9";
+
+    if (!ps->saw_mbc && ps->saw_vlc && ps->saw_voice && ps->tail_kind == 2)
+        return "VLC_VOICE_TAIL_TLC";
+
+    if (ps->saw_mbc && ps->saw_vlc && ps->saw_voice)
+        return "MBC_VLC_VOICE";
+
+    if (!ps->saw_mbc && ps->saw_vlc && ps->saw_voice)
+        return "VLC_VOICE";
+
+    if (ps->saw_mbc && ps->saw_vlc)
+        return "MBC_VLC";
+
+    if (ps->saw_vlc)
+        return "VLC_ONLY";
+
+    if (ps->saw_mbc)
+        return "MBC_ONLY";
+
+    return "NONE";
+}
+
+static void veda_emit_path_summary(dsd_opts *opts,
+                                   dsd_state *state,
+                                   int slot,
+                                   const char *reason)
+{
+    veda_path_state_t *ps;
+
+    if (!opts || !state || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->veda_debug)
+        return;
+
+    ps = &state->veda_path[slot];
+    if (!ps->session_no)
+        return;
+
+    fprintf(stderr,
+            "\n[VEDA PATH] slot=%d sess=%u reason=%s pattern=%s "
+            "sf=%u..%u mbc_seq=%u vlc_seq=%u voice_seq=%u tail_seq=%u tail=%u\n",
+            slot + 1,
+            (unsigned)ps->session_no,
+            reason ? reason : "none",
+            veda_path_pattern_name(ps),
+            (unsigned)ps->start_sf,
+            (unsigned)ps->last_sf,
+            (unsigned)ps->mbc_seq,
+            (unsigned)ps->vlc_seq,
+            (unsigned)ps->voice_seq,
+            (unsigned)ps->tail_seq,
+            (unsigned)ps->tail_kind);
+}
+
+static void veda_path_note_candidate(dsd_opts *opts,
+                                     dsd_state *state,
+                                     int slot,
+                                     const veda_session_candidate_t *cand)
+{
+    veda_path_state_t *ps;
+
+    if (!opts || !state || !cand || slot < 0 || slot > 1)
+        return;
+
+    ps = &state->veda_path[slot];
+
+    if (!ps->active)
+    {
+        if (cand->source_type == VEDA_CAND_MBC05 ||
+            cand->source_type == VEDA_CAND_VLC01)
+        {
+            memset(ps, 0, sizeof(*ps));
+            ps->active = 1;
+            ps->stage = VEDA_PATH_PREVOICE;
+            state->veda_path_counter[slot]++;
+            if (state->veda_path_counter[slot] == 0)
+                state->veda_path_counter[slot] = 1;
+            ps->session_no = state->veda_path_counter[slot];
+            ps->start_sf = cand->timestamp_sf;
+            ps->last_sf = cand->timestamp_sf;
+        }
+        else
+        {
+            return;
+        }
+    }
+
+    ps->last_sf = cand->timestamp_sf;
+
+    switch (cand->source_type)
+    {
+    case VEDA_CAND_MBC05:
+        if (!ps->saw_mbc)
+            ps->mbc_seq = cand->seq_in_session;
+        ps->saw_mbc = 1;
+        if (ps->stage < VEDA_PATH_PREVOICE)
+            ps->stage = VEDA_PATH_PREVOICE;
+        break;
+
+    case VEDA_CAND_VLC01:
+        if (!ps->saw_vlc)
+            ps->vlc_seq = cand->seq_in_session;
+        ps->saw_vlc = 1;
+        if (ps->stage < VEDA_PATH_PREVOICE)
+            ps->stage = VEDA_PATH_PREVOICE;
+        break;
+
+    case VEDA_CAND_VC_EMB:
+        if (!ps->saw_voice)
+            ps->voice_seq = cand->seq_in_session;
+        ps->saw_voice = 1;
+        ps->stage = VEDA_PATH_INVOICE;
+        break;
+
+    case VEDA_CAND_TLC_F9:
+        ps->tail_kind = 1;
+        ps->tail_seq = cand->seq_in_session;
+        ps->stage = VEDA_PATH_TAIL;
+        veda_emit_path_summary(opts, state, slot, "tail");
+        ps->active = 0;
+        break;
+
+    case VEDA_CAND_TLC02:
+        ps->tail_kind = 2;
+        ps->tail_seq = cand->seq_in_session;
+        ps->stage = VEDA_PATH_TAIL;
+        veda_emit_path_summary(opts, state, slot, "tail");
+        ps->active = 0;
+        break;
+
+    default:
+        break;
+    }
 }
 
 void veda_note_candidate(dsd_opts *opts,
@@ -517,6 +667,7 @@ void veda_note_candidate(dsd_opts *opts,
 
         fprintf(stderr, "\n");
     }
+    veda_path_note_candidate(opts, state, slot, cand);
 }
 //======================================================================================
 
