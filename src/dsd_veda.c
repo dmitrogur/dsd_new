@@ -48,7 +48,7 @@ void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key) {
     veda_permute_384(state->veda_crypto_state[slot], 253);
     
     state->veda_pos[slot] = 0;
-    state->veda_state_valid[slot] = 1;
+    state->veda_stream_valid[slot] = 0;
 }
 
 // Применение Tweak (MI)
@@ -57,6 +57,7 @@ void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
     state->veda_crypto_state[slot][1] ^= (uint32_t)(mi >> 32);
     veda_permute_384(state->veda_crypto_state[slot], 2);
     state->veda_pos[slot] = 0;
+    state->veda_stream_valid[slot] = 1;
 }
 
 
@@ -88,8 +89,13 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
         // Копируем RX ключ (первые 32 байта из сессионной пары)
         memcpy(state->veda_session_key[slot], kp.rx, 32);
         
-        // Инициализируем поток дешифрования
-        veda_stream_init(state, slot, state->veda_session_key[slot]);
+        /* аналог session_key_valid из дампа */
+        state->veda_state_valid[slot] = 1;
+        state->veda_stream_valid[slot] = 0;
+        state->veda_mi_applied[slot] = 0;
+        state->veda_last_applied_mi[slot] = 0;
+
+        // veda_stream_init(state, slot, state->veda_session_key[slot]);
         
         if (opts->veda_debug) {
             fprintf(stderr, "\n[VEDA] Session Key Derived for Slot %d: ", slot + 1);
@@ -128,7 +134,7 @@ static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint
 
 // Дешифрование ровно 72 бит фрейма (DMR TCH стандарт)
 void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24]) {
-    if (!state->veda_state_valid[slot]) return;
+    if (!state->veda_stream_valid[slot]) return;    
 
     // Проходим по 72 битам (3 блока по 24 бита в матрице ambe_fr)
     // dsd-fme использует 4x24, но DMR Voice - это 72 бита. 
@@ -151,7 +157,8 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
     if (!state->veda_state_valid[slot])
         return;
 
-    if (state->veda_mi_applied[slot] && state->veda_last_applied_mi[slot] == mi)
+    if (state->veda_stream_valid[slot] && state->veda_mi_applied[slot] &&
+        state->veda_last_applied_mi[slot] == mi)
         return;
 
     /*
@@ -192,7 +199,10 @@ int veda_try_decrypt_voice_triplet(dsd_opts *opts,
     if (!state->veda_state_valid[slot] && opts->veda_manual_set)
     {
         memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
-        veda_stream_init(state, slot, state->veda_session_key[slot]);
+        state->veda_state_valid[slot] = 1;
+        state->veda_stream_valid[slot] = 0;
+        state->veda_mi_applied[slot] = 0;
+        state->veda_last_applied_mi[slot] = 0;
     }
 
     eff_mi = veda_get_effective_mi(state, slot);
@@ -293,7 +303,7 @@ int veda_stream_ctx_valid(const dsd_state *state, int slot)
     if (!state || slot < 0 || slot > 1)
         return 0;
 
-    return state->veda_state_valid[slot] ? 1 : 0;
+    return state->veda_stream_valid[slot] ? 1 : 0;
 }
 
 uint8_t *veda_session_material_ptr(dsd_state *state, int slot)
@@ -798,6 +808,9 @@ void veda_reset_slot(dsd_state *state, int slot)
 
     veda_clear_candidate(state, slot);
     state->veda_candidate_seq[slot] = 0;
+
+    state->veda_stream_valid[slot] = 0;
+    state->veda_pos[slot] = 0;    
 }
 
 void veda_reset_profile(dsd_state *state, int slot)

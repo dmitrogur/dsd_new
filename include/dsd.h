@@ -1352,10 +1352,11 @@ typedef struct
   uint16_t Priority3; 
   uint16_t irr_err;
 
-  uint8_t veda_session_key[2][32]; // Сессионные ключи для 2-х слотов
-  uint32_t veda_crypto_state[2][12]; // 384-битное состояние (12 слов по 32 бита)
-  int veda_state_valid[2];          // Флаг готовности дешифратора для слота
-  int veda_pos[2];                  // Позиция в гамме
+  uint8_t veda_session_key[2][32];     // 32-байтный session material
+  uint32_t veda_crypto_state[2][12];   // 384-битное состояние
+  int veda_state_valid[2];             // session_key_valid: ключ сессии уже есть
+  int veda_stream_valid[2];            // stream_ctx_prepared: ctx уже инициализирован и MI/tweak применён
+  int veda_pos[2];                     // Позиция в гамме
 
   uint8_t veda_kx_buffer[2][48]; // Буфер для сборки KX пакета (по слотам)
   int     veda_kx_pos[2];        // Текущий индекс сборки
