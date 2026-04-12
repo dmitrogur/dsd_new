@@ -25,6 +25,56 @@ static void veda_try_handle_csbk_header(dsd_opts *opts, dsd_state *state, const 
   (void)veda_try_handle_header(opts, state, state->currentslot, &hdr, VEDA_HDRSRC_CSBK);
 }
 
+static void veda_trace_csbk_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *cs_pdu,
+                                  uint8_t csbk_o, uint8_t csbk_fid)
+{
+  uint8_t service_like = 0;
+  int slot;
+  int i;
+
+  if (!opts || !state || !cs_pdu)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  slot = state->currentslot & 1;
+
+  switch (csbk_o)
+  {
+    case 4:   /* UU_V_Req */
+    case 5:   /* UU_Ans_Req */
+    case 28:  /* C_AHOY */
+    case 30:  /* C_ACKVIT */
+    case 31:  /* C_RAND */
+    case 32:
+    case 33:
+    case 34:
+    case 35:  /* ACK family */
+    case 42:  /* P_MAINT */
+    case 47:  /* P_PROTECT */
+    case 56:  /* BS_Dwn_Act / variant */
+    case 61:  /* Preamble */
+      service_like = 1;
+      break;
+    default:
+      break;
+  }
+
+  fprintf(stderr,
+          "\n[VEDA CSBK RAW] slot=%d op=%02X fid=%02X svc_like=%u b=",
+          slot + 1,
+          (unsigned)csbk_o,
+          (unsigned)csbk_fid,
+          (unsigned)service_like);
+
+  for (i = 0; i < 12; i++)
+    fprintf(stderr, "%02X", cs_pdu[i]);
+
+  fprintf(stderr, "\n");
+}
+
 #define PCLEAR_TUNE_AWAY //disable if slower return is preferred
 //function for handling Control Signalling PDUs (CSBK, MBC) messages
 
@@ -71,9 +121,11 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
     if (csbk_pf == 0) //okay to run
     {
-      if (opts->isVEDA)
-        veda_try_handle_csbk_header(opts, state, cs_pdu);
-
+        if (opts->isVEDA)
+        {
+            veda_trace_csbk_probe(opts, state, cs_pdu, (uint8_t)csbk_o, (uint8_t)csbk_fid);
+            veda_try_handle_csbk_header(opts, state, cs_pdu);
+        }
       //set overarching manufacturer in use when non-standard feature id set is up
       if (csbk_fid != 0) state->dmr_mfid = csbk_fid;
 

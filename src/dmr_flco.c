@@ -157,6 +157,19 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
   {
   uint8_t lc_bytes[9];
+
+if (opts->veda_debug && type == 3)
+{
+    fprintf(stderr,
+            "\n[VEDA EMB8] slot=%d b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X\n",
+            slot + 1,
+            (unsigned)lc_bytes[0],
+            (unsigned)lc_bytes[1],
+            (unsigned)((uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8)),
+            (unsigned)((uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8)),
+            (unsigned)((uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8)));
+}
+  
   uint32_t alt_tgt_be_24 = 0;
   uint32_t alt_src_be_24 = 0;
   uint32_t alt_tgt_le_24 = 0;

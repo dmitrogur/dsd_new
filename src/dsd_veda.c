@@ -209,7 +209,7 @@ int veda_try_decrypt_voice_triplet(dsd_opts *opts,
 
     if (!state->veda_state_valid[slot])
         veda_try_session_bridge(opts, state, slot);
-            
+
     if (!(state->veda_state_valid[slot] && eff_mi != 0))
         return 0;
 
@@ -1083,6 +1083,29 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
 
     if (!opts->isVEDA)
         return 0;
+
+    if (state->veda_debug)
+    {
+    uint8_t svc_class = (((hdr->b0 & 0x60) == 0x20) ? 1 : 0);
+
+    fprintf(stderr,
+            "\n[VEDA HTRY] slot=%d src=%u svc=%u "
+            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
+            "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u\n",
+            slot + 1,
+            (unsigned)src_kind,
+            (unsigned)svc_class,
+            (unsigned)hdr->b0,
+            (unsigned)hdr->b1,
+            (unsigned)hdr->w2,
+            (unsigned)hdr->w4,
+            (unsigned)hdr->w6,
+            (unsigned)state->veda_sm[slot],
+            (unsigned)state->veda_len_lo[slot],
+            (unsigned)state->veda_len_hi[slot],
+            (unsigned)state->veda_raw_src[slot],
+            (unsigned)state->veda_raw_tgt[slot]);
+    }
 
     veda_store_last_hdr(state, slot, hdr, src_kind);
 
