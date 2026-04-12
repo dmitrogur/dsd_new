@@ -33,6 +33,14 @@ void veda_debug_voice_wait(dsd_opts *opts,
                            int sf_cur,
                            int sf_total);
 
+void veda_trace_probe_air_header(dsd_opts *opts,
+                                 dsd_state *state,
+                                 int slot,
+                                 const uint8_t *buf,
+                                 uint8_t len,
+                                 const char *tag,
+                                 int sf_cur);
+                                 
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
 
 int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot);

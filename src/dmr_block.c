@@ -1434,6 +1434,16 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
       fprintf(stderr, "\n");
     }    
 
+    if (opts->isVEDA && databurst == 0x05 && blockcounter == 1)
+{
+    veda_trace_probe_air_header(opts,
+                                state,
+                                slot,
+                                block_bytes,
+                                block_len,
+                                "MBC_BLK0",
+                                state->indx_SF);
+}
     if (opts->isVEDA && databurst == 0x05 && block_len > 0)
     {
       veda_note_candidate(opts,
@@ -1550,6 +1560,16 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
 
           fprintf(stderr, "\n");
         }
+        if (total_bytes > 0)
+        {
+          veda_trace_probe_air_header(opts,
+                                state,
+                                slot,
+                                state->dmr_pdu_sf[slot],
+                                (uint8_t)total_bytes,
+                                "MBC_SF",
+                                state->indx_SF);
+        }        
         if (total_bytes > 0)
         {
             veda_note_candidate(opts,

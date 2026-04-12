@@ -1402,3 +1402,59 @@ static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a,
     *id24_b = src & 0xFFFFFFu;
     return 1;
 }
+
+void veda_trace_probe_air_header(dsd_opts *opts,
+                                 dsd_state *state,
+                                 int slot,
+                                 const uint8_t *buf,
+                                 uint8_t len,
+                                 const char *tag,
+                                 int sf_cur)
+{
+    uint8_t b0, b1;
+    uint16_t w2, w4, w6;
+    uint8_t svc;
+
+    if (!opts || !state || !buf || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->isVEDA || !opts->veda_debug)
+        return;
+
+    if (len < 8)
+    {
+        fprintf(stderr,
+                "\n[VEDA MBCH] slot=%d tag=%s sf=%d len=%u short\n",
+                slot + 1,
+                tag ? tag : "MBC",
+                sf_cur,
+                (unsigned)len);
+        return;
+    }
+
+    b0 = buf[0];
+    b1 = buf[1];
+    w2 = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
+    w4 = (uint16_t)buf[4] | ((uint16_t)buf[5] << 8);
+    w6 = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
+    svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
+
+    fprintf(stderr,
+            "\n[VEDA MBCH] slot=%d tag=%s sf=%d len=%u svc=%u "
+            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
+            slot + 1,
+            tag ? tag : "MBC",
+            sf_cur,
+            (unsigned)len,
+            (unsigned)svc,
+            (unsigned)b0,
+            (unsigned)b1,
+            (unsigned)w2,
+            (unsigned)w4,
+            (unsigned)w6);
+
+    for (int i = 0; i < len && i < 12; i++)
+        fprintf(stderr, "%02X", buf[i]);
+
+    fprintf(stderr, "\n");
+}
