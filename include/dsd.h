@@ -1385,6 +1385,9 @@ typedef struct
   uint8_t  veda_seen_mbc48[2];
   uint16_t veda_kx_try_count[2];
 
+  uint8_t  veda_bridge_notice_done[2];
+  uint16_t veda_bridge_probe_count[2]; 
+
 } dsd_state;
 
 /*

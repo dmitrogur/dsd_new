@@ -207,6 +207,9 @@ int veda_try_decrypt_voice_triplet(dsd_opts *opts,
 
     eff_mi = veda_get_effective_mi(state, slot);
 
+    if (!state->veda_state_valid[slot])
+        veda_try_session_bridge(opts, state, slot);
+            
     if (!(state->veda_state_valid[slot] && eff_mi != 0))
         return 0;
 
@@ -774,6 +777,60 @@ void veda_note_candidate(dsd_opts *opts,
     }
     veda_path_note_candidate(opts, state, slot, cand);
 }
+
+int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
+{
+    veda_path_state_t *ps;
+    uint64_t eff_mi;
+
+    if (!opts || !state || slot < 0 || slot > 1)
+        return 0;
+
+    if (!opts->isVEDA)
+        return 0;
+
+    if (state->veda_state_valid[slot])
+        return 0;
+
+    ps = &state->veda_path[slot];
+
+    /*
+      Не шумим слишком рано:
+      bridge нужен только если уже виден живой voice-сеанс
+      или хотя бы vendor MI уже поднялся.
+    */
+    if (!ps->saw_voice && !state->veda_vendor_mi_valid[slot])
+        return 0;
+
+    if (state->veda_bridge_notice_done[slot])
+        return 0;
+
+    state->veda_bridge_notice_done[slot] = 1;
+    state->veda_bridge_probe_count[slot]++;
+
+    eff_mi = veda_get_effective_mi(state, slot);
+
+    if (opts->veda_debug)
+    {
+        fprintf(stderr,
+                "\n[VEDA BRIDGE] slot=%d sess=%u need=EXT_SESSION_SOURCE "
+                "pattern=%s db06=%u db07=%u mbc48=%u kx_try=%u "
+                "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u\n",
+                slot + 1,
+                (unsigned)ps->session_no,
+                veda_path_pattern_name(ps),
+                (unsigned)state->veda_seen_db06[slot],
+                (unsigned)state->veda_seen_db07[slot],
+                (unsigned)state->veda_seen_mbc48[slot],
+                (unsigned)state->veda_kx_try_count[slot],
+                (unsigned)state->veda_vendor_mi_valid[slot],
+                (unsigned long long)eff_mi,
+                (unsigned)state->veda_ref_mbc[slot].payload_len,
+                (unsigned)state->veda_ref_vlc[slot].payload_len);
+    }
+
+    return 0;
+}
 //======================================================================================
 
 void veda_reset_slot(dsd_state *state, int slot)
@@ -829,7 +886,10 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_candidate_seq[slot] = 0;
 
     state->veda_stream_valid[slot] = 0;
-    state->veda_pos[slot] = 0;    
+    state->veda_pos[slot] = 0;   
+    
+    state->veda_bridge_notice_done[slot] = 0;
+    state->veda_bridge_probe_count[slot] = 0;    
 }
 
 void veda_reset_profile(dsd_state *state, int slot)

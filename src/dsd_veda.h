@@ -32,8 +32,10 @@ void veda_debug_voice_wait(dsd_opts *opts,
                            int slot,
                            int sf_cur,
                            int sf_total);
-                           
+
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
+
+int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot);
 
 int veda_session_key_valid(const dsd_state *state, int slot);
 int veda_stream_ctx_valid(const dsd_state *state, int slot);
