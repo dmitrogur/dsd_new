@@ -218,6 +218,9 @@ void veda_debug_voice_wait(dsd_opts *opts,
     uint64_t eff_mi;
     uint64_t payload_mi;
     const char *reason;
+    uint8_t reason_code;
+    static int last_sf[2] = { -1, -1 };
+    static uint8_t last_reason[2] = { 0, 0 };
 
     if (!opts || !state || slot < 0 || slot > 1)
         return;
@@ -231,6 +234,13 @@ void veda_debug_voice_wait(dsd_opts *opts,
 
     payload_mi = (slot == 0) ? state->payload_mi : state->payload_miR;
     reason = state->veda_state_valid[slot] ? "WAIT_MI" : "WAIT_SESSION";
+    reason_code = state->veda_state_valid[slot] ? 2 : 1;
+
+    if (last_sf[slot] == sf_cur && last_reason[slot] == reason_code)
+        return;
+
+    last_sf[slot] = sf_cur;
+    last_reason[slot] = reason_code;
 
     fprintf(stderr,
             "\n[VEDA] %s slot=%d payload_mi=%016llX eff_mi=%016llX\n",
@@ -557,6 +567,9 @@ static void veda_path_note_candidate(dsd_opts *opts,
             memset(ps, 0, sizeof(*ps));
             ps->active = 1;
             ps->stage = VEDA_PATH_PREVOICE;
+            
+            if (state->veda_path_counter[slot] > 1000)
+                state->veda_path_counter[slot] = 0;            
             state->veda_path_counter[slot]++;
             if (state->veda_path_counter[slot] == 0)
                 state->veda_path_counter[slot] = 1;
