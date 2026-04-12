@@ -356,6 +356,13 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
+  int veda_voice_done = 0;
+  if (opts->isVEDA)
+  {
+    veda_voice_done = veda_try_decrypt_voice_triplet(opts, state, 0,
+                                                     ambe_fr, ambe_fr2, ambe_fr3);
+  }
+
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
   ambe2_codeword_print_i(opts, ambe_fr2);
@@ -589,37 +596,12 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, vc, m1, m2, m3);
 
-if (opts->isVEDA)
+if (opts->isVEDA && !veda_voice_done)
 {
-    const int slot = 0; /* MS/DM mono path uses slot 0 */
-    uint64_t eff_mi;
-
-    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
-    {
-        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
-        veda_stream_init(state, slot, state->veda_session_key[slot]);
-    }
-
-    eff_mi = veda_get_effective_mi(state, slot);
-
-    if (state->veda_state_valid[slot] && eff_mi != 0)
-    {
-        veda_prepare_voice_ctx(opts, state, slot, eff_mi);
-
-        veda_decrypt_ambe(state, slot, ambe_fr);
-        veda_decrypt_ambe(state, slot, ambe_fr2);
-        veda_decrypt_ambe(state, slot, ambe_fr3);
-    }
-    else if (opts->veda_debug)
-    {
-        fprintf(stderr,
-                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX eff_mi=%016llX\n",
-                slot + 1,
-                state->veda_state_valid[slot],
-                (unsigned long long)state->payload_mi,
-                (unsigned long long)eff_mi);
-    }
-}   
+    veda_debug_voice_wait(opts, state, 0,
+                          state->indx_SF,
+                          state->total_sf[0]);
+}
   //errors in ms/mono since we skip the other slot
   // cach_err = dmr_cach (opts, state, cachdata);
 
@@ -944,6 +926,13 @@ if (opts->run_scout)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
+  int veda_voice_done = 0;
+  if (opts->isVEDA)
+  {
+    veda_voice_done = veda_try_decrypt_voice_triplet(opts, state, 0,
+                                                     ambe_fr, ambe_fr2, ambe_fr3);
+  }
+
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
   ambe2_codeword_print_i(opts, ambe_fr2);
@@ -1034,69 +1023,11 @@ if (opts->run_scout)
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, 1, m1, m2, m3);
 
-if (opts->isVEDA)
+if (opts->isVEDA && !veda_voice_done)
 {
-    const int slot = 0; /* MS/DM mono path uses slot 0 */
-    uint64_t eff_mi;
-
-    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
-    {
-        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
-        veda_stream_init(state, slot, state->veda_session_key[slot]);
-    }
-
-    eff_mi = veda_get_effective_mi(state, slot);
-
-    if (state->veda_state_valid[slot] && eff_mi != 0)
-    {
-        veda_prepare_voice_ctx(opts, state, slot, eff_mi);
-
-        veda_decrypt_ambe(state, slot, ambe_fr);
-        veda_decrypt_ambe(state, slot, ambe_fr2);
-        veda_decrypt_ambe(state, slot, ambe_fr3);
-    }
-    else if (opts->veda_debug)
-    {
-        int vi, vj;
-
-        fprintf(stderr,
-                "\n[VEDA] WAIT MI slot=%d state_valid=%u payload_mi=%016llX eff_mi=%016llX\n",
-                slot + 1,
-                state->veda_state_valid[slot],
-                (unsigned long long)state->payload_mi,
-                (unsigned long long)eff_mi);
-
-        veda_trace_baseline(opts, state, slot, "PREVOICE",
-                    state->indx_SF,
-                    state->total_sf[slot]);
-
-        if (state->veda_kx_pos[slot] > 0)
-        {
-            fprintf(stderr,
-                    "[VEDA PREVOICE] KXBUF slot=%d bytes=",
-                    slot + 1);
-
-            for (vi = 0; vi < state->veda_kx_pos[slot]; vi++)
-                fprintf(stderr, "%02X", state->veda_kx_buffer[slot][vi]);
-
-            fprintf(stderr, "\n");
-        }
-
-        for (vi = 0; vi < state->veda_f9_lc_count[slot]; vi++)
-        {
-            fprintf(stderr,
-                    "[VEDA PREVOICE] F9 slot=%d idx=%d type=%u bytes=",
-                    slot + 1,
-                    vi,
-                    (unsigned)state->veda_f9_lc_type[slot][vi]);
-
-            for (vj = 0; vj < 9; vj++)
-                fprintf(stderr, "%02X",
-                        state->veda_f9_lc_bytes[slot][vi][vj]);
-
-            fprintf(stderr, "\n");
-        }
-    }
+    veda_debug_voice_wait(opts, state, 0,
+                          state->indx_SF,
+                          state->total_sf[0]);
 }
 
   //errors due to skipping other slot

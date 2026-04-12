@@ -20,6 +20,19 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload);
 // void veda_decrypt_ambe_matrix(dsd_opts *opts, dsd_state *state, int slot, char ambe_fr[4][24]);
 void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t mi);
 
+int veda_try_decrypt_voice_triplet(dsd_opts *opts,
+                                   dsd_state *state,
+                                   int slot,
+                                   char ambe_fr[4][24],
+                                   char ambe_fr2[4][24],
+                                   char ambe_fr3[4][24]);
+
+void veda_debug_voice_wait(dsd_opts *opts,
+                           dsd_state *state,
+                           int slot,
+                           int sf_cur,
+                           int sf_total);
+                           
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
 
 int veda_session_key_valid(const dsd_state *state, int slot);

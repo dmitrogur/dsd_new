@@ -174,7 +174,74 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
     }
 }
 
-// static 
+int veda_try_decrypt_voice_triplet(dsd_opts *opts,
+                                   dsd_state *state,
+                                   int slot,
+                                   char ambe_fr[4][24],
+                                   char ambe_fr2[4][24],
+                                   char ambe_fr3[4][24])
+{
+    uint64_t eff_mi;
+
+    if (!opts || !state || slot < 0 || slot > 1)
+        return 0;
+
+    if (!opts->isVEDA)
+        return 0;
+
+    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
+    {
+        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
+        veda_stream_init(state, slot, state->veda_session_key[slot]);
+    }
+
+    eff_mi = veda_get_effective_mi(state, slot);
+
+    if (!(state->veda_state_valid[slot] && eff_mi != 0))
+        return 0;
+
+    veda_prepare_voice_ctx(opts, state, slot, eff_mi);
+
+    veda_decrypt_ambe(state, slot, ambe_fr);
+    veda_decrypt_ambe(state, slot, ambe_fr2);
+    veda_decrypt_ambe(state, slot, ambe_fr3);
+
+    return 1;
+}
+
+void veda_debug_voice_wait(dsd_opts *opts,
+                           dsd_state *state,
+                           int slot,
+                           int sf_cur,
+                           int sf_total)
+{
+    uint64_t eff_mi;
+    uint64_t payload_mi;
+    const char *reason;
+
+    if (!opts || !state || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->isVEDA || !opts->veda_debug)
+        return;
+
+    eff_mi = veda_get_effective_mi(state, slot);
+    if (state->veda_state_valid[slot] && eff_mi != 0)
+        return;
+
+    payload_mi = (slot == 0) ? state->payload_mi : state->payload_miR;
+    reason = state->veda_state_valid[slot] ? "WAIT_MI" : "WAIT_SESSION";
+
+    fprintf(stderr,
+            "\n[VEDA] %s slot=%d payload_mi=%016llX eff_mi=%016llX\n",
+            reason,
+            slot + 1,
+            (unsigned long long)payload_mi,
+            (unsigned long long)eff_mi);
+
+    veda_trace_baseline(opts, state, slot, "PREVOICE", sf_cur, sf_total);
+}
+
 uint64_t veda_get_effective_mi(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
@@ -525,7 +592,17 @@ static void veda_path_note_candidate(dsd_opts *opts,
 
     case VEDA_CAND_VC_EMB:
         if (!ps->saw_voice)
+        {
             ps->voice_seq = cand->seq_in_session;
+
+            /*
+              Для session summary хотим диапазон реального voice-сеанса,
+              а не ранний prevoice sf=0 от VLC/MBC.
+              Поэтому первый VC_EMB фиксирует старт voice-range.
+            */
+            if (cand->timestamp_sf != 0)
+                ps->start_sf = cand->timestamp_sf;
+        }
         ps->saw_voice = 1;
         ps->stage = VEDA_PATH_INVOICE;
         break;
