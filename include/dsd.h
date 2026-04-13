@@ -1388,6 +1388,8 @@ typedef struct
   uint8_t  veda_bridge_notice_done[2];
   uint16_t veda_bridge_probe_count[2]; 
 
+  uint16_t veda_svc_hdr_hits[2];
+    
 } dsd_state;
 
 /*

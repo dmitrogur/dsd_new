@@ -782,6 +782,7 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
 {
     veda_path_state_t *ps;
     uint64_t eff_mi;
+    const char *likely;
 
     if (!opts || !state || slot < 0 || slot > 1)
         return 0;
@@ -794,11 +795,6 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
 
     ps = &state->veda_path[slot];
 
-    /*
-      Не шумим слишком рано:
-      bridge нужен только если уже виден живой voice-сеанс
-      или хотя бы vendor MI уже поднялся.
-    */
     if (!ps->saw_voice && !state->veda_vendor_mi_valid[slot])
         return 0;
 
@@ -810,15 +806,31 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
 
     eff_mi = veda_get_effective_mi(state, slot);
 
+    likely = "UNKNOWN_PREVOICE_PATH";
+
+    if (ps->saw_voice &&
+        state->veda_vendor_mi_valid[slot] &&
+        state->veda_kx_try_count[slot] == 0 &&
+        state->veda_seen_db06[slot] == 0 &&
+        state->veda_seen_db07[slot] == 0 &&
+        state->veda_seen_mbc48[slot] == 0 &&
+        state->veda_svc_hdr_hits[slot] == 0)
+    {
+        likely = "LATE_ENTRY_OR_PRECALL_LOSS";
+    }
+
     if (opts->veda_debug)
     {
         fprintf(stderr,
-                "\n[VEDA BRIDGE] slot=%d sess=%u need=EXT_SESSION_SOURCE "
-                "pattern=%s db06=%u db07=%u mbc48=%u kx_try=%u "
+                "\n[VEDA CASE6 MISS] slot=%d sess=%u cause=NO_VISIBLE_CASE6_PATH "
+                "likely=%s pattern=%s svc_hdr=%u "
+                "db06=%u db07=%u mbc48=%u kx_try=%u "
                 "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u\n",
                 slot + 1,
                 (unsigned)ps->session_no,
+                likely,
                 veda_path_pattern_name(ps),
+                (unsigned)state->veda_svc_hdr_hits[slot],
                 (unsigned)state->veda_seen_db06[slot],
                 (unsigned)state->veda_seen_db07[slot],
                 (unsigned)state->veda_seen_mbc48[slot],
@@ -832,7 +844,6 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
     return 0;
 }
 //======================================================================================
-
 void veda_reset_slot(dsd_state *state, int slot)
 {
     if (!state || slot < 0 || slot > 1)
@@ -889,7 +900,9 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_pos[slot] = 0;   
     
     state->veda_bridge_notice_done[slot] = 0;
-    state->veda_bridge_probe_count[slot] = 0;    
+    state->veda_bridge_probe_count[slot] = 0;
+    
+    state->veda_svc_hdr_hits[slot] = 0;
 }
 
 void veda_reset_profile(dsd_state *state, int slot)
@@ -1084,10 +1097,13 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
     if (!opts->isVEDA)
         return 0;
 
-    if (state->veda_debug)
-    {
     uint8_t svc_class = (((hdr->b0 & 0x60) == 0x20) ? 1 : 0);
 
+    if (svc_class)
+        state->veda_svc_hdr_hits[slot]++;        
+
+    if (state->veda_debug)
+    {
     fprintf(stderr,
             "\n[VEDA HTRY] slot=%d src=%u svc=%u "
             "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
