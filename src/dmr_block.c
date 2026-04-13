@@ -1550,12 +1550,14 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
       {
         int total_bytes = (blocks + 1) * block_len;
 
-        veda_raw_log_mbc(opts, state, slot,
+        if (databurst == 0x05 && blockcounter == 1 && block_len > 0) {
+          veda_raw_log_mbc(opts, state, slot,
                  VEDA_RAW_MBC_SF, databurst,
                  state->dmr_pdu_sf[slot], (uint8_t)total_bytes,
                  (uint8_t)CRCCorrect, (uint8_t)IrrecoverableErrors,
                  blockcounter, blocks, lb, pf,
                  state->indx_SF); 
+        }         
 
         if (opts->veda_debug)
         {
@@ -1608,7 +1610,7 @@ if (opts->isVEDA && total_bytes >= 8)
     }
 }
 
-        if (total_bytes > 0)
+        if (total_bytes > 0 && blockcounter == 1)
         {
             veda_note_candidate(opts,
                                 state,

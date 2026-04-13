@@ -577,7 +577,7 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
                 state->payload_algidR = alg + 0x20; //assuming DMRA approved alg values (moto patent)
               // --- ВСТАВИТЬ ВОТ ЗДЕСЬ ---
               avr_scout_stat_le_observe(slot, 1);
-              scout_db_on_pi_or_lc(slot, state->payload_algid, state->payload_keyid, 1, state->tg);                
+              scout_db_on_pi_or_lc(slot, state->payload_algidR, state->payload_keyidR, 1, state->tg);                
             }
 
           }

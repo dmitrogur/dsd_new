@@ -633,9 +633,9 @@ if (opts->isVEDA && !veda_voice_done)
   /* Реальный CACH decode вместо debug-only gate */
   if (opts->isVEDA) 
   {
-    uint8_t ms_cach_bits[25];
-    dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
-    (void)dmr_cach(opts, state, ms_cach_bits);
+    // uint8_t ms_cach_bits[25];
+    // dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
+    // (void)dmr_cach(opts, state, ms_cach_bits);
   }
   //update voice sync time for trunking purposes (particularly Con+)
   state->last_vc_sync_time = time(NULL);
@@ -1066,9 +1066,9 @@ if (opts->isVEDA && !veda_voice_done)
   /* Реально декодируем CACH и запускаем обычный Short LC path в MS/simplex */
   if (opts->isVEDA)  
   {
-    uint8_t ms_cach_bits[25];
-    dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
-    (void)dmr_cach(opts, state, ms_cach_bits);
+    // uint8_t ms_cach_bits[25];
+    // dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
+    // (void)dmr_cach(opts, state, ms_cach_bits);
   }  
   if (timestr != NULL)
   {
