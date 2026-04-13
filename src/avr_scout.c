@@ -384,40 +384,54 @@ done:
 
 // Ищет существующую группу или создаёт новую.
 // Возвращает индекс группы (0..ngroups-1) или -1 при переполнении.
-static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid, uint32_t tg)
+static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid,
+                                        uint32_t tg, uint32_t src)
 {
-
     for (int i = 0; i < SC.ngroups; ++i)
     {
         avr_scout_group_t *G = &SC.groups[i];
-        SLOG("%d. scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", i, alg, kid, tg, slot);
-        SLOG("%d. scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}, SC.sf_total {%d}  !!!\n\n", i, G->alg_id, G->key_id, G->tg, G->slot, SC.sf_total[slot]);
+
+        SLOG("%d. scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n",
+             i, alg, kid, tg, slot);
+        SLOG("%d. scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}, SC.sf_total {%d}  !!!\n\n",
+             i, G->alg_id, G->key_id, G->tg, G->slot, SC.sf_total[slot]);
+
         if (G->slot == slot)
         {
             if (G->alg_id == alg && G->key_id == kid && G->tg == tg)
             {
+                if (src != 0)
+                    G->src = src;   // <-- ВОТ ЭТОГО НЕ ХВАТАЛО
+
                 return i;
             }
-            if (SC.sf_total[slot] < 3) // для влзможного сбоя
+
+            if (SC.sf_total[slot] < 3) // для возможного сбоя
             {
                 if (G->tg == tg)
                 {
                     if ((G->alg_id == 0 && alg > 0) && (G->key_id == 0 && kid > 0))
                     {
-                        SLOG("UPDATE scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", alg, kid, tg, slot);
-                        SLOG("UPDATE scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n\n", G->alg_id, G->key_id, G->tg, G->slot);
+                        SLOG("UPDATE scout_find_or_make_group_key      alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n",
+                             alg, kid, tg, slot);
+                        SLOG("UPDATE scout_find_or_make_group_key G->  alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n\n",
+                             G->alg_id, G->key_id, G->tg, G->slot);
+
                         G->alg_id = alg;
                         G->key_id = kid;
+
+                        if (src != 0)
+                            G->src = src;   // <-- и тут тоже
+
                         return i;
                     }
                 }
             }
         }
     }
+
     if (SC.ngroups >= AVR_SCOUT_MAX_GROUPS)
         return -1;
-
-    // SLOG("\n\nscout_find_or_make_group_key  SC.ngroups {%d}. alg {%d}, kid {%d}, tg {%d}, slot {%d}  !!!\n", SC.ngroups, alg, kid, tg, slot);
 
     avr_scout_group_t *G = &SC.groups[SC.ngroups];
     memset(G, 0, sizeof(*G));
@@ -425,8 +439,7 @@ static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid, 
     G->alg_id = alg;
     G->key_id = kid;
     G->tg = tg;
-    // src можно не фиксировать как часть ключа, но можно сохранить последнее встреченное:
-    G->src = SC.run[slot].src;
+    G->src = src;   // <-- вместо SC.run[slot].src
     G->flco_err_count = 0;
     G->sf_total = 0;
     G->sf_total_scan = 0;
@@ -435,6 +448,7 @@ static int scout_find_or_make_group_key(uint8_t slot, uint8_t alg, uint8_t kid, 
     G->Priority = 0;
     G->Synctype = 0;
     G->irr_err = 0;
+
     return SC.ngroups++;
 }
 
@@ -512,7 +526,7 @@ void scout_series_finalize_and_store(dsd_opts *opts, dsd_state *st, uint8_t slot
     const uint32_t src = r->src; // для логов/диагностики (НЕ часть ключа группы)
 
     // найти/создать группу по КЛЮЧУ БЕЗ SRC: (Slot, ALG, KID, TG)
-    int gi = scout_find_or_make_group_key(slot, alg, kid, tg);
+    int gi = scout_find_or_make_group_key(slot, alg, kid, tg, src);
     /// SLOG("111111 (gi < 0)!!!\n\n");
     if (gi < 0)
     {
@@ -1206,7 +1220,7 @@ void avr_scout_on_superframe(dsd_opts *opts, dsd_state *st)
     // Не создаём "пустую" группу, если нет ни TG, ни ALG
     if (eff_tg != 0 || eff_alg != 0)
     {
-        const int gi = scout_find_or_make_group_key(slot, eff_alg, eff_kid, eff_tg);
+        const int gi = scout_find_or_make_group_key(slot, eff_alg, eff_kid, eff_tg, eff_src);
         SLOG("const int gi = {%d} !!\n\n", gi);
         if (gi >= 0)
         {
@@ -1312,7 +1326,7 @@ static void scout_force_window_on_flush(dsd_opts *opts, dsd_state *st, uint8_t s
 
     // найдём/создадим группу под признаки незавершённой серии
     // printf("3333 r->alg_id {%d} !!!\n\n", r->alg_id);
-    const int gi = scout_find_or_make_group_key(slot, r->alg_id, r->key_id, r->tg);
+    const int gi = scout_find_or_make_group_key(slot, r->alg_id, r->key_id, r->tg, r->src);
     if (gi < 0)
         return;
 
