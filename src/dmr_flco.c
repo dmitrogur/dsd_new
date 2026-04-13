@@ -124,6 +124,90 @@ static void veda_trace_bad_lc_candidate(dsd_opts *opts, dsd_state *state,
   fprintf(stderr, "\n");
 }
 
+static void veda_trace_cach_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *cach_bits,
+                                  uint8_t tact_valid,
+                                  uint8_t at,
+                                  uint8_t slot_hint,
+                                  uint8_t lcss,
+                                  int sf_cur)
+{
+  uint8_t raw[4] = {0, 0, 0, 0};
+  int i;
+
+  if (!opts || !state || !cach_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  for (i = 0; i < 3; i++)
+    raw[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[i * 8], 8);
+
+  raw[3] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[24], 1);
+
+  fprintf(stderr,
+          "\n[VEDA CACH] sf=%d tact=%u at=%u slot=%u lcss=%u raw=%02X%02X%02X%01X\n",
+          sf_cur,
+          (unsigned)tact_valid,
+          (unsigned)at,
+          (unsigned)((slot_hint < 2) ? (slot_hint + 1) : 0),
+          (unsigned)lcss,
+          (unsigned)raw[0],
+          (unsigned)raw[1],
+          (unsigned)raw[2],
+          (unsigned)raw[3]);
+}
+
+static void veda_trace_slco_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *slco_raw_bits,
+                                  const uint8_t *slco_bits,
+                                  uint8_t h1, uint8_t h2, uint8_t h3, uint8_t crc,
+                                  int sf_cur)
+{
+  uint8_t raw[9] = {0};
+  uint8_t di[9] = {0};
+  uint8_t slco_bytes[6] = {0};
+  uint8_t slco = 0;
+  int i;
+
+  if (!opts || !state || !slco_raw_bits || !slco_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  for (i = 0; i < 8; i++)
+  {
+    raw[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_raw_bits[i * 8], 8);
+    di[i]  = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[i * 8], 8);
+  }
+
+  raw[8] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_raw_bits[64], 4);
+  di[8]  = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[64], 4);
+
+  for (i = 0; i < 5; i++)
+    slco_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[i * 8], 8);
+
+  slco_bytes[5] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[32], 4);
+  slco = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[0], 4);
+
+  fprintf(stderr,
+          "\n[VEDA SLCO RAW] sf=%d h1=%u h2=%u h3=%u crc=%u slco=%X "
+          "raw=%02X%02X%02X%02X%02X%02X%02X%02X%01X "
+          "di=%02X%02X%02X%02X%02X%02X%02X%02X%01X "
+          "slc=%02X%02X%02X%02X%02X%01X\n",
+          sf_cur,
+          (unsigned)h1, (unsigned)h2, (unsigned)h3, (unsigned)crc,
+          (unsigned)slco,
+          (unsigned)raw[0], (unsigned)raw[1], (unsigned)raw[2], (unsigned)raw[3],
+          (unsigned)raw[4], (unsigned)raw[5], (unsigned)raw[6], (unsigned)raw[7], (unsigned)raw[8],
+          (unsigned)di[0], (unsigned)di[1], (unsigned)di[2], (unsigned)di[3],
+          (unsigned)di[4], (unsigned)di[5], (unsigned)di[6], (unsigned)di[7], (unsigned)di[8],
+          (unsigned)slco_bytes[0], (unsigned)slco_bytes[1], (unsigned)slco_bytes[2],
+          (unsigned)slco_bytes[3], (unsigned)slco_bytes[4], (unsigned)slco_bytes[5]);
+}
+
 static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
                                       int slot, const uint8_t *lc_bits,
                                       uint8_t lc_type,
@@ -213,7 +297,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     veda_trace_bad_lc_candidate(opts, state, slot, lc_bits, type,
                                 CRCCorrect, *IrrecoverableErrors);
   }
-  
+
   if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
   {
   uint8_t lc_bytes[9];
@@ -1282,6 +1366,8 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     //return (err);
   }
 
+  veda_trace_cach_probe(opts, state, cach_bits,
+                        tact_valid, at, slot, lcss, state->indx_SF);
   //determine counter value based on lcss value
   if (lcss == 0) //run as single block/fragment NOTE: There is no Single fragment LC defined for CACH signalling (but is mentioned in the manual table)
   {
@@ -1356,7 +1442,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
         slco_raw_bits[i+(17*j)] = state->dmr_cach_fragment[j][i];
       }
     }
-
+crc = crc8_ok(slco_bits, 36);
     //De-interleave method, hamming, and crc from Boatbod OP25
 
     //De-interleave
@@ -1389,6 +1475,11 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
     //run crc8
     crc = crc8_ok(slco_bits, 36);
+
+        veda_trace_slco_probe(opts, state,
+                          slco_raw_bits, slco_bits,
+                          h1, h2, h3, crc,
+                          state->indx_SF);
 
     //only run SLCO on good everything
     if (h1 && h2 && h3 && crc) dmr_slco (opts, state, slco_bits);
@@ -1433,6 +1524,21 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
   uint16_t csc = (uint16_t)ConvertBitIntoBytes(&slco_bits[19], 9); //common slot counter, 0-511
   UNUSED(netsite);
 
+  if (opts->isVEDA && opts->veda_debug)
+  {
+    fprintf(stderr,
+            "\n[VEDA SLCO] sf=%d slco=%X model=%u bytes=%02X%02X%02X%02X%02X%01X\n",
+            state->indx_SF,
+            (unsigned)slco,
+            (unsigned)model,
+            (unsigned)slco_bytes[0],
+            (unsigned)slco_bytes[1],
+            (unsigned)slco_bytes[2],
+            (unsigned)slco_bytes[3],
+            (unsigned)slco_bytes[4],
+            (unsigned)slco_bytes[5]);
+  }
+    
   uint16_t net = 0;
 	uint16_t site = 0;
   char model_str[8];
