@@ -9,7 +9,34 @@
 #include "dmr_const.h"
 #include "avr_kv.h"
 #include "dsd_veda.h"
+#include <string.h>
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
+
+static void
+dmr_ms_unpack_cach_bits_from_dibits(const char *cach_dibits, uint8_t cach_bits[25])
+{
+  static const int cach_interleave[24] = {
+    0, 7, 8, 9, 1, 10,
+    11, 12, 2, 13, 14, 15,
+    3, 16, 4, 17, 18, 19,
+    5, 20, 21, 22, 6, 23
+  };
+
+  int i;
+
+  memset(cach_bits, 0, 25);
+
+  if (cach_dibits == NULL)
+    return;
+
+  for (i = 0; i < 12; i++)
+  {
+    uint8_t dibit = (uint8_t)cach_dibits[i] & 0x03;
+
+    cach_bits[cach_interleave[(i * 2) + 0]] = (uint8_t)((dibit >> 1) & 0x01);
+    cach_bits[cach_interleave[(i * 2) + 1]] = (uint8_t)(dibit & 0x01);
+  }
+}
 
 static void veda_trace_ms_cach_gate(dsd_opts *opts, dsd_state *state,
                                     const char *tag, const char *cachdata)
@@ -661,10 +688,13 @@ if (opts->isVEDA && !veda_voice_done)
                           state->total_sf[0]);
 }
   //errors in ms/mono since we skip the other slot
-  if (opts->isVEDA)
-    veda_trace_ms_cach_gate(opts, state, "MS", cachdata);
   // cach_err = dmr_cach (opts, state, cachdata);
-
+  /* Реальный CACH decode вместо debug-only gate */
+  {
+    uint8_t ms_cach_bits[25];
+    dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
+    (void)dmr_cach(opts, state, ms_cach_bits);
+  }
   //update voice sync time for trunking purposes (particularly Con+)
   state->last_vc_sync_time = time(NULL);
 
@@ -1093,6 +1123,12 @@ if (opts->isVEDA && !veda_voice_done)
 
   //errors due to skipping other slot
   // cach_err = dmr_cach (opts, state, cachdata);
+  /* Реально декодируем CACH и запускаем обычный Short LC path в MS/simplex */
+  {
+    uint8_t ms_cach_bits[25];
+    dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
+    (void)dmr_cach(opts, state, ms_cach_bits);
+  }  
   if (timestr != NULL)
   {
     free (timestr);
