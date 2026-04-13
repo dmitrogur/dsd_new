@@ -12,8 +12,8 @@
 #include <string.h>
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
 
-static void
-dmr_ms_unpack_cach_bits_from_dibits(const char *cach_dibits, uint8_t cach_bits[25])
+static void dmr_ms_unpack_cach_bits_from_dibits(const char *cach_dibits,
+                                                uint8_t cach_bits[25])
 {
   static const int cach_interleave[24] = {
     0, 7, 8, 9, 1, 10,
@@ -32,7 +32,6 @@ dmr_ms_unpack_cach_bits_from_dibits(const char *cach_dibits, uint8_t cach_bits[2
   for (i = 0; i < 12; i++)
   {
     uint8_t dibit = (uint8_t)cach_dibits[i] & 0x03;
-
     cach_bits[cach_interleave[(i * 2) + 0]] = (uint8_t)((dibit >> 1) & 0x01);
     cach_bits[cach_interleave[(i * 2) + 1]] = (uint8_t)(dibit & 0x01);
   }
@@ -690,6 +689,7 @@ if (opts->isVEDA && !veda_voice_done)
   //errors in ms/mono since we skip the other slot
   // cach_err = dmr_cach (opts, state, cachdata);
   /* Реальный CACH decode вместо debug-only gate */
+  if (opts->isVEDA) 
   {
     uint8_t ms_cach_bits[25];
     dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
@@ -1124,6 +1124,7 @@ if (opts->isVEDA && !veda_voice_done)
   //errors due to skipping other slot
   // cach_err = dmr_cach (opts, state, cachdata);
   /* Реально декодируем CACH и запускаем обычный Short LC path в MS/simplex */
+  if (opts->isVEDA)  
   {
     uint8_t ms_cach_bits[25];
     dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
