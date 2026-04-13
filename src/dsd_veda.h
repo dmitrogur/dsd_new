@@ -40,7 +40,17 @@ void veda_trace_probe_air_header(dsd_opts *opts,
                                  uint8_t len,
                                  const char *tag,
                                  int sf_cur);
-                                 
+
+void veda_trace_rejected_air_header(dsd_opts *opts,
+                                    dsd_state *state,
+                                    int slot,
+                                    uint8_t databurst,
+                                    const uint8_t *buf,
+                                    uint8_t len,
+                                    uint32_t crc_ok,
+                                    uint32_t irr_err,
+                                    int sf_cur);
+                                                                     
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
 
 int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot);

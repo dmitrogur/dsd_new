@@ -574,6 +574,24 @@ if (opts->isVEDA && opts->veda_debug)
 
 
   //time for some pi
+  /*
+    VEDA: trace rejected pre-voice control/service candidates.
+    Здесь PDU уже собран, CRC/FEC уже известны, но high-level handler ещё не вызван.
+    Это лучшая точка, чтобы увидеть, не теряем ли case6-подобный путь ещё до обработки.
+  */
+  if (opts->isVEDA)
+  {
+    veda_trace_rejected_air_header(opts,
+                                   state,
+                                   slot,
+                                   databurst,
+                                   DMR_PDU,
+                                   pdu_len,
+                                   CRCCorrect,
+                                   IrrecoverableErrors,
+                                   state->indx_SF);
+  }
+    
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control

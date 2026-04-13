@@ -823,7 +823,7 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
     {
         fprintf(stderr,
                 "\n[VEDA CASE6 MISS] slot=%d sess=%u cause=NO_VISIBLE_CASE6_PATH "
-                "likely=%s pattern=%s svc_hdr=%u "
+                "likely=%s pattern=%s svc_hdr=%u reject=%u reject_svc=%u "
                 "db06=%u db07=%u mbc48=%u kx_try=%u "
                 "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u\n",
                 slot + 1,
@@ -831,6 +831,8 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
                 likely,
                 veda_path_pattern_name(ps),
                 (unsigned)state->veda_svc_hdr_hits[slot],
+                (unsigned)state->veda_reject_probe_count[slot],
+                (unsigned)state->veda_reject_svc_hits[slot],
                 (unsigned)state->veda_seen_db06[slot],
                 (unsigned)state->veda_seen_db07[slot],
                 (unsigned)state->veda_seen_mbc48[slot],
@@ -903,6 +905,9 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_bridge_probe_count[slot] = 0;
     
     state->veda_svc_hdr_hits[slot] = 0;
+
+    state->veda_reject_probe_count[slot] = 0;
+    state->veda_reject_svc_hits[slot] = 0;    
 }
 
 void veda_reset_profile(dsd_state *state, int slot)
@@ -1470,6 +1475,91 @@ void veda_trace_probe_air_header(dsd_opts *opts,
             (unsigned)w6);
 
     for (int i = 0; i < len && i < 12; i++)
+        fprintf(stderr, "%02X", buf[i]);
+
+    fprintf(stderr, "\n");
+}
+
+
+void veda_trace_rejected_air_header(dsd_opts *opts,
+                                    dsd_state *state,
+                                    int slot,
+                                    uint8_t databurst,
+                                    const uint8_t *buf,
+                                    uint8_t len,
+                                    uint32_t crc_ok,
+                                    uint32_t irr_err,
+                                    int sf_cur)
+{
+    uint8_t b0 = 0, b1 = 0, svc = 0;
+    uint16_t w2 = 0, w4 = 0, w6 = 0;
+    int i;
+
+    if (!opts || !state || !buf || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->isVEDA || !opts->veda_debug)
+        return;
+
+    /*
+      Нужны только реально подозрительные control/service burst-ы.
+      Voice EMB сюда пока специально не тащим.
+    */
+    switch (databurst)
+    {
+    case 0x01: /* VLC */
+    case 0x02: /* TLC */
+    case 0x03: /* CSBK */
+    case 0x04: /* MBCH */
+    case 0x06: /* DATA HDR */
+    case 0x07: /* 1/2 DATA */
+        break;
+    default:
+        return;
+    }
+
+    /* интересуют только отброшенные/битые */
+    if (crc_ok && irr_err == 0)
+        return;
+
+    /* не спамим бесконечно */
+    if (state->veda_reject_probe_count[slot] >= 24)
+        return;
+
+    state->veda_reject_probe_count[slot]++;
+
+    if (len >= 1)
+        b0 = buf[0];
+    if (len >= 2)
+        b1 = buf[1];
+    if (len >= 8)
+    {
+        w2 = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
+        w4 = (uint16_t)buf[4] | ((uint16_t)buf[5] << 8);
+        w6 = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
+    }
+
+    svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
+    if (svc)
+        state->veda_reject_svc_hits[slot]++;
+
+    fprintf(stderr,
+            "\n[VEDA RXDROP] slot=%d sf=%d db=0x%02X crc=%u irr=%u len=%u svc=%u "
+            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
+            slot + 1,
+            sf_cur,
+            (unsigned)databurst,
+            (unsigned)crc_ok,
+            (unsigned)irr_err,
+            (unsigned)len,
+            (unsigned)svc,
+            (unsigned)b0,
+            (unsigned)b1,
+            (unsigned)w2,
+            (unsigned)w4,
+            (unsigned)w6);
+
+    for (i = 0; i < len && i < 12; i++)
         fprintf(stderr, "%02X", buf[i]);
 
     fprintf(stderr, "\n");
