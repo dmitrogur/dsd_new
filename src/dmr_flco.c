@@ -1378,6 +1378,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   {
     //reset the full cach, even if we aren't going to use it, may be beneficial for next time
     state->dmr_cach_counter = 0; //first fragment, set to zero.
+    *frag_mask = 0;
     memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
 
     //seperate
@@ -1416,6 +1417,25 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   }
   else if (lcss == 3) /* continuation */
   {
+    if ((*frag_mask & 0x01) == 0)
+    {
+        state->dmr_cach_counter = 0;
+        *frag_mask = 0;
+        memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+
+        if (opts->isVEDA && opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA CACH ASM] sf=%d slot=%d orphan-continuation mask=%X counter=%u lcss=%u\n",
+                    state->indx_SF,
+                    frag_slot + 1,
+                    (unsigned)(*frag_mask & 0x0F),
+                    (unsigned)state->dmr_cach_counter,
+                    (unsigned)lcss);
+        }
+     return 1;
+    }
+               
     state->dmr_cach_counter++;
 
     if (state->dmr_cach_counter == 1)
@@ -1450,24 +1470,29 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   if (lcss == 2) //last block arrived, compile, hamming, crc and send off to dmr_slco
   {
     //isVEDA
-    if ((*frag_mask & 0x0F) != 0x0F)
+    if ((*frag_mask & 0x01) == 0)
     {
-      if (opts->isVEDA && opts->veda_debug)
-      {
-        fprintf(stderr,
-                "\n[VEDA CACH ASM] sf=%d slot=%d incomplete mask=%X counter=%u lcss=%u\n",
-                state->indx_SF,
-                frag_slot + 1,
-                (unsigned)(*frag_mask & 0x0F),
-                (unsigned)state->dmr_cach_counter,
-                (unsigned)lcss);
-      }
+        state->dmr_cach_counter = 0;
+        *frag_mask = 0;
+        memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
 
-      state->dmr_cach_counter = 0;
-      *frag_mask = 0;
-      memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
-      return 1;
-      }    
+        if (opts->isVEDA && opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA CACH ASM] sf=%d slot=%d orphan-final mask=%X counter=%u lcss=%u\n",
+                    state->indx_SF,
+                    frag_slot + 1,
+                    (unsigned)(*frag_mask & 0x0F),
+                    (unsigned)state->dmr_cach_counter,
+                    (unsigned)lcss);
+        }
+
+        return 1;
+    }
+
+    state->dmr_cach_counter = 3;
+    *frag_mask |= 0x08;
+    
     //assemble
     for (j = 0; j < 4; j++)
     {
@@ -1476,7 +1501,8 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
         slco_raw_bits[i+(17*j)] = state->dmr_cach_fragment[j][i];
       }
     }
-crc = crc8_ok(slco_bits, 36);
+    
+    crc = crc8_ok(slco_bits, 36);
     //De-interleave method, hamming, and crc from Boatbod OP25
 
     //De-interleave
