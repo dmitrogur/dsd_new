@@ -1393,6 +1393,13 @@ typedef struct
 
   uint16_t veda_svc_hdr_hits[2];
 
+  uint16_t veda_seen_db03[2];
+  uint16_t veda_seen_db04[2];
+  uint16_t veda_seen_svc_db03[2];
+  uint16_t veda_seen_svc_db04[2];
+  uint16_t veda_case5_like_hits[2];
+  uint16_t veda_case6_like_hits[2];
+
 } dsd_state;
 
 /*

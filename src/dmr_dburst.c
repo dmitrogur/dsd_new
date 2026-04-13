@@ -592,6 +592,42 @@ if (opts->isVEDA && opts->veda_debug)
                                    state->indx_SF);
   }
 
+  if (opts->isVEDA && CRCCorrect && IrrecoverableErrors == 0 && pdu_len >= 8)
+  {
+    uint8_t b0 = DMR_PDU[0];
+    uint8_t b1 = DMR_PDU[1];
+    uint16_t w2 = (uint16_t)DMR_PDU[2] | ((uint16_t)DMR_PDU[3] << 8);
+    uint16_t w4 = (uint16_t)DMR_PDU[4] | ((uint16_t)DMR_PDU[5] << 8);
+    uint16_t w6 = (uint16_t)DMR_PDU[6] | ((uint16_t)DMR_PDU[7] << 8);
+    uint8_t svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
+
+    if (databurst == 0x03)
+    {
+      state->veda_seen_db03[slot]++;
+      if (svc) state->veda_seen_svc_db03[slot]++;
+    }
+    else if (databurst == 0x04)
+    {
+      state->veda_seen_db04[slot]++;
+      if (svc) state->veda_seen_svc_db04[slot]++;
+    }
+
+    if (opts->veda_debug && svc && (databurst == 0x03 || databurst == 0x04))
+    {
+      fprintf(stderr,
+              "\n[VEDA SVCPROBE] slot=%d sf=%d db=0x%02X b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
+              slot + 1,
+              state->indx_SF,
+              databurst,
+              b0, b1, w2, w4, w6);
+
+      for (int x = 0; x < pdu_len && x < 12; x++)
+        fprintf(stderr, "%02X", DMR_PDU[x]);
+
+      fprintf(stderr, "\n");
+    }
+  }
+  
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control

@@ -1341,10 +1341,11 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
   //tact pdu
   uint8_t tact_bits[7];
-  uint8_t at = 0; //access type, set to 1 during continuous transmission mode
-  uint8_t slot = 2; //tdma time slot
-  uint8_t lcss = 0; //link control start stop (9.3.3) NOTE: There is no Single fragment LC defined for CACH signalling
-  UNUSED2(at, slot);
+  
+  uint8_t at = 0;
+  uint8_t slot = (uint8_t)(state->currentslot & 1);
+  uint8_t lcss = 0;
+  UNUSED(at);
 
   int frag_slot = state->currentslot & 1;
   uint8_t *frag_mask = &dmr_cach_frag_mask[frag_slot];
@@ -1356,6 +1357,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   }
 
   //run hamming 7_4 on the tact_bits (redundant, since we do it earlier, but need the lcss)
+  /*
   if ( Hamming_7_4_decode (tact_bits) )
   {
     at = tact_bits[0]; //any useful tricks with this? csbk on/off etc?
@@ -1364,6 +1366,17 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     tact_valid = 1; //set to 1 for valid, else remains 0.
     //fprintf (stderr, "AT=%d LCSS=%d - ", at, lcss); //debug print
   }
+  */
+  if (Hamming_7_4_decode(tact_bits))
+  {
+    at = tact_bits[0];
+    slot = tact_bits[1] & 0x01;
+    lcss = (tact_bits[2] << 1) | tact_bits[3];
+    tact_valid = 1;
+
+    frag_slot = slot & 0x01;
+    frag_mask = &dmr_cach_frag_mask[frag_slot];
+  }  
   else //probably skip/memset/zeroes with else statement?
   {
     //do something?
@@ -1412,8 +1425,19 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   if (lcss == 1) /* first */
   {
     state->dmr_cach_counter = 0;
+    *frag_mask = 0x01;
     memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
-    *frag_mask = 0x01; /* frag0 seen */
+
+    if (opts->isVEDA && opts->veda_debug)
+    {
+      fprintf(stderr,
+              "\n[VEDA CACH ASM] sf=%d slot=%d first mask=%X counter=%u lcss=%u\n",
+              state->indx_SF,
+              frag_slot + 1,
+              (unsigned)(*frag_mask & 0x0F),
+              (unsigned)state->dmr_cach_counter,
+              (unsigned)lcss);
+    }
   }
   else if (lcss == 3) /* continuation */
   {

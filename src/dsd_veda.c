@@ -825,7 +825,8 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
                 "\n[VEDA CASE6 MISS] slot=%d sess=%u cause=NO_VISIBLE_CASE6_PATH "
                 "likely=%s pattern=%s svc_hdr=%u reject=%u reject_svc=%u "
                 "db06=%u db07=%u mbc48=%u kx_try=%u "
-                "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u\n",
+                "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u"
+                "db03=%u db04=%u svc_db03=%u svc_db04=%u\n",
                 slot + 1,
                 (unsigned)ps->session_no,
                 likely,
@@ -840,7 +841,11 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
                 (unsigned)state->veda_vendor_mi_valid[slot],
                 (unsigned long long)eff_mi,
                 (unsigned)state->veda_ref_mbc[slot].payload_len,
-                (unsigned)state->veda_ref_vlc[slot].payload_len);
+                (unsigned)state->veda_ref_vlc[slot].payload_len),
+                (unsigned)state->veda_seen_db03[slot],
+                (unsigned)state->veda_seen_db04[slot],
+                (unsigned)state->veda_seen_svc_db03[slot],
+                (unsigned)state->veda_seen_svc_db04[slot];
     }
 
     return 0;
