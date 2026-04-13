@@ -71,6 +71,59 @@ static void veda_note_f9_lc(dsd_opts *opts, dsd_state *state, int slot,
   }
 }
 
+static void veda_trace_bad_lc_candidate(dsd_opts *opts, dsd_state *state,
+                                        int slot, const uint8_t *lc_bits,
+                                        uint8_t lc_type,
+                                        uint32_t crc_ok,
+                                        uint32_t irrecoverable_errors)
+{
+  uint8_t lc_bytes[9];
+  uint16_t w2, w4, w6;
+  int i;
+
+  if (!opts || !state || !lc_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  if (slot < 0 || slot > 1)
+    return;
+
+  /* интересуют только LC/EMB, которые НЕ прошли clean-path */
+  if (crc_ok == 1 && irrecoverable_errors == 0)
+    return;
+
+  /* только VLC/TLC/EMB */
+  if (lc_type != 1 && lc_type != 2 && lc_type != 3)
+    return;
+
+  for (i = 0; i < 9; i++)
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+
+  w2 = (uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8);
+  w4 = (uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8);
+  w6 = (uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8);
+
+  fprintf(stderr,
+          "\n[VEDA LCDROP] slot=%d type=%u crc=%u irr=%u "
+          "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
+          slot + 1,
+          (unsigned)lc_type,
+          (unsigned)crc_ok,
+          (unsigned)irrecoverable_errors,
+          (unsigned)lc_bytes[0],
+          (unsigned)lc_bytes[1],
+          (unsigned)w2,
+          (unsigned)w4,
+          (unsigned)w6);
+
+  for (i = 0; i < 9; i++)
+    fprintf(stderr, "%02X", lc_bytes[i]);
+
+  fprintf(stderr, "\n");
+}
+
 static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
                                       int slot, const uint8_t *lc_bits,
                                       uint8_t lc_type,
@@ -106,6 +159,7 @@ static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
   (void)veda_try_handle_header(opts, state, slot, &hdr,
                                (lc_type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC);
 }
+
 
 //combined flco handler (vlc, tlc, emb), minus the superfluous structs and strings
 void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t CRCCorrect, uint32_t * IrrecoverableErrors, uint8_t type)
@@ -153,6 +207,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   so = (uint8_t)ConvertBitIntoBytes(&lc_bits[16], 8); //Service Options
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
+  
+    if (opts->isVEDA)
+  {
+    veda_trace_bad_lc_candidate(opts, state, slot, lc_bits, type,
+                                CRCCorrect, *IrrecoverableErrors);
+  }
   
   if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
   {
