@@ -591,7 +591,7 @@ if (opts->isVEDA && opts->veda_debug)
                                    IrrecoverableErrors,
                                    state->indx_SF);
   }
-    
+
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control
@@ -726,7 +726,7 @@ if (opts->isVEDA)
             CRCCorrect &&
             pdu_len == 12)
         {
-            state->veda_seen_db06[slot] = 1;
+            state->veda_seen_db07[slot] = 1;
             memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], DMR_PDU, 12);
             state->veda_kx_pos[slot] += 12;
 

@@ -816,7 +816,7 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
         state->veda_seen_mbc48[slot] == 0 &&
         state->veda_svc_hdr_hits[slot] == 0)
     {
-        likely = "LATE_ENTRY_OR_PRECALL_LOSS";
+        likely = "UNOBSERVED_SERVICE_PATH";
     }
 
     if (opts->veda_debug)

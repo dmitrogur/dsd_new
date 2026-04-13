@@ -27,7 +27,8 @@ static void veda_try_handle_csbk_header(dsd_opts *opts, dsd_state *state, const 
 
 static void veda_trace_csbk_probe(dsd_opts *opts, dsd_state *state,
                                   const uint8_t *cs_pdu,
-                                  uint8_t csbk_o, uint8_t csbk_fid)
+                                  uint8_t csbk_o, uint8_t csbk_fid,
+                                  uint8_t csbk_pf)
 {
   uint8_t service_like = 0;
   int slot;
@@ -63,10 +64,11 @@ static void veda_trace_csbk_probe(dsd_opts *opts, dsd_state *state,
   }
 
   fprintf(stderr,
-          "\n[VEDA CSBK RAW] slot=%d op=%02X fid=%02X svc_like=%u b=",
+          "\n[VEDA CSBK RAW] slot=%d op=%02X fid=%02X pf=%u svc_like=%u b=",
           slot + 1,
           (unsigned)csbk_o,
           (unsigned)csbk_fid,
+          (unsigned)csbk_pf,
           (unsigned)service_like);
 
   for (i = 0; i < 12; i++)
@@ -119,13 +121,17 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
     //in the middle of voice call on current Control Channel (con+ and t3)
     state->last_cc_sync_time = time(NULL);
 
+    if (opts->isVEDA)
+        veda_trace_csbk_probe(opts, state, cs_pdu,
+                              (uint8_t)csbk_o,
+                              (uint8_t)csbk_fid,
+                              (uint8_t)csbk_pf);
+
     if (csbk_pf == 0) //okay to run
     {
         if (opts->isVEDA)
-        {
-            veda_trace_csbk_probe(opts, state, cs_pdu, (uint8_t)csbk_o, (uint8_t)csbk_fid);
-            veda_try_handle_csbk_header(opts, state, cs_pdu);
-        }
+          veda_try_handle_csbk_header(opts, state, cs_pdu);
+          
       //set overarching manufacturer in use when non-standard feature id set is up
       if (csbk_fid != 0) state->dmr_mfid = csbk_fid;
 
