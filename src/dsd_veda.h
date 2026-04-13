@@ -50,7 +50,7 @@ void veda_trace_rejected_air_header(dsd_opts *opts,
                                     uint32_t crc_ok,
                                     uint32_t irr_err,
                                     int sf_cur);
-                                                                     
+
 uint64_t veda_get_effective_mi(dsd_state *state, int slot);
 
 int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot);
@@ -76,6 +76,40 @@ void veda_note_candidate(dsd_opts *opts,
                          int sf_cur);
 
 void veda_clear_candidate(dsd_state *state, int slot);                         
+
+
+void veda_raw_reset_slot(dsd_state *state, int slot);
+void veda_raw_begin_if_needed(dsd_state *state, int slot, uint16_t sf, uint8_t first_kind);
+void veda_raw_close_if_needed(dsd_state *state, int slot, uint16_t sf, uint8_t reason);
+
+void veda_raw_log_mbc(dsd_opts *opts, dsd_state *state, int slot,
+                      uint8_t kind, uint8_t databurst,
+                      const uint8_t *raw, uint8_t len,
+                      uint8_t crc_ok, uint8_t irr_err,
+                      uint8_t blockcounter, uint8_t blocks,
+                      uint8_t lb, uint8_t pf, uint16_t sf);
+
+void veda_raw_log_db(dsd_opts *opts, dsd_state *state, int slot,
+                     uint8_t databurst,
+                     const uint8_t *raw, uint8_t len,
+                     uint8_t crc_ok, uint8_t irr_err,
+                     uint16_t sf);
+
+void veda_raw_log_lc(dsd_opts *opts, dsd_state *state, int slot,
+                     uint8_t kind,
+                     const uint8_t *raw, uint8_t len,
+                     uint8_t crc_ok, uint8_t irr_err,
+                     uint8_t flco, uint8_t fid, uint8_t so,
+                     uint16_t sf);
+
+void veda_raw_log_cach(dsd_opts *opts, dsd_state *state, int slot,
+                       uint32_t tact_raw,
+                       uint8_t tact_ok, uint8_t at, uint8_t tdma_slot, uint8_t lcss,
+                       const uint8_t *raw, uint8_t len,
+                       uint16_t sf);
+
+void veda_raw_log_mi(dsd_opts *opts, dsd_state *state, int slot,
+                     uint32_t mi32, uint16_t sf);
 
 // инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {

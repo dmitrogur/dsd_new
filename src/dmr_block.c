@@ -1453,6 +1453,13 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
                         block_bytes,
                         block_len,
                         state->indx_SF);
+      
+      veda_raw_log_mbc(opts, state, slot,
+                 VEDA_RAW_MBC_BLK0, databurst,
+                 block_bytes, block_len,
+                 state->data_block_crc_valid[slot][0], 0,
+                 blockcounter, blocks, lb, pf,
+                 state->indx_SF);                      
     }
     if (is_udt)
     {
@@ -1555,6 +1562,12 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
                   (unsigned)CRCCorrect,
                   (unsigned)state->data_block_crc_valid[slot][0]);
 
+          veda_raw_log_mbc(opts, state, slot,
+                 VEDA_RAW_MBC_SF, databurst,
+                 state->dmr_pdu_sf[slot], (uint8_t)total_bytes,
+                 (uint8_t)CRCCorrect, (uint8_t)IrrecoverableErrors,
+                 blockcounter, blocks, lb, pf,
+                 state->indx_SF);                  
           for (int x = 0; x < total_bytes; x++)
             fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
 

@@ -441,6 +441,10 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
         state->veda_vendor_mi32[vslot] = sbrcpl;
         state->veda_vendor_mi_valid[vslot] = 1;
 
+        veda_raw_log_mi(opts, state, slot,
+                state->veda_vendor_mi32[slot],
+                state->indx_SF);
+                
         if (opts->veda_debug)
         {
           fprintf(stderr,

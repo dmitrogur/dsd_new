@@ -69,6 +69,7 @@
 #define SAMPLE_RATE_IN 48000 //48000
 #define SAMPLE_RATE_OUT 8000 //8000
 
+
 #ifdef USE_RTLSDR
 #include <rtl-sdr.h>
 #endif
@@ -373,6 +374,50 @@ typedef struct
 
 //============================= 
 // VEDA
+#define VEDA_RAW_MAX_EVTS   256
+#define VEDA_RAW_MAX_BYTES   64
+#define VEDA_RAW_SF_WINDOW    3   /* ~ первые 0.7–1.1 с по текущим логам */
+
+typedef enum
+{
+  VEDA_RAW_NONE = 0,
+  VEDA_RAW_MBC_BLK0,
+  VEDA_RAW_MBC_SF,
+  VEDA_RAW_DB,
+  VEDA_RAW_VLC,
+  VEDA_RAW_TLC,
+  VEDA_RAW_EMB,
+  VEDA_RAW_CACH,
+  VEDA_RAW_MI
+} veda_raw_kind_t;
+
+typedef struct
+{
+  uint8_t  kind;
+  uint8_t  databurst;
+  uint8_t  slot;
+  uint8_t  crc_ok;
+  uint8_t  irr_err;
+
+  uint16_t sf;
+  uint16_t session_no;
+  uint16_t seq;
+
+  uint8_t  len;
+
+  /* универсальные aux-поля */
+  uint8_t  aux0;
+  uint8_t  aux1;
+  uint8_t  aux2;
+  uint8_t  aux3;
+
+  /* для CACH */
+  uint32_t tact_raw;
+
+  uint8_t  raw[VEDA_RAW_MAX_BYTES];
+} veda_raw_evt_t;
+
+
 typedef struct
 {
   uint8_t  b0;
@@ -479,6 +524,66 @@ typedef struct {
   uint8_t source_kind;
 } veda_id_map_t;
 
+//=====================================================
+// На будущее!!!
+typedef struct {
+  uint8_t kind;          // MBC, DB, VLC, TLC, EMB, CACH, LC, unknown
+  uint8_t databurst;     // 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0xEB ...
+  uint8_t slot;
+  uint8_t sf;
+  uint8_t crc_ok;
+  uint8_t irr_err;
+  uint8_t len;           // байт в raw[]
+  uint8_t raw[64];       // запас с перекрытием
+  uint32_t tact_raw;
+  uint8_t lcss;
+  uint8_t at;
+  uint8_t tdma_slot;
+} veda_raw_block_t;
+
+typedef struct {
+  uint32_t session_no;
+  uint8_t active;
+  uint8_t slot;
+
+  uint8_t primary_key[32];
+  uint8_t primary_key_len;
+
+  uint8_t saw_first_voice;
+  uint8_t saw_tail_f9;
+  uint8_t setup_finalized;
+
+  uint32_t start_sf;
+  uint32_t first_voice_sf;
+
+  uint8_t vendor_mi_valid;
+  uint32_t vendor_mi32;
+  uint64_t eff_mi64;
+
+  uint16_t raw_count;
+  veda_raw_block_t raw_blocks[256];
+
+  uint16_t early_mbc_count;
+  uint16_t early_db_count;
+  uint16_t early_lc_count;
+  uint16_t early_cach_count;
+} veda_air_session_t;
+
+typedef struct {
+  uint8_t valid;
+
+  uint8_t peer_material[128];
+  uint8_t peer_material_len;
+
+  uint8_t challenge[128];
+  uint8_t challenge_len;
+
+  uint8_t entropy_tmp[32];
+  uint8_t session_key[32];
+
+  uint32_t score;
+  uint32_t reason_flags;
+} veda_kx_candidate_t;
 //=====================================================
 typedef struct
 {
@@ -1399,6 +1504,16 @@ typedef struct
   uint16_t veda_seen_svc_db04[2];
   uint16_t veda_case5_like_hits[2];
   uint16_t veda_case6_like_hits[2];
+
+  /* VEDA raw early logging */
+  uint8_t  veda_raw_active[2];
+  uint16_t veda_raw_session_no[2];
+  uint16_t veda_raw_start_sf[2];
+  uint16_t veda_raw_first_voice_sf[2];
+  uint16_t veda_raw_capture_until_sf[2];
+  uint16_t veda_raw_count[2];
+  uint16_t veda_raw_seq[2];
+  veda_raw_evt_t veda_raw_evt[2][VEDA_RAW_MAX_EVTS];
 
 } dsd_state;
 

@@ -811,12 +811,27 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
     if (ps->saw_voice &&
         state->veda_vendor_mi_valid[slot] &&
         state->veda_kx_try_count[slot] == 0 &&
+        state->veda_seen_db03[slot] == 0 &&
+        state->veda_seen_db04[slot] == 0 &&
         state->veda_seen_db06[slot] == 0 &&
         state->veda_seen_db07[slot] == 0 &&
         state->veda_seen_mbc48[slot] == 0 &&
         state->veda_svc_hdr_hits[slot] == 0)
     {
-        likely = "UNOBSERVED_SERVICE_PATH";
+        if (state->veda_ref_mbc[slot].valid &&
+            state->veda_ref_mbc[slot].payload_len == 12)
+        {
+            likely = "LIKELY_MIDCALL_OR_TRUNCATED_MBC_START";
+        }
+        else if (state->veda_ref_vlc[slot].valid &&
+             !state->veda_ref_mbc[slot].valid)
+        {
+            likely = "LIKELY_MIDCALL_VLC_START";
+        }
+        else
+        {
+            likely = "UNOBSERVED_SERVICE_PATH";
+        }
     }
 
     if (opts->veda_debug)
@@ -917,7 +932,9 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_seen_db03[slot] = 0;
     state->veda_seen_db04[slot] = 0;
     state->veda_seen_svc_db03[slot] = 0;
-    state->veda_seen_svc_db04[slot] = 0;    
+    state->veda_seen_svc_db04[slot] = 0;
+    
+    veda_raw_reset_slot(state, slot);
 }
 
 void veda_reset_profile(dsd_state *state, int slot)
@@ -1573,4 +1590,316 @@ void veda_trace_rejected_air_header(dsd_opts *opts,
         fprintf(stderr, "%02X", buf[i]);
 
     fprintf(stderr, "\n");
+}
+
+
+static const char *veda_raw_kind_name(uint8_t kind)
+{
+    switch (kind)
+    {
+    case VEDA_RAW_MBC_BLK0: return "MBC_BLK0";
+    case VEDA_RAW_MBC_SF:   return "MBC_SF";
+    case VEDA_RAW_DB:       return "DB";
+    case VEDA_RAW_VLC:      return "VLC";
+    case VEDA_RAW_TLC:      return "TLC";
+    case VEDA_RAW_EMB:      return "EMB";
+    case VEDA_RAW_CACH:     return "CACH";
+    case VEDA_RAW_MI:       return "MI";
+    default:                return "NONE";
+    }
+}
+
+static int veda_raw_can_open(uint8_t kind)
+{
+    return (kind == VEDA_RAW_MBC_BLK0 ||
+            kind == VEDA_RAW_MBC_SF   ||
+            kind == VEDA_RAW_VLC);
+}
+
+static void veda_raw_debug_dump(dsd_opts *opts,
+                                dsd_state *state,
+                                int slot,
+                                const veda_raw_evt_t *evt)
+{
+    int i;
+
+    if (!opts || !state || !evt || slot < 0 || slot > 1)
+        return;
+
+    if (!opts->isVEDA || !opts->veda_debug)
+        return;
+
+    fprintf(stderr,
+            "\n[VEDA RAW] slot=%d sess=%u seq=%u kind=%s sf=%u len=%u "
+            "crc=%u irr=%u db=%02X aux=%02X %02X %02X %02X raw=",
+            slot + 1,
+            (unsigned)evt->session_no,
+            (unsigned)evt->seq,
+            veda_raw_kind_name(evt->kind),
+            (unsigned)evt->sf,
+            (unsigned)evt->len,
+            (unsigned)evt->crc_ok,
+            (unsigned)evt->irr_err,
+            (unsigned)evt->databurst,
+            (unsigned)evt->aux0,
+            (unsigned)evt->aux1,
+            (unsigned)evt->aux2,
+            (unsigned)evt->aux3);
+
+    for (i = 0; i < evt->len; i++)
+        fprintf(stderr, "%02X", evt->raw[i]);
+
+    fprintf(stderr, "\n");
+}
+
+static void veda_raw_push_evt(dsd_opts *opts,
+                              dsd_state *state,
+                              int slot,
+                              const veda_raw_evt_t *src)
+{
+    veda_raw_evt_t *dst;
+    uint16_t idx;
+
+    if (!state || !src || slot < 0 || slot > 1)
+        return;
+
+    if (!state->veda_raw_active[slot])
+        return;
+
+    if (state->veda_raw_count[slot] >= VEDA_RAW_MAX_EVTS)
+        return;
+
+    idx = state->veda_raw_count[slot]++;
+    dst = &state->veda_raw_evt[slot][idx];
+    *dst = *src;
+
+    veda_raw_debug_dump(opts, state, slot, dst);
+}
+
+void veda_raw_reset_slot(dsd_state *state, int slot)
+{
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    state->veda_raw_active[slot] = 0;
+    state->veda_raw_session_no[slot] = 0;
+    state->veda_raw_start_sf[slot] = 0;
+    state->veda_raw_first_voice_sf[slot] = 0;
+    state->veda_raw_capture_until_sf[slot] = 0;
+    state->veda_raw_count[slot] = 0;
+    state->veda_raw_seq[slot] = 0;
+
+    memset(state->veda_raw_evt[slot], 0, sizeof(state->veda_raw_evt[slot]));
+}
+
+void veda_raw_begin_if_needed(dsd_state *state, int slot, uint16_t sf, uint8_t first_kind)
+{
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    if (state->veda_raw_active[slot])
+        return;
+
+    if (!veda_raw_can_open(first_kind))
+        return;
+
+    state->veda_raw_session_no[slot]++;
+    if (state->veda_raw_session_no[slot] == 0)
+        state->veda_raw_session_no[slot] = 1;
+
+    state->veda_raw_active[slot] = 1;
+    state->veda_raw_start_sf[slot] = sf;
+    state->veda_raw_first_voice_sf[slot] = 0;
+    state->veda_raw_capture_until_sf[slot] = (uint16_t)(sf + VEDA_RAW_SF_WINDOW);
+    state->veda_raw_count[slot] = 0;
+    state->veda_raw_seq[slot] = 0;
+
+    memset(state->veda_raw_evt[slot], 0, sizeof(state->veda_raw_evt[slot]));
+}
+
+void veda_raw_close_if_needed(dsd_state *state, int slot, uint16_t sf, uint8_t reason)
+{
+    (void)sf;
+    (void)reason;
+
+    if (!state || slot < 0 || slot > 1)
+        return;
+
+    if (!state->veda_raw_active[slot])
+        return;
+
+    state->veda_raw_active[slot] = 0;
+}
+
+static int veda_raw_prepare_event(dsd_state *state,
+                                  int slot,
+                                  uint8_t kind,
+                                  uint16_t sf,
+                                  veda_raw_evt_t *evt)
+{
+    if (!state || !evt || slot < 0 || slot > 1)
+        return 0;
+
+    if (state->veda_raw_active[slot] &&
+        sf > state->veda_raw_capture_until_sf[slot])
+    {
+        veda_raw_close_if_needed(state, slot, sf, 1);
+    }
+
+    if (!state->veda_raw_active[slot])
+    {
+        veda_raw_begin_if_needed(state, slot, sf, kind);
+    }
+
+    if (!state->veda_raw_active[slot])
+        return 0;
+
+    memset(evt, 0, sizeof(*evt));
+
+    state->veda_raw_seq[slot]++;
+    if (state->veda_raw_seq[slot] == 0)
+        state->veda_raw_seq[slot] = 1;
+
+    evt->kind = kind;
+    evt->slot = (uint8_t)slot;
+    evt->sf = sf;
+    evt->session_no = state->veda_raw_session_no[slot];
+    evt->seq = state->veda_raw_seq[slot];
+
+    return 1;
+}
+
+void veda_raw_log_mbc(dsd_opts *opts, dsd_state *state, int slot,
+                      uint8_t kind, uint8_t databurst,
+                      const uint8_t *raw, uint8_t len,
+                      uint8_t crc_ok, uint8_t irr_err,
+                      uint8_t blockcounter, uint8_t blocks,
+                      uint8_t lb, uint8_t pf, uint16_t sf)
+{
+    veda_raw_evt_t evt;
+
+    if (!raw || len == 0)
+        return;
+
+    if (!veda_raw_prepare_event(state, slot, kind, sf, &evt))
+        return;
+
+    evt.databurst = databurst;
+    evt.crc_ok = crc_ok;
+    evt.irr_err = irr_err;
+    evt.len = (len > VEDA_RAW_MAX_BYTES) ? VEDA_RAW_MAX_BYTES : len;
+    evt.aux0 = blockcounter;
+    evt.aux1 = blocks;
+    evt.aux2 = lb;
+    evt.aux3 = pf;
+
+    memcpy(evt.raw, raw, evt.len);
+
+    veda_raw_push_evt(opts, state, slot, &evt);
+}
+
+void veda_raw_log_db(dsd_opts *opts, dsd_state *state, int slot,
+                     uint8_t databurst,
+                     const uint8_t *raw, uint8_t len,
+                     uint8_t crc_ok, uint8_t irr_err,
+                     uint16_t sf)
+{
+    veda_raw_evt_t evt;
+
+    if (!raw || len == 0)
+        return;
+
+    if (!veda_raw_prepare_event(state, slot, VEDA_RAW_DB, sf, &evt))
+        return;
+
+    evt.databurst = databurst;
+    evt.crc_ok = crc_ok;
+    evt.irr_err = irr_err;
+    evt.len = (len > VEDA_RAW_MAX_BYTES) ? VEDA_RAW_MAX_BYTES : len;
+
+    memcpy(evt.raw, raw, evt.len);
+
+    veda_raw_push_evt(opts, state, slot, &evt);
+}
+
+void veda_raw_log_lc(dsd_opts *opts, dsd_state *state, int slot,
+                     uint8_t kind,
+                     const uint8_t *raw, uint8_t len,
+                     uint8_t crc_ok, uint8_t irr_err,
+                     uint8_t flco, uint8_t fid, uint8_t so,
+                     uint16_t sf)
+{
+    veda_raw_evt_t evt;
+
+    if (!raw || len == 0)
+        return;
+
+    if (!veda_raw_prepare_event(state, slot, kind, sf, &evt))
+        return;
+
+    if (kind == VEDA_RAW_VLC) evt.databurst = 0x01;
+    else if (kind == VEDA_RAW_TLC) evt.databurst = 0x02;
+    else if (kind == VEDA_RAW_EMB) evt.databurst = 0xEB;
+    else evt.databurst = 0x00;
+
+    evt.crc_ok = crc_ok;
+    evt.irr_err = irr_err;
+    evt.len = (len > VEDA_RAW_MAX_BYTES) ? VEDA_RAW_MAX_BYTES : len;
+    evt.aux0 = flco;
+    evt.aux1 = fid;
+    evt.aux2 = so;
+
+    memcpy(evt.raw, raw, evt.len);
+
+    if ((kind == VEDA_RAW_VLC || kind == VEDA_RAW_EMB) &&
+        state->veda_raw_first_voice_sf[slot] == 0)
+    {
+        state->veda_raw_first_voice_sf[slot] = sf;
+    }
+
+    veda_raw_push_evt(opts, state, slot, &evt);
+}
+
+void veda_raw_log_cach(dsd_opts *opts, dsd_state *state, int slot,
+                       uint32_t tact_raw,
+                       uint8_t tact_ok, uint8_t at, uint8_t tdma_slot, uint8_t lcss,
+                       const uint8_t *raw, uint8_t len,
+                       uint16_t sf)
+{
+    veda_raw_evt_t evt;
+
+    if (!raw || len == 0)
+        return;
+
+    if (!veda_raw_prepare_event(state, slot, VEDA_RAW_CACH, sf, &evt))
+        return;
+
+    evt.crc_ok = tact_ok;
+    evt.len = (len > VEDA_RAW_MAX_BYTES) ? VEDA_RAW_MAX_BYTES : len;
+    evt.aux0 = tact_ok;
+    evt.aux1 = at;
+    evt.aux2 = tdma_slot;
+    evt.aux3 = lcss;
+    evt.tact_raw = tact_raw;
+
+    memcpy(evt.raw, raw, evt.len);
+
+    veda_raw_push_evt(opts, state, slot, &evt);
+}
+
+void veda_raw_log_mi(dsd_opts *opts, dsd_state *state, int slot,
+                     uint32_t mi32, uint16_t sf)
+{
+    veda_raw_evt_t evt;
+
+    if (!veda_raw_prepare_event(state, slot, VEDA_RAW_MI, sf, &evt))
+        return;
+
+    evt.len = 4;
+    evt.raw[0] = (uint8_t)((mi32 >> 24) & 0xFF);
+    evt.raw[1] = (uint8_t)((mi32 >> 16) & 0xFF);
+    evt.raw[2] = (uint8_t)((mi32 >> 8) & 0xFF);
+    evt.raw[3] = (uint8_t)(mi32 & 0xFF);
+
+    veda_raw_push_evt(opts, state, slot, &evt);
 }

@@ -118,12 +118,13 @@ static void veda_trace_bad_lc_candidate(dsd_opts *opts, dsd_state *state,
           (unsigned)lc_bytes[1],
           (unsigned)w2,
           (unsigned)w4,
-          (unsigned)w6);
+          (unsigned)w6);          
 
   for (i = 0; i < 9; i++)
     fprintf(stderr, "%02X", lc_bytes[i]);
 
   fprintf(stderr, "\n");
+  
 }
 
 static void veda_trace_cach_probe(dsd_opts *opts, dsd_state *state,
@@ -355,6 +356,23 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     target, source,
     alt_tgt_be_24, alt_src_be_24,
     alt_tgt_le_24, alt_src_le_24);
+
+  if (opts->isVEDA && (type == 1 || type == 2 || type == 3))
+  {
+      uint8_t raw_kind = VEDA_RAW_NONE;
+
+      if (type == 1) raw_kind = VEDA_RAW_VLC;
+      else if (type == 2) raw_kind = VEDA_RAW_TLC;
+      else if (type == 3) raw_kind = VEDA_RAW_EMB;
+
+      veda_raw_log_lc(opts, state, slot,
+                      raw_kind,
+                      lc_bytes, 9,
+                      (uint8_t)CRCCorrect,
+                      (uint8_t)(*IrrecoverableErrors),
+                      flco, fid, so,
+                      state->indx_SF);
+  }    
 
 if (type == 1)
 {
@@ -1386,6 +1404,26 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
   veda_trace_cach_probe(opts, state, cach_bits,
                         tact_valid, at, slot, lcss, state->indx_SF);
+
+if (opts->isVEDA)
+{
+    uint8_t cach_raw[4] = {0};
+    uint32_t tact_raw = 0;
+
+    for (int b = 0; b < 3; b++)
+        cach_raw[b] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[b * 8], 8);
+    cach_raw[3] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[24], 1);
+
+    tact_raw = ((uint32_t)cach_raw[0] << 16) |
+               ((uint32_t)cach_raw[1] << 8)  |
+               ((uint32_t)cach_raw[2]);
+
+    veda_raw_log_cach(opts, state, frag_slot,
+                      tact_raw,
+                      tact_valid, at, slot, lcss,
+                      cach_raw, 4,
+                      state->indx_SF);
+}                        
   //determine counter value based on lcss value
   if (lcss == 0) //run as single block/fragment NOTE: There is no Single fragment LC defined for CACH signalling (but is mentioned in the manual table)
   {

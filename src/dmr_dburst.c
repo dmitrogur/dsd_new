@@ -590,6 +590,16 @@ if (opts->isVEDA && opts->veda_debug)
                                    CRCCorrect,
                                    IrrecoverableErrors,
                                    state->indx_SF);
+    if (databurst == 0x03 || databurst == 0x04 || databurst == 0x05 ||
+      databurst == 0x06 || databurst == 0x07 || databurst == 0x0B)
+    {
+      veda_raw_log_db(opts, state, slot,
+                    databurst,
+                    DMR_PDU, pdu_len,
+                    (uint8_t)CRCCorrect,
+                    (uint8_t)IrrecoverableErrors,
+                    state->indx_SF);
+    }                                   
   }
 
   if (opts->isVEDA && CRCCorrect && IrrecoverableErrors == 0 && pdu_len >= 8)
@@ -627,7 +637,7 @@ if (opts->isVEDA && opts->veda_debug)
       fprintf(stderr, "\n");
     }
   }
-  
+
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control
