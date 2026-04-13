@@ -839,8 +839,8 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
     }
     cachdata[i] = dibit;
   }
-  if (opts->isVEDA)
-    veda_trace_ms_cach_gate(opts, state, "MSBOOT", cachdata); 
+  // if (opts->isVEDA)
+  //  veda_trace_ms_cach_gate(opts, state, "MSBOOT", cachdata); 
   //Setup for first AMBE Frame
 
   //Interleave Schedule

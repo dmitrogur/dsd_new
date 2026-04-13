@@ -9,6 +9,8 @@
 #include "avr_kv.h"
 #include "dsd_veda.h"
 
+static uint8_t dmr_cach_frag_mask[2] = {0, 0};
+
 static void veda_note_f9_lc(dsd_opts *opts, dsd_state *state, int slot,
                             uint8_t type, const uint8_t lc_bytes[9],
                             uint8_t flco, uint8_t fid, uint8_t so)
@@ -1344,6 +1346,9 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   uint8_t lcss = 0; //link control start stop (9.3.3) NOTE: There is no Single fragment LC defined for CACH signalling
   UNUSED2(at, slot);
 
+  int frag_slot = state->currentslot & 1;
+  uint8_t *frag_mask = &dmr_cach_frag_mask[frag_slot];
+
   //cach_bits are already de-interleaved upon initial collection (still needs secodary slco de-interleave)
   for (i = 0; i < 7; i++)
   {
@@ -1403,16 +1408,25 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     return (err);
   }
 
-  if (lcss == 1) //first block, reset counters and memset
+  if (lcss == 1) /* first */
   {
-    //reset the full cach and counter
     state->dmr_cach_counter = 0;
-    memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
+    memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+    *frag_mask = 0x01; /* frag0 seen */
   }
-  if (lcss == 3) state->dmr_cach_counter++; //continuation, so increment counter by one.
-  if (lcss == 2) //final segment - assemble, de-interleave, hamming, crc, and execute
+  else if (lcss == 3) /* continuation */
+  {
+    state->dmr_cach_counter++;
+
+    if (state->dmr_cach_counter == 1)
+      *frag_mask |= 0x02; /* frag1 seen */
+    else if (state->dmr_cach_counter == 2)
+      *frag_mask |= 0x04; /* frag2 seen */
+  }
+  else if (lcss == 2) /* final */
   {
     state->dmr_cach_counter = 3;
+    *frag_mask |= 0x08; /* frag3 seen */
   }
 
   //sanity check
@@ -1421,6 +1435,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     //zero out complete fragment array
     lcss = 5; //toss away value
     state->dmr_cach_counter = 0;
+    *frag_mask = 0;
     memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
     err = 1;
     return (err);
@@ -1434,6 +1449,25 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
   if (lcss == 2) //last block arrived, compile, hamming, crc and send off to dmr_slco
   {
+    //isVEDA
+    if ((*frag_mask & 0x0F) != 0x0F)
+    {
+      if (opts->isVEDA && opts->veda_debug)
+      {
+        fprintf(stderr,
+                "\n[VEDA CACH ASM] sf=%d slot=%d incomplete mask=%X counter=%u lcss=%u\n",
+                state->indx_SF,
+                frag_slot + 1,
+                (unsigned)(*frag_mask & 0x0F),
+                (unsigned)state->dmr_cach_counter,
+                (unsigned)lcss);
+      }
+
+      state->dmr_cach_counter = 0;
+      *frag_mask = 0;
+      memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+      return 1;
+      }    
     //assemble
     for (j = 0; j < 4; j++)
     {
@@ -1501,6 +1535,10 @@ crc = crc8_ok(slco_bits, 36);
         fprintf (stderr, "\n");
     }
 
+    state->dmr_cach_counter = 0;
+    *frag_mask = 0;
+    memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));    
+
   }
   return (err); //return err value based on success or failure, even if we aren't checking it
 }
@@ -1538,7 +1576,7 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
             (unsigned)slco_bytes[4],
             (unsigned)slco_bytes[5]);
   }
-    
+
   uint16_t net = 0;
 	uint16_t site = 0;
   char model_str[8];
