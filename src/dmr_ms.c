@@ -11,6 +11,64 @@
 #include "dsd_veda.h"
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
 
+static void veda_trace_ms_cach_gate(dsd_opts *opts, dsd_state *state,
+                                    const char *tag, const char *cachdata)
+{
+  uint8_t tact_bits[7];
+  uint8_t tact_okay = 0;
+  uint8_t at = 0;
+  uint8_t slot = 0;
+  uint8_t lcss = 0;
+  uint8_t raw0 = 0, raw1 = 0, raw2 = 0;
+  int i;
+
+  if (!opts || !state || !cachdata)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  for (i = 0; i < 7; i++)
+    tact_bits[i] = (uint8_t)cachdata[i];
+
+  raw0 = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cachdata[0], 8);
+  raw1 = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cachdata[8], 4);
+
+  /*
+    Второй байт raw собираем вручную:
+    bits 8..11 уже в raw1 high nibble,
+    bits 12..15 берём из того, что уже есть в payload/cachdata.
+  */
+  raw1 = 0;
+  for (i = 0; i < 8; i++)
+    raw1 = (uint8_t)((raw1 << 1) | ((uint8_t)cachdata[8 + i] & 1));
+
+  raw2 = 0;
+  for (i = 0; i < 8; i++)
+    raw2 = (uint8_t)((raw2 << 1) | ((uint8_t)cachdata[16 + i] & 1));
+
+  if (Hamming_7_4_decode(tact_bits))
+  {
+    tact_okay = 1;
+    at   = tact_bits[0];
+    slot = tact_bits[1];
+    lcss = (uint8_t)((tact_bits[2] << 1) | tact_bits[3]);
+  }
+
+  fprintf(stderr,
+          "\n[VEDA CACH GATE] tag=%s sf=%d bypass=dmr_cach_disabled_in_ms "
+          "tact=%u at=%u slot=%u lcss=%u raw=%02X%02X%02X\n",
+          tag ? tag : "MS",
+          state->indx_SF,
+          (unsigned)tact_okay,
+          (unsigned)at,
+          (unsigned)(slot + 1),
+          (unsigned)lcss,
+          (unsigned)raw0,
+          (unsigned)raw1,
+          (unsigned)raw2);
+}
+
 //A subroutine for processing MS voice
 void dmrMS (dsd_opts * opts, dsd_state * state)
 {
@@ -603,6 +661,8 @@ if (opts->isVEDA && !veda_voice_done)
                           state->total_sf[0]);
 }
   //errors in ms/mono since we skip the other slot
+  if (opts->isVEDA)
+    veda_trace_ms_cach_gate(opts, state, "MS", cachdata);
   // cach_err = dmr_cach (opts, state, cachdata);
 
   //update voice sync time for trunking purposes (particularly Con+)
@@ -749,7 +809,8 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
     }
     cachdata[i] = dibit;
   }
-
+  if (opts->isVEDA)
+    veda_trace_ms_cach_gate(opts, state, "MSBOOT", cachdata); 
   //Setup for first AMBE Frame
 
   //Interleave Schedule
