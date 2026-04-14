@@ -304,10 +304,6 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
   {
   uint8_t lc_bytes[9];
-  uint32_t alt_tgt_be_24 = 0;
-  uint32_t alt_src_be_24 = 0;
-  uint32_t alt_tgt_le_24 = 0;
-  uint32_t alt_src_le_24 = 0;
   int i;
 
   for (i = 0; i < 9; i++) {
@@ -328,6 +324,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   /* стандартный DMR-разбор уже в target/source */
 
   /* альтернативные кандидаты из сырых байт */
+  /*
+  uint32_t alt_tgt_be_24 = 0;
+  uint32_t alt_src_be_24 = 0;
+  uint32_t alt_tgt_le_24 = 0;
+  uint32_t alt_src_le_24 = 0;
+
   alt_tgt_be_24 = ((uint32_t)lc_bytes[3] << 16) |
                   ((uint32_t)lc_bytes[4] << 8)  |
                   ((uint32_t)lc_bytes[5]);
@@ -343,7 +345,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   alt_src_le_24 = ((uint32_t)lc_bytes[8] << 16) |
                   ((uint32_t)lc_bytes[7] << 8)  |
                   ((uint32_t)lc_bytes[6]);
-
+  
   fprintf(stderr,
     "\nVEDA LC RAW slot=%d type=%u flco=%02X fid=%02X so=%02X "
     "b=[%02X %02X %02X %02X %02X %02X %02X %02X %02X] "
@@ -356,6 +358,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     target, source,
     alt_tgt_be_24, alt_src_be_24,
     alt_tgt_le_24, alt_src_le_24);
+  */  
 
   if (opts->isVEDA && (type == 1 || type == 2 || type == 3))
   {

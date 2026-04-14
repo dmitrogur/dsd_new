@@ -722,7 +722,7 @@ if (opts->isVEDA)
     if (state->veda_kx_pos[slot] > 0 && 
       databurst != 0x06 && databurst != 0x07 && 
       databurst != 0x04 && databurst != 0x05 &&
-      databurst != 0x01 && databurst != 0x02) // Добавили VLC и TLC      
+      databurst != 0x01 && databurst != 0x02 && databurst != 0xEB) // Добавили VLC и TLC      
       {
         if (opts->veda_debug)
         {
@@ -731,7 +731,9 @@ if (opts->isVEDA)
                     slot + 1, databurst, state->veda_kx_pos[slot]);
         }
 
+        // RESET происходит только если пришел реально чужой пакет (например, данные другого типа)
         state->veda_kx_pos[slot] = 0;
+        
         memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
     }
 

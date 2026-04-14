@@ -313,6 +313,7 @@ uint64_t veda_get_effective_mi(dsd_state *state, int slot)
         // Попробуем стандартный для Hydrogen/Sponge вариант: 
         // MI заходит в начало (младшие байты), остальное нули.
         return (uint64_t)x; 
+        // return ((uint64_t)x << 32); - если деривация в следующем логе сработает (SUCCESS), а голос будет мусором — это будет первым кандидатом на правку
     }
 
     return 0;
@@ -374,6 +375,13 @@ void veda_trace_baseline(dsd_opts *opts,
 
     if (!opts->veda_debug)
         return;
+
+    static int last_valid_status[2] = {-1, -1};
+    if (last_valid_status[slot] == state->veda_state_valid[slot]) 
+        return; // Не спамить
+    
+    last_valid_status[slot] = state->veda_state_valid[slot];
+
 
     eff_mi = veda_get_effective_mi(state, slot);
 

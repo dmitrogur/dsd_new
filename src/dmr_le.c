@@ -424,17 +424,18 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
       fprintf(stderr, "FEC ERR %d. Power %d\n", irr_err, power);
 
       
-
-      fprintf(stderr,"\nVEDA SBRC slot=%d I=%08X D=%03X I_hi16=%u I_lo16=%u "
-        "I_b0=%02X I_b1=%02X I_b2=%02X I_b3=%02X "
-        "I_24_a=%u I_24_b=%u",
-        slot + 1,
-        sbrcpl, sbrcpl,
-        (sbrcpl >> 16) & 0xFFFF, sbrcpl & 0xFFFF,
-        (sbrcpl >> 24) & 0xFF, (sbrcpl >> 16) & 0xFF,
-        (sbrcpl >> 8) & 0xFF, sbrcpl & 0xFF,
-        sbrcpl & 0xFFFFFF,
-        (sbrcpl >> 8) & 0xFFFFFF);      
+      if(opts->veda_debug && !state->veda_vendor_mi_valid){ 
+        fprintf(stderr,"\nVEDA SBRC slot=%d I=%08X D=%03X I_hi16=%u I_lo16=%u "
+          "I_b0=%02X I_b1=%02X I_b2=%02X I_b3=%02X "
+          "I_24_a=%u I_24_b=%u",
+          slot + 1,
+          sbrcpl, sbrcpl,
+          (sbrcpl >> 16) & 0xFFFF, sbrcpl & 0xFFFF,
+          (sbrcpl >> 24) & 0xFF, (sbrcpl >> 16) & 0xFF,
+          (sbrcpl >> 8) & 0xFF, sbrcpl & 0xFF,
+          sbrcpl & 0xFFFFFF,
+          (sbrcpl >> 8) & 0xFFFFFF);      
+      }  
       if (opts->isVEDA && sbrcpl != 0)
       {
         int vslot = state->currentslot & 1;
