@@ -63,38 +63,77 @@ void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
 void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
     hydro_kx_session_keypair kp;
     hydro_kx_keypair static_kp;
-    uint8_t transformed_master[32]; // Буфер для PM (Primary Material)
+    uint8_t primary_material[32]; 
+    int slot = state->currentslot & 1;
 
+    // Библиотека Hydrogen требует инициализации
     static int hydro_ready = 0;
     if (!hydro_ready) {
-        if (hydro_init() != 0) return;
+        if (hydro_init() != 0) {
+            if (opts->veda_debug) fprintf(stderr, "[VEDA] Critical: hydro_init failed!\n");
+            return;
+        }
         hydro_ready = 1;
     }
 
-    // --- НОВАЯ ЛОГИКА ТРАНСФОРМАЦИИ ---
-    // Копируем исходный мастер-ключ
-    memcpy(transformed_master, opts->veda_master_key, 32);
-    
-    // Применяем маски из 1FFF7920 (XOR с первыми 16 байтами мастер-ключа)
-    uint32_t *key_ptr = (uint32_t *)transformed_master;
-    for(int i = 0; i < 4; i++) {
-        key_ptr[i] ^= veda_masks[i];
+    /* 
+     * ПРОВЕРКА ДЛИНЫ: 
+     * Протокол Hydro "N" (n_2) ожидает пакет длиной 48 байт (32 public + 16 MAC).
+     * Если мы накопили меньше (например, только 12 или 32), функция вернет ошибку.
+     */
+    if (state->veda_kx_pos[slot] < 48) {
+        if (opts->veda_debug) 
+            fprintf(stderr, "[VEDA KX] Packet too short (%d/48). Waiting for more blocks...\n", 
+                    state->veda_kx_pos[slot]);
+        return;
     }
-    // ----------------------------------
 
-    // Теперь используем transformed_master вместо veda_master_key
-    memcpy(static_kp.sk, transformed_master, 32);
-    hydro_kx_keygen_deterministic(&static_kp, transformed_master);
+    // --- ФОРМИРОВАНИЕ PRIMARY MATERIAL (PM) ---
+    // Копируем исходный мастер-ключ (128 или 256 бит)
+    memcpy(primary_material, opts->veda_master_key, 32);
+    
+    // Применяем аппаратные маски (XOR с первыми 16 байтами)
+    // Это превращает "ключ из CPS" в "ключ, понятный алгоритму VEDA"
+    uint32_t *pm_u32 = (uint32_t *)primary_material;
+    pm_u32[0] ^= veda_masks[0];
+    pm_u32[1] ^= veda_masks[1];
+    pm_u32[2] ^= veda_masks[2];
+    pm_u32[3] ^= veda_masks[3];
 
-    // Вызов функции обмена с трансформированным ключом
-    if (hydro_kx_n_2(&kp, payload, transformed_master, &static_kp) == 0) {
-        int slot = state->currentslot & 1;
+    // Генерируем эфемерную пару ключей на основе нашего PM
+    // В данном протоколе PM выступает как Seed для генерации статической пары
+    hydro_kx_keygen_deterministic(&static_kp, primary_material);
+
+    /*
+     * ВЫЗОВ ДЕРИВАЦИИ (hydro_kx_n_2):
+     * @kp:      Сюда запишутся итоговые RX/TX ключи (по 32 байта)
+     * @payload: 48 байт, накопленных из MBC/Data блоков
+     * @psk:     В качестве PSK используем наш Primary Material
+     * @static:  Наша статическая пара ключей
+     */
+    if (hydro_kx_n_2(&kp, payload, primary_material, &static_kp) == 0) {
+        // УСПЕХ: Копируем RX-ключ в сессионный контекст слота
         memcpy(state->veda_session_key[slot], kp.rx, 32);
-        state->veda_state_valid[slot] = 1;
         
-        if (opts->veda_debug) {
-            fprintf(stderr, "\n[VEDA] Session Key Derived (using PM) for Slot %d\n", slot + 1);
+        state->veda_state_valid[slot] = 1;      // Сессионный ключ готов
+        state->veda_stream_valid[slot] = 0;     // Стрим еще не инициализирован (нужен MI)
+        state->veda_mi_applied[slot] = 0;
+        
+        if (opts->veda_debug || 1) { // Печатаем всегда для отладки вскрытия
+            fprintf(stderr, "\n%s[VEDA] SUCCESS! Session Key Derived for Slot %d: ", KGRN, slot + 1);
+            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
+            fprintf(stderr, "%s\n", KNRM);
         }
+        
+        // Сбрасываем позицию накопления после успеха
+        state->veda_kx_pos[slot] = 0;
+
+    } else {
+        if (opts->veda_debug) {
+            fprintf(stderr, "%s[VEDA] Handshake failed for Slot %d (Wrong Key or Corrupt Data)%s\n", 
+                    KRED, slot + 1, KNRM);
+        }
+        // Не сбрасываем kx_pos, возможно придут другие блоки, которые дополнят картину
     }
 }
 

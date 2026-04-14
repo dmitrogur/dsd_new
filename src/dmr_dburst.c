@@ -721,7 +721,8 @@ if (opts->isVEDA)
     /* если в процессе сборки прилетел не тот burst — сбрасываем кандидат */
     if (state->veda_kx_pos[slot] > 0 && 
       databurst != 0x06 && databurst != 0x07 && 
-      databurst != 0x04 && databurst != 0x05)
+      databurst != 0x04 && databurst != 0x05 &&
+      databurst != 0x01 && databurst != 0x02) // Добавили VLC и TLC      
       {
         if (opts->veda_debug)
         {

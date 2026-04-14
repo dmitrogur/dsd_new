@@ -1477,10 +1477,9 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
             // Пробуем вызвать деривацию. 
             if (state->veda_kx_pos[slot] >= 32)
             {
+                if (opts->veda_debug) 
+                  fprintf(stderr, "[VEDA KX] Calling derivation with %d bytes\n", state->veda_kx_pos[slot]);              
                 handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-                // Не сбрасываем pos сразу, так как могут прийти дубли, 
-                // но сбросим в veda_reset_slot при конце сессии.
-                 if (state->veda_state_valid[slot]) state->veda_kx_pos[slot] = 0; 
             }
         }
     }    
