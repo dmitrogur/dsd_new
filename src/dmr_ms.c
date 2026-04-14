@@ -563,12 +563,28 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
       playSynthesizedVoiceFS3(opts, state);
   }
 
+if (opts->isVEDA) {
+    uint8_t raw_64[36]; // 288 бит полезной нагрузки MS кадра
+    memset(raw_64, 0, 36);
+    // dmr_stereo_payload хранит 144 дибита (288 бит) кадра
+    for (int i = 0; i < 144; i++) {
+        uint8_t dibit = state->dmr_stereo_payload[i];
+        int bit_idx = i * 2;
+        if (dibit & 2) raw_64[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
+        if (dibit & 1) raw_64[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
+    }
+    
+    fprintf(stderr, "\n[VEDA PHY DUMP] raw=");
+    for(int i=0; i<36; i++) fprintf(stderr, "%02X", raw_64[i]);
+    fprintf(stderr, "\n");
+}
+  
   if (vc == 6)
   {
     //this needs to run prior to embedded link control
     if (state->payload_algid == 0x02)
         hytera_enhanced_alg_refresh(state);
-    
+        
     dmr_data_burst_handler(opts, state, (uint8_t *)dummy_bits, 0xEB);
     //check the single burst/reverse channel opportunity
     dmr_sbrc (opts, state, power);

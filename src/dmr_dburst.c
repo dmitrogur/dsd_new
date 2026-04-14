@@ -24,6 +24,23 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   uint32_t IrrecoverableErrors = 0;
   uint8_t slot = state->currentslot;
 
+if (opts->isVEDA) {
+      // Собираем 196 бит (24.5 байта) в HEX-строку для дампа
+      uint8_t raw_bytes[25];
+      memset(raw_bytes, 0, 25);
+      for (int i = 0; i < 196; i++) {
+          if (info[i] & 1) {
+              raw_bytes[i / 8] |= (1 << (7 - (i % 8)));
+          }
+      }
+      
+      fprintf(stderr, "\n[VEDA RAW BURST] db=0x%02X info=", databurst);
+      for (int i = 0; i < 25; i++) {
+          fprintf(stderr, "%02X", raw_bytes[i]);
+      }
+      fprintf(stderr, "\n");
+}
+
 if (opts->isVEDA && opts->veda_debug)
 {
     fprintf(stderr,
@@ -638,6 +655,19 @@ if (opts->isVEDA && opts->veda_debug)
     }
   }
 
+  /* ========================================================================= */
+  /* VEDA HARDCORE RAW DUMP - ЛОГИРУЕМ ВООБЩЕ ВСЁ ДО ФИЛЬТРОВ И ПРОВЕРОК CRC   */
+  /* ========================================================================= */
+  if (opts->isVEDA) // Можно добавить && opts->veda_debug, но для тестов лучше выводить всегда
+  {
+      fprintf(stderr, "\n[VEDA HARDCORE] db=0x%02X len=%d crc=%d fec_err=%d raw=", 
+              databurst, pdu_len, CRCCorrect, IrrecoverableErrors);
+      for (int x = 0; x < pdu_len; x++) {
+          fprintf(stderr, "%02X", DMR_PDU[x]);
+      }
+      fprintf(stderr, "\n");
+  }
+  /* ========================================================================= */  
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control

@@ -737,24 +737,29 @@ static void avr_scout_report_summary(bool ms_mode, dsd_state *stat)
     {
         if (ms_mode)
         {
-            fprintf(stderr, "\n MS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
+            if(DEBUG)
+                fprintf(stderr, "\n MS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
                     total_groups, (stat->total_good[0] + stat->total_good[1]), (stat->total_sf[0] + stat->total_sf[1]));
         }
         else
         {
-            fprintf(stderr, "\n BS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
+            if(DEBUG)
+                fprintf(stderr, "\n BS SUMMARY: groups=%u, sf_good=%u / sf_total=%u\n",
                     total_groups, (stat->total_good[0] + stat->total_good[1]), (stat->total_sf[0] + stat->total_sf[1]));
         }
     }
     for (int i = 0; i < SC.ngroups; ++i)
     {
         const avr_scout_group_t *G = &SC.groups[i];
-        if (ms_mode)
-            fprintf(stderr, " MS group[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u. sf=%u/%u windows=%u\n",
+        if (ms_mode) {
+            if(DEBUG)
+                fprintf(stderr, " MS group[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u. sf=%u/%u windows=%u\n",
                     i, G->slot, G->alg_id, G->key_id, G->tg, G->src, (unsigned)G->sf_good, (unsigned)G->sf_total, G->nwins);
-        else
-            fprintf(stderr, " BS group[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u. sf=%u/%u windows=%u\n",
+        } else {
+            if(DEBUG)
+                fprintf(stderr, " BS group[%d] slot=%u alg=0x%02X kid=%u tg=%u src=%u. sf=%u/%u windows=%u\n",
                     i, G->slot, G->alg_id, G->key_id, G->tg, G->src, (unsigned)G->sf_good, (unsigned)G->sf_total, G->nwins);
+        }            
         /*        
         for (uint8_t w = 0; w < G->nwins; ++w)
         {

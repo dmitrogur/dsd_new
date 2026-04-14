@@ -86,7 +86,8 @@ processFrame (dsd_opts * opts, dsd_state * state)
       state->minref = state->min;
     }
   
-  fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d, state->slot %d \n", state->synctype, opts->errorbars, (state->currentslot & 1));
+  if(DEBUG)
+    fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d, state->slot %d \n", state->synctype, opts->errorbars, (state->currentslot & 1));
 
   //NXDN FSW
   if ((state->synctype == 28) || (state->synctype == 29))
@@ -151,7 +152,9 @@ processFrame (dsd_opts * opts, dsd_state * state)
       }      
       //disable so radio id doesn't blink in and out during ncurses and aggressive_framesync
       state->nac = 0;
-      fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d\n", state->synctype, opts->errorbars);
+      if(DEBUG)
+        fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d\n", state->synctype, opts->errorbars);
+        
       if (opts->errorbars == 1)
       {
         if (opts->verbose > 0)
