@@ -1572,7 +1572,8 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
       {
         int total_bytes = (blocks + 1) * block_len;
 
-        if (databurst == 0x05 && blockcounter == 1 && block_len > 0) {
+        // Логируем ПОЛНЫЙ собранный суперфрейм (SF), без привязки к blockcounter == 1
+        if (total_bytes > 0) {
           veda_raw_log_mbc(opts, state, slot,
                  VEDA_RAW_MBC_SF, databurst,
                  state->dmr_pdu_sf[slot], (uint8_t)total_bytes,
@@ -1598,6 +1599,7 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
 
           fprintf(stderr, "\n");
         }
+
         if (total_bytes > 0)
         {
           veda_trace_probe_air_header(opts,
@@ -1608,36 +1610,37 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
                                 "MBC_SF",
                                 state->indx_SF);
         }        
-if (opts->isVEDA && total_bytes >= 8)
-{
-    uint8_t b0 = state->dmr_pdu_sf[slot][0];
-    uint8_t svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
 
-    if (svc)
-    {
-        state->veda_seen_svc_db04[slot]++;
-
-        if (opts->veda_debug)
+        if (opts->isVEDA && total_bytes >= 8)
         {
-            fprintf(stderr,
-                    "\n[VEDA MBC SVC] slot=%d sf=%d total=%d raw=",
-                    slot + 1,
-                    state->indx_SF,
-                    total_bytes);
+            uint8_t b0 = state->dmr_pdu_sf[slot][0];
+            uint8_t svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
 
-            for (int x = 0; x < total_bytes && x < 16; x++)
-                fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
-            fprintf(stderr, "\n");
+            if (svc)
+            {
+                state->veda_seen_svc_db04[slot]++;
+
+                if (opts->veda_debug)
+                {
+                    fprintf(stderr,
+                            "\n[VEDA MBC SVC] slot=%d sf=%d total=%d raw=",
+                            slot + 1,
+                            state->indx_SF,
+                            total_bytes);
+
+                    for (int x = 0; x < total_bytes && x < 16; x++)
+                        fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+                    fprintf(stderr, "\n");
+                }
+            }
         }
-    }
-}
 
-        if (total_bytes > 0 && blockcounter == 1)
+        if (total_bytes > 0)
         {
             veda_note_candidate(opts,
                                 state,
                                 slot,
-                                VEDA_CAND_MBC05,
+                                VEDA_CAND_MBC05, // Можно оставить это имя для истории
                                 state->dmr_pdu_sf[slot],
                                 (uint8_t)total_bytes,
                                 state->indx_SF);

@@ -60,65 +60,35 @@ void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
     state->veda_stream_valid[slot] = 1;
 }
 
-void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
+void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload_64_bytes) {
     hydro_kx_session_keypair kp;
     hydro_kx_keypair static_kp;
     uint8_t primary_material[32]; 
     int slot = state->currentslot & 1;
 
-    // 1. Инициализация библиотеки (обязательно один раз)
-    static int hydro_ready = 0;
-    if (!hydro_ready) {
-        if (hydro_init() != 0) {
-            fprintf(stderr, "[VEDA] Critical: hydro_init failed!\n");
-            return;
-        }
-        hydro_ready = 1;
-    }
-
-    // 2. Проверка накопления (нужно ровно 48 байт для пакета типа "N")
-    if (state->veda_kx_pos[slot] < 48) {
-        if (opts->veda_debug) 
-            fprintf(stderr, "[VEDA KX] Buffer incomplete (%d/48). Skip derivation.\n", 
-                    state->veda_kx_pos[slot]);
-        return;
-    }
-
-    // 3. Формирование Primary Material (PM)
-    // Копируем 16 байт мастер-ключа (128 бит), остальное забиваем нулями до 32 байт
+    // 1. Формируем PM (Primary Material) - 32 байта
     memset(primary_material, 0, 32);
     memcpy(primary_material, opts->veda_master_key, 16);
-    
-    // Применяем аппаратные маски (согласно псевдокоду sub_8005D54)
     uint32_t *pm_u32 = (uint32_t *)primary_material;
     pm_u32[0] ^= veda_masks[0];
     pm_u32[1] ^= veda_masks[1];
     pm_u32[2] ^= veda_masks[2];
     pm_u32[3] ^= veda_masks[3];
 
-    // 4. Генерация статической пары на основе нашего PM (Seed)
+    // 2. Генерируем статику (как в IDA)
     hydro_kx_keygen_deterministic(&static_kp, primary_material);
 
-    // 5. Попытка деривации Session Key через протокол N (n_2)
-    // payload — это 48 байт из эфира (32 байта EPK + 16 байт MAC)
-    if (hydro_kx_n_2(&kp, payload, primary_material, &static_kp) == 0) {
-        // УСПЕХ!
-        memcpy(state->veda_session_key[slot], kp.rx, 32);
-        state->veda_state_valid[slot] = 1;      
-        state->veda_stream_valid[slot] = 0; // Ждем MI для старта потока
-        
-        fprintf(stderr, "\n%s[VEDA] SUCCESS! Session Key Derived: ", KGRN);
-        for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
-        fprintf(stderr, "%s\n", KNRM);
-        
-        state->veda_kx_pos[slot] = 0; // Сбрасываем после успеха
-    } else {
-        // ОШИБКА: либо данные битые, либо ключ не подходит
-        if (opts->veda_debug) {
-            fprintf(stderr, "%s[VEDA] Handshake FAILED for Slot %d (Check Master Key)%s\n", 
-                    KRED, slot + 1, KNRM);
-        }
-    }
+    // 3. Вызываем правильный протокол: KK или XX (в Hydrogen нет прямого эквивалента Npsk0, 
+    // но hydro_kx_xx_2 или hydro_kx_kk_2 с нужными параметрами делают то же самое. 
+    // В идеале нам нужно вызвать именно ту функцию, которую расписал твой спец:
+    // dmr_kx_npsk0_responder(kp.rx, payload_64_bytes, 0, primary_material);
+    
+    // ПРОВЕРОЧНЫЙ ХАК: Просто распечатаем эти 64 байта, чтобы убедиться, что мы их правильно собрали
+    fprintf(stderr, "\n[VEDA KX ATTEMPT] Feeding 64 bytes: ");
+    for(int i=0; i<64; i++) fprintf(stderr, "%02X", payload_64_bytes[i]);
+    fprintf(stderr, "\n");
+    
+    // Здесь будет вызов крипты
 }
 
 // Единая функция получения бита гаммы с Feedback
@@ -359,13 +329,6 @@ void veda_trace_baseline(dsd_opts *opts,
 
     if (!opts->veda_debug)
         return;
-
-    static int last_valid_status[2] = {-1, -1};
-    if (last_valid_status[slot] == state->veda_state_valid[slot]) 
-        return; // Не спамить
-    
-    last_valid_status[slot] = state->veda_state_valid[slot];
-
 
     eff_mi = veda_get_effective_mi(state, slot);
 
@@ -1372,15 +1335,17 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
             if (state->veda_debug)
                 veda_log_subst(state, slot, 2);
 
-fprintf(stderr,
-  "\nVEDA CMP slot=%d raw_src=%u raw_tgt=%u id_a=%u id_b=%u sel=%u subst=%u\n",
-  slot + 1,
-  state->veda_raw_src[slot],
-  state->veda_raw_tgt[slot],
-  state->veda_id24_a[slot],
-  state->veda_id24_b[slot],
-  state->veda_last_sel[slot],
-  state->veda_subst_active[slot]);                
+            if (opts->veda_debug) {
+              fprintf(stderr,
+               "\nVEDA CMP slot=%d raw_src=%u raw_tgt=%u id_a=%u id_b=%u sel=%u subst=%u\n",
+               slot + 1,
+               state->veda_raw_src[slot],
+               state->veda_raw_tgt[slot],
+               state->veda_id24_a[slot],
+               state->veda_id24_b[slot],
+               state->veda_last_sel[slot],
+               state->veda_subst_active[slot]);                
+            }             
 
             if (veda_try_build_tx_subst_frame(state, slot))
                 return 2;
@@ -1638,7 +1603,9 @@ static int veda_raw_can_open(uint8_t kind)
 {
     return (kind == VEDA_RAW_MBC_BLK0 ||
             kind == VEDA_RAW_MBC_SF   ||
-            kind == VEDA_RAW_VLC);
+            kind == VEDA_RAW_VLC      ||
+            kind == VEDA_RAW_DB       ||
+            kind == VEDA_RAW_EMB);
 }
 
 static void veda_raw_debug_dump(dsd_opts *opts,

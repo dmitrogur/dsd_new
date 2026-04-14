@@ -322,19 +322,6 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     // Ничего больше тут не трогаем — основной пайплайн пусть работает как есть.
 }
 
-  //'DSP' output to file
-  if (opts->use_dsp_output == 1)
-  {
-    FILE * pFile; //file pointer
-    pFile = fopen (opts->dsp_out_file, "a");
-    fprintf (pFile, "\n%d 10 ", state->currentslot+1); //0x10 for "voice burst", forced to slot 1
-    for (i = 6; i < 72; i++) //33 bytes, no CACH
-    {
-      int dsp_byte = (state->dmr_stereo_payload[i*2] << 2) | state->dmr_stereo_payload[i*2 + 1];
-      fprintf (pFile, "%X", dsp_byte);
-    }
-    fclose (pFile);
-  }
   //DMH
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
@@ -564,21 +551,27 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   }
 
 if (opts->isVEDA) {
-    uint8_t raw_64[36]; // 288 бит полезной нагрузки MS кадра
-    memset(raw_64, 0, 36);
-    // dmr_stereo_payload хранит 144 дибита (288 бит) кадра
+    uint8_t raw_36[36]; 
+    memset(raw_36, 0, 36);
     for (int i = 0; i < 144; i++) {
         uint8_t dibit = state->dmr_stereo_payload[i];
         int bit_idx = i * 2;
-        if (dibit & 2) raw_64[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
-        if (dibit & 1) raw_64[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
+        if (dibit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
+        if (dibit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
     }
     
-    fprintf(stderr, "\n[VEDA PHY DUMP] raw=");
-    for(int i=0; i<36; i++) fprintf(stderr, "%02X", raw_64[i]);
-    fprintf(stderr, "\n");
+    // Накапливаем первые 64 байта в начале сессии
+    int slot = state->currentslot & 1;
+    if (state->veda_kx_pos[slot] < 64) {
+        int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
+        memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
+        state->veda_kx_pos[slot] += copy_len;
+        
+        if (state->veda_kx_pos[slot] == 64) {
+            handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+        }
+    }
 }
-  
   if (vc == 6)
   {
     //this needs to run prior to embedded link control
@@ -907,6 +900,33 @@ if (opts->run_scout)
   }
 }
 */
+
+if (opts->isVEDA) {
+      uint8_t raw_36[36]; 
+      memset(raw_36, 0, 36);
+      for (int i = 0; i < 144; i++) {
+          uint8_t d_bit = state->dmr_stereo_payload[i];
+          int bit_idx = i * 2;
+          if (d_bit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
+          if (d_bit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
+      }
+      
+      int slot = state->currentslot & 1;
+      if (state->veda_kx_pos[slot] < 64) {
+          int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
+          memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
+          state->veda_kx_pos[slot] += copy_len;
+          
+          if (opts->veda_debug) {
+              fprintf(stderr, "[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added %d bytes. Pos: %d/64\n", copy_len, state->veda_kx_pos[slot]);
+          }
+
+          if (state->veda_kx_pos[slot] == 64) {
+              handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+          }
+      }
+  }
+
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
   {

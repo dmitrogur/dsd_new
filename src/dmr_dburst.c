@@ -731,22 +731,7 @@ if (databurst == 0x05)
     else fprintf (stderr, "Reserved %d ", usbd_st);
   }
 
-    // По анализу VEDA, Case 6 (KX) пролетает как пакет данных.
-    // Обычно это burst тип 6 (Confirmed Data) или 7 (Unconfirmed Data).
-/* === VEDA KX ASSEMBLY ===
- * Ищем только data-path:
- *   0x06 = Data Header
- *   0x07 = 1/2 Rate Data
- *
- * KX-кандидат собираем как:
- *   12B header + 3 * 12B data = 48B
- *
- * Важно:
- * - используем уже ДЕКОДИРОВАННЫЕ байты DMR_PDU, а не сырой info[]
- * - копим только при хорошем CRC
- * - любой неожиданный databurst во время сборки рвёт кандидат
- */
-if (opts->isVEDA)
+
 {
     // ВМЕСТО НЕГО: Сбрасываем только если пришел TLC (конец сессии)
     if (databurst == 0x02) { // TLC
