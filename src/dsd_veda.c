@@ -66,6 +66,41 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
     uint8_t primary_material[32]; 
     int slot = state->currentslot & 1;
 
+    // 1. Подготовка PM (Primary Material)
+    memcpy(primary_material, opts->veda_master_key, 16); // Берем 128 бит
+    memset(primary_material + 16, 0, 16); // Остальное нули для 256-битного входа
+    
+    uint32_t *pm_u32 = (uint32_t *)primary_material;
+    pm_u32[0] ^= veda_masks[0];
+    pm_u32[1] ^= veda_masks[1];
+    pm_u32[2] ^= veda_masks[2];
+    pm_u32[3] ^= veda_masks[3];
+
+    // 2. Генерация статической пары на основе PM (аналог sub_80067E0)
+    hydro_kx_keygen_deterministic(&static_kp, primary_material);
+
+    // 3. Вызов N_2 (библиотека Hydrogen)
+    // payload — это те самые 48 байт из эфира
+    // ВАЖНО: Challenge в рации обычно 0. Проверьте это.
+    if (hydro_kx_n_2(&kp, payload, primary_material, &static_kp) == 0) {
+        memcpy(state->veda_session_key[slot], kp.rx, 32);
+        state->veda_state_valid[slot] = 1;
+        
+        fprintf(stderr, "\n%s[VEDA] !!! SESSION KEY DERIVED !!!%s\n", KGRN, KNRM);
+        if (opts->veda_debug) {
+            fprintf(stderr, "[VEDA] Session Key: ");
+            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
+            fprintf(stderr, "\n");
+        }
+    }
+}
+
+void handle_veda_kx_packet_old(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
+    hydro_kx_session_keypair kp;
+    hydro_kx_keypair static_kp;
+    uint8_t primary_material[32]; 
+    int slot = state->currentslot & 1;
+
     // Библиотека Hydrogen требует инициализации
     static int hydro_ready = 0;
     if (!hydro_ready) {

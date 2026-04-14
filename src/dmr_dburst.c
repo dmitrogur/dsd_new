@@ -719,6 +719,7 @@ if (databurst == 0x05)
 if (opts->isVEDA)
 {
     /* если в процессе сборки прилетел не тот burst — сбрасываем кандидат */
+    /*
     if (state->veda_kx_pos[slot] > 0 && 
       databurst != 0x06 && databurst != 0x07 && 
       databurst != 0x04 && databurst != 0x05 &&
@@ -733,11 +734,38 @@ if (opts->isVEDA)
 
         // RESET происходит только если пришел реально чужой пакет (например, данные другого типа)
         state->veda_kx_pos[slot] = 0;
-        
+
         memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
     }
+    */
+    // ВМЕСТО НЕГО: Сбрасываем только если пришел TLC (конец сессии)
+    if (databurst == 0x02) { // TLC
+        if (opts->veda_debug && state->veda_kx_pos[slot] > 0)
+            fprintf(stderr, "[VEDA KX] Resetting buffer due to TLC (End of Call)\n");
+        state->veda_kx_pos[slot] = 0;
+    }
+        // Накопление из DATA блоков (burst 6 и 7)
+    if (databurst == 0x06 || databurst == 0x07 || databurst == 0x04 || databurst == 0x05)
+    {
+        // Проверяем, чтобы не выйти за пределы (48 байт = 4 блока по 12)
+        if (state->veda_kx_pos[slot] <= 36 && CRCCorrect)
+        {
+            memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], DMR_PDU, 12);
+            state->veda_kx_pos[slot] += 12;
 
-    /* старт новой сборки только от валидного Data Header */
+            if (opts->veda_debug)
+                fprintf(stderr, "[VEDA KX] Added block (DB:0x%02X). Pos: %d/48\n", databurst, state->veda_kx_pos[slot]);
+
+            if (state->veda_kx_pos[slot] == 48)
+            {
+                handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+                // НЕ ОБНУЛЯЕМ сразу, если хотим пробовать разные комбинации, 
+                // но для стабильности лучше сбросить после успеха.
+            }
+        }
+    }
+    /*
+    // старт новой сборки только от валидного Data Header 
     if (databurst == 0x06)
     {
         state->veda_kx_pos[slot] = 0;
@@ -767,7 +795,7 @@ if (opts->isVEDA)
             }
         }
     }
-    /* продолжаем только data block 0x07 */
+    // продолжаем только data block 0x07
     else if (databurst == 0x07)
     {
         if (state->veda_kx_pos[slot] >= 12 &&
@@ -802,7 +830,7 @@ if (opts->isVEDA)
                 state->veda_kx_try_count[slot]++;
                 handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
 
-                /* после попытки — сброс, чтобы не слепить следующий кандидат поверх */
+                // после попытки — сброс, чтобы не слепить следующий кандидат поверх 
                 state->veda_kx_pos[slot] = 0;
                 memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
             }
@@ -823,7 +851,8 @@ if (opts->isVEDA)
             memset(state->veda_kx_buffer[slot], 0, sizeof(state->veda_kx_buffer[slot]));
         }
     }
-}
+    */
+  }
 
   //set the original CRCCorrect back to its original value if the RAS flag was tripped
   if (is_ras == 1) CRCCorrect = crc_original_validity;
