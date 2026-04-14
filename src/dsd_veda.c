@@ -66,109 +66,58 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
     uint8_t primary_material[32]; 
     int slot = state->currentslot & 1;
 
-    // 1. Подготовка PM (Primary Material)
-    memcpy(primary_material, opts->veda_master_key, 16); // Берем 128 бит
-    memset(primary_material + 16, 0, 16); // Остальное нули для 256-битного входа
-    
-    uint32_t *pm_u32 = (uint32_t *)primary_material;
-    pm_u32[0] ^= veda_masks[0];
-    pm_u32[1] ^= veda_masks[1];
-    pm_u32[2] ^= veda_masks[2];
-    pm_u32[3] ^= veda_masks[3];
-
-    // 2. Генерация статической пары на основе PM (аналог sub_80067E0)
-    hydro_kx_keygen_deterministic(&static_kp, primary_material);
-
-    // 3. Вызов N_2 (библиотека Hydrogen)
-    // payload — это те самые 48 байт из эфира
-    // ВАЖНО: Challenge в рации обычно 0. Проверьте это.
-    if (hydro_kx_n_2(&kp, payload, primary_material, &static_kp) == 0) {
-        memcpy(state->veda_session_key[slot], kp.rx, 32);
-        state->veda_state_valid[slot] = 1;
-        
-        fprintf(stderr, "\n%s[VEDA] !!! SESSION KEY DERIVED !!!%s\n", KGRN, KNRM);
-        if (opts->veda_debug) {
-            fprintf(stderr, "[VEDA] Session Key: ");
-            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
-            fprintf(stderr, "\n");
-        }
-    }
-}
-
-void handle_veda_kx_packet_old(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
-    hydro_kx_session_keypair kp;
-    hydro_kx_keypair static_kp;
-    uint8_t primary_material[32]; 
-    int slot = state->currentslot & 1;
-
-    // Библиотека Hydrogen требует инициализации
+    // 1. Инициализация библиотеки (обязательно один раз)
     static int hydro_ready = 0;
     if (!hydro_ready) {
         if (hydro_init() != 0) {
-            if (opts->veda_debug) fprintf(stderr, "[VEDA] Critical: hydro_init failed!\n");
+            fprintf(stderr, "[VEDA] Critical: hydro_init failed!\n");
             return;
         }
         hydro_ready = 1;
     }
 
-    /* 
-     * ПРОВЕРКА ДЛИНЫ: 
-     * Протокол Hydro "N" (n_2) ожидает пакет длиной 48 байт (32 public + 16 MAC).
-     * Если мы накопили меньше (например, только 12 или 32), функция вернет ошибку.
-     */
+    // 2. Проверка накопления (нужно ровно 48 байт для пакета типа "N")
     if (state->veda_kx_pos[slot] < 48) {
         if (opts->veda_debug) 
-            fprintf(stderr, "[VEDA KX] Packet too short (%d/48). Waiting for more blocks...\n", 
+            fprintf(stderr, "[VEDA KX] Buffer incomplete (%d/48). Skip derivation.\n", 
                     state->veda_kx_pos[slot]);
         return;
     }
 
-    // --- ФОРМИРОВАНИЕ PRIMARY MATERIAL (PM) ---
-    // Копируем исходный мастер-ключ (128 или 256 бит)
-    memcpy(primary_material, opts->veda_master_key, 32);
+    // 3. Формирование Primary Material (PM)
+    // Копируем 16 байт мастер-ключа (128 бит), остальное забиваем нулями до 32 байт
+    memset(primary_material, 0, 32);
+    memcpy(primary_material, opts->veda_master_key, 16);
     
-    // Применяем аппаратные маски (XOR с первыми 16 байтами)
-    // Это превращает "ключ из CPS" в "ключ, понятный алгоритму VEDA"
+    // Применяем аппаратные маски (согласно псевдокоду sub_8005D54)
     uint32_t *pm_u32 = (uint32_t *)primary_material;
     pm_u32[0] ^= veda_masks[0];
     pm_u32[1] ^= veda_masks[1];
     pm_u32[2] ^= veda_masks[2];
     pm_u32[3] ^= veda_masks[3];
 
-    // Генерируем эфемерную пару ключей на основе нашего PM
-    // В данном протоколе PM выступает как Seed для генерации статической пары
+    // 4. Генерация статической пары на основе нашего PM (Seed)
     hydro_kx_keygen_deterministic(&static_kp, primary_material);
 
-    /*
-     * ВЫЗОВ ДЕРИВАЦИИ (hydro_kx_n_2):
-     * @kp:      Сюда запишутся итоговые RX/TX ключи (по 32 байта)
-     * @payload: 48 байт, накопленных из MBC/Data блоков
-     * @psk:     В качестве PSK используем наш Primary Material
-     * @static:  Наша статическая пара ключей
-     */
+    // 5. Попытка деривации Session Key через протокол N (n_2)
+    // payload — это 48 байт из эфира (32 байта EPK + 16 байт MAC)
     if (hydro_kx_n_2(&kp, payload, primary_material, &static_kp) == 0) {
-        // УСПЕХ: Копируем RX-ключ в сессионный контекст слота
+        // УСПЕХ!
         memcpy(state->veda_session_key[slot], kp.rx, 32);
+        state->veda_state_valid[slot] = 1;      
+        state->veda_stream_valid[slot] = 0; // Ждем MI для старта потока
         
-        state->veda_state_valid[slot] = 1;      // Сессионный ключ готов
-        state->veda_stream_valid[slot] = 0;     // Стрим еще не инициализирован (нужен MI)
-        state->veda_mi_applied[slot] = 0;
+        fprintf(stderr, "\n%s[VEDA] SUCCESS! Session Key Derived: ", KGRN);
+        for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
+        fprintf(stderr, "%s\n", KNRM);
         
-        if (opts->veda_debug || 1) { // Печатаем всегда для отладки вскрытия
-            fprintf(stderr, "\n%s[VEDA] SUCCESS! Session Key Derived for Slot %d: ", KGRN, slot + 1);
-            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
-            fprintf(stderr, "%s\n", KNRM);
-        }
-        
-        // Сбрасываем позицию накопления после успеха
-        state->veda_kx_pos[slot] = 0;
-
+        state->veda_kx_pos[slot] = 0; // Сбрасываем после успеха
     } else {
+        // ОШИБКА: либо данные битые, либо ключ не подходит
         if (opts->veda_debug) {
-            fprintf(stderr, "%s[VEDA] Handshake failed for Slot %d (Wrong Key or Corrupt Data)%s\n", 
+            fprintf(stderr, "%s[VEDA] Handshake FAILED for Slot %d (Check Master Key)%s\n", 
                     KRED, slot + 1, KNRM);
         }
-        // Не сбрасываем kx_pos, возможно придут другие блоки, которые дополнят картину
     }
 }
 
