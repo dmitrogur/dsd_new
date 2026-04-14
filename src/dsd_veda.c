@@ -60,55 +60,44 @@ void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
     state->veda_stream_valid[slot] = 1;
 }
 
-
 void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload) {
-    hydro_kx_session_keypair kp; // Структура из твоего grep (содержит rx и tx)
-    hydro_kx_keypair static_kp;  // Нам нужен объект для ключа
+    hydro_kx_session_keypair kp;
+    hydro_kx_keypair static_kp;
+    uint8_t transformed_master[32]; // Буфер для PM (Primary Material)
 
-    // Инициализация библиотеки (обязательно один раз)
     static int hydro_ready = 0;
     if (!hydro_ready) {
         if (hydro_init() != 0) return;
         hydro_ready = 1;
     }
 
-    // Готовим наш мастер-ключ. 
-    // В протоколе "N" мастер-ключ из CPS используется и как PSK, и как Static Secret Key.
-    memcpy(static_kp.sk, opts->veda_master_key, 32);
-    // Генерируем публичную часть из секретной (нужно для библиотеки)
-    hydro_kx_keygen_deterministic(&static_kp, opts->veda_master_key);
+    // --- НОВАЯ ЛОГИКА ТРАНСФОРМАЦИИ ---
+    // Копируем исходный мастер-ключ
+    memcpy(transformed_master, opts->veda_master_key, 32);
+    
+    // Применяем маски из 1FFF7920 (XOR с первыми 16 байтами мастер-ключа)
+    uint32_t *key_ptr = (uint32_t *)transformed_master;
+    for(int i = 0; i < 4; i++) {
+        key_ptr[i] ^= veda_masks[i];
+    }
+    // ----------------------------------
 
-    // ВЫЗОВ ПРАВИЛЬНОЙ ФУНКЦИИ ИЗ ТВОЕГО GREP: hydro_kx_n_2
-    // kp - куда писать ключи
-    // payload - 48 байт из эфира
-    // PSK - наш мастер ключ
-    // &static_kp - наш объект ключа
-    if (hydro_kx_n_2(&kp, payload, opts->veda_master_key, &static_kp) == 0) {
+    // Теперь используем transformed_master вместо veda_master_key
+    memcpy(static_kp.sk, transformed_master, 32);
+    hydro_kx_keygen_deterministic(&static_kp, transformed_master);
+
+    // Вызов функции обмена с трансформированным ключом
+    if (hydro_kx_n_2(&kp, payload, transformed_master, &static_kp) == 0) {
         int slot = state->currentslot & 1;
-        
-        // Копируем RX ключ (первые 32 байта из сессионной пары)
         memcpy(state->veda_session_key[slot], kp.rx, 32);
-        
-        /* аналог session_key_valid из дампа */
         state->veda_state_valid[slot] = 1;
-        state->veda_stream_valid[slot] = 0;
-        state->veda_mi_applied[slot] = 0;
-        state->veda_last_applied_mi[slot] = 0;
-
-        // veda_stream_init(state, slot, state->veda_session_key[slot]);
         
         if (opts->veda_debug) {
-            fprintf(stderr, "\n[VEDA] Session Key Derived for Slot %d: ", slot + 1);
-            for(int i=0; i<32; i++) fprintf(stderr, "%02X", kp.rx[i]);
-            fprintf(stderr, "\n");
+            fprintf(stderr, "\n[VEDA] Session Key Derived (using PM) for Slot %d\n", slot + 1);
         }
-    } else if (opts->veda_debug) {
-        fprintf(stderr, "\n[VEDA] KX Handshake Failed (Bad Master Key or Packet)\n");
     }
 }
 
-
-// Единая функция получения бита гаммы с Feedback
 // Единая функция получения бита гаммы с Feedback
 static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint8_t cipher_bit) {
     if (state->veda_pos[slot] >= 128) { // 16 байт
@@ -267,19 +256,24 @@ void veda_debug_voice_wait(dsd_opts *opts,
 
 uint64_t veda_get_effective_mi(dsd_state *state, int slot)
 {
-    if (!state || slot < 0 || slot > 1)
-        return 0;
+    if (!state || slot < 0 || slot > 1) return 0;
 
-    if (state->payload_mi != 0 && slot == 0)
-        return state->payload_mi;
+    // 1. Приоритет MI из заголовков (если они есть)
+    if (state->payload_mi != 0 && slot == 0) return state->payload_mi;
+    if (state->payload_miR != 0 && slot == 1) return state->payload_miR;
 
-    if (state->payload_miR != 0 && slot == 1)
-        return state->payload_miR;
-
+    // 2. Если MI пришел из SBRC (Vendor MI)
     if (state->veda_vendor_mi_valid[slot])
     {
-        uint64_t x = (uint64_t)state->veda_vendor_mi32[slot];
-        return (x << 32) | x;   /* первая рабочая гипотеза */
+        uint32_t x = state->veda_vendor_mi32[slot];
+        
+        // ГИПОТЕЗА 2: MI используется как младшие 32 бита 64-битного Nonce
+        // (x << 32) | x  <-- твой старый вариант
+        // return (uint64_t)x; <-- вариант с 32-битным значением
+        
+        // Попробуем стандартный для Hydrogen/Sponge вариант: 
+        // MI заходит в начало (младшие байты), остальное нули.
+        return (uint64_t)x; 
     }
 
     return 0;

@@ -9,7 +9,7 @@ extern "C" {
 
 // Все инклуды С-библиотек только здесь
 #include <hydrogen.h>
-
+static const uint32_t veda_masks[] = {0x17C20B2A, 0x56456023, 0x4794E038, 0x8BC3C444};
 // Все прототипы только здесь и только один раз
 void veda_permute_384(uint32_t *state, uint8_t domain);
 void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key);

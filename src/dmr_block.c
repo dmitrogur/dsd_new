@@ -1461,6 +1461,28 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
                  blockcounter, blocks, lb, pf,
                  state->indx_SF);                      
     }
+    // --- НОВАЯ ВСТАВКА ДЛЯ НАКОПЛЕНИЯ KX ИЗ MBC ---
+    if (opts->isVEDA && databurst == 0x05) 
+    {
+        // Копируем 12 байт текущего блока в накопительный KX-буфер
+        if (state->veda_kx_pos[slot] + 12 <= 48) 
+        {
+            memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], block_bytes, 12);
+            state->veda_kx_pos[slot] += 12;
+
+            if (opts->veda_debug) 
+                fprintf(stderr, "[VEDA KX-MBC] Accumulating: %d/48 bytes\n", state->veda_kx_pos[slot]);
+
+            // Если набрали достаточно для начала (32 байта для ключа или 48 для полного пакета)
+            // Пробуем вызвать деривацию. 
+            if (state->veda_kx_pos[slot] == 48) 
+            {
+                handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+                // Не сбрасываем pos сразу, так как могут прийти дубли, 
+                // но сбросим в veda_reset_slot при конце сессии.
+            }
+        }
+    }    
     if (is_udt)
     {
       lb = 0; //set to zero, data header may erroneously the lb flag check above (IG)
