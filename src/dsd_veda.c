@@ -172,37 +172,46 @@ int veda_try_decrypt_voice_triplet(dsd_opts *opts,
 {
     uint64_t eff_mi;
 
-    if (!opts || !state || slot < 0 || slot > 1)
-        return 0;
+    if (!opts || !state || slot < 0 || slot > 1) return 0;
+    if (!opts->isVEDA) return 0;
 
-    if (!opts->isVEDA)
-        return 0;
+    // --- VEDA BYPASS: ФОРСИРУЕМ PRIMARY MATERIAL КАК СЕССИОННЫЙ КЛЮЧ ---
+    if (!state->veda_state_valid[slot]) {
+        uint8_t pm[32];
+        memset(pm, 0, 32);
+        memcpy(pm, opts->veda_master_key, 16); // 128 бит твоего ключа
+        
+        // Накладываем железные маски из дампа
+        uint32_t *pm_u32 = (uint32_t *)pm;
+        pm_u32[0] ^= veda_masks[0]; // 0x17C20B2A
+        pm_u32[1] ^= veda_masks[1]; // 0x56456023
+        pm_u32[2] ^= veda_masks[2]; // 0x4794E038
+        pm_u32[3] ^= veda_masks[3]; // 0x8BC3C444
 
-    if (!state->veda_state_valid[slot] && opts->veda_manual_set)
-    {
-        memcpy(state->veda_session_key[slot], opts->veda_manual_session_key, 32);
+        // Принудительно устанавливаем это как ключ потока
+        memcpy(state->veda_session_key[slot], pm, 32);
         state->veda_state_valid[slot] = 1;
         state->veda_stream_valid[slot] = 0;
         state->veda_mi_applied[slot] = 0;
-        state->veda_last_applied_mi[slot] = 0;
     }
+    // ------------------------------------------------------------------
 
     eff_mi = veda_get_effective_mi(state, slot);
-
-    if (!state->veda_state_valid[slot])
-        veda_try_session_bridge(opts, state, slot);
 
     if (!(state->veda_state_valid[slot] && eff_mi != 0))
         return 0;
 
+    // Инициализируем VEDA-384: Ключ + "sbx256PrssEntr" + Tweak(MI)
     veda_prepare_voice_ctx(opts, state, slot, eff_mi);
 
+    // Расшифровываем голос
     veda_decrypt_ambe(state, slot, ambe_fr);
     veda_decrypt_ambe(state, slot, ambe_fr2);
     veda_decrypt_ambe(state, slot, ambe_fr3);
 
     return 1;
 }
+
 
 void veda_debug_voice_wait(dsd_opts *opts,
                            dsd_state *state,

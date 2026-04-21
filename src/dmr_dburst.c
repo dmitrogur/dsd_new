@@ -24,21 +24,53 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   uint32_t IrrecoverableErrors = 0;
   uint8_t slot = state->currentslot;
 
-if (opts->isVEDA) {
-      // Собираем 196 бит (24.5 байта) в HEX-строку для дампа
-      uint8_t raw_bytes[25];
-      memset(raw_bytes, 0, 25);
-      for (int i = 0; i < 196; i++) {
-          if (info[i] & 1) {
-              raw_bytes[i / 8] |= (1 << (7 - (i % 8)));
-          }
-      }
-      
-      fprintf(stderr, "\n[VEDA RAW BURST] db=0x%02X info=", databurst);
-      for (int i = 0; i < 25; i++) {
-          fprintf(stderr, "%02X", raw_bytes[i]);
-      }
-      fprintf(stderr, "\n");
+if (opts->isVEDA)
+{
+    uint8_t raw_bytes[25];
+    memset(raw_bytes, 0, sizeof(raw_bytes));
+
+    if (databurst == 0xEB)
+    {
+        /*
+         * Для db=0xEB обычный info[196] в MS path пустой (dummy_bits).
+         * Поэтому берём реальный EMB источник:
+         * state->dmr_embedded_signalling[slot][1..4][8..39]
+         *
+         * Это 128 бит = 16 байт.
+         * Но чтобы формат info= остался одинаковым с db=0x01/0x02,
+         * печатаем всё равно 25 байт (50 hex):
+         *   первые 16 байт = реальный EMB128
+         *   оставшиеся 9 байт = 00
+         */
+        int bitpos = 0;
+
+        for (int burst = 1; burst <= 4; burst++)
+        {
+            for (int k = 0; k < 32; k++, bitpos++)
+            {
+                uint8_t bit = state->dmr_embedded_signalling[slot][burst][k + 8] & 1;
+                if (bit)
+                    raw_bytes[bitpos >> 3] |= (uint8_t)(1u << (7 - (bitpos & 7)));
+            }
+        }
+    }
+    else
+    {
+        /*
+         * Обычные databurst'ы: старое поведение.
+         * Печатаем входные 196 бит как 25 байт.
+         */
+        for (int i = 0; i < 196; i++)
+        {
+            if (info[i] & 1)
+                raw_bytes[i >> 3] |= (uint8_t)(1u << (7 - (i & 7)));
+        }
+    }
+
+    fprintf(stderr, "\n[VEDA RAW BURST] db=0x%02X info=", databurst);
+    for (int i = 0; i < 25; i++)
+        fprintf(stderr, "%02X", raw_bytes[i]);
+    fprintf(stderr, "\n");
 }
 
 if (opts->isVEDA && opts->veda_debug)
