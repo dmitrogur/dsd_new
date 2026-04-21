@@ -1,0 +1,2299 @@
+Build Version: AW 2025-157-gd89accf 
+MBElib Version: 1.3.4
+CODEC2 Support Enabled
+VEDA Master Key (128 bits) loaded.
+VEDA mode enabled.
+VEDA debug enabled.
+-fr / DMR Mono switch has been deprecated.
+Decoding DMR BS/MS Simplex
+Audio In Device: /home/dgm/IDA/Recording/audio_414250000Hz_17-35-53_17-04-2026.wav
+57168    1.191 |  Sync: +DMR MS/DM MODE/MONO | Color Code=XX | Color Code=XX [31m| CACH/Burst FEC ERR[0m
+60078    1.252 |  Sync: +DMR MS/DM MODE/MONO | Color Code=XX | Color Code=XX 
+[VEDA RAW BURST] db=0x01 info=5619066F5F727BB88C1329A389C3A0814C1A9807615B3023C0
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=03000257C0B71EFA20BEF095
+
+[VEDA RAW] slot=1 sess=1 seq=1 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=03000257C0B71EFA20
+
+[VEDA CAND] slot=1 seq=1 src=VLC01 sf=0 len=9 prev=NONE same_prev=0 ref_mbc=0 ref_vlc=0 role=PREVOICE_VLC has_sbx256=0 has_prssentr=0 bytes=03000257C0B71EFA20
+[32m 
+ SLOT 1 TGT=5750967 SRC=2030112 
+VEDA IDS slot=1 id_a=0x57C0B7 (5750967) id_b=0x1EFA20 (2030112)
+
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E sm=0 len_lo=0 len_hi=0 raw_src=2030112 raw_tgt=5750967
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=2030112 raw_tgt=5750967
+
+[VEDA BASE] tag=VLC slot=1 sf=0/0 tg=5750967 src=2030112 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+62958    1.312 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=5619066F5F727BB88C1329A389C3A0814C1A9807615B3023C0
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=03000257C0B71EFA20BEF095
+
+[VEDA RAW] slot=1 sess=1 seq=2 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m 
+ SLOT 1 TGT=5750967 SRC=2030112 
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E sm=0 len_lo=0 len_hi=0 raw_src=2030112 raw_tgt=5750967
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=2030112 raw_tgt=5750967
+
+[VEDA BASE] tag=VLC slot=1 sf=0/0 tg=5750967 src=2030112 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added 36 bytes. Pos: 36/64
+65838    1.372 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] WAIT_MI slot=1 payload_mi=0000000000000000 eff_mi=0000000000000000
+
+[VEDA BASE] tag=PREVOICE slot=1 sf=0/0 tg=5750967 src=2030112 sess_valid=1 stream_valid=0 kx_pos=36 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E sm=0 len_lo=0 len_hi=0 f9_count=0
+
+[VEDA KX ATTEMPT] Feeding 64 bytes: 00A0004D449826ABABE8C3BB15DBCF46A7F7D5DD57DFDFFD204025D9648D85C72F19DD8E39000095029D6A2464260F6A80A28E7B8023F1D0528737C4E6A5EAB7
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=1 seq=3 kind=EMB sf=1 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+
+[VEDA CAND] slot=1 seq=2 src=VC_EMB sf=1 len=9 prev=VLC01 same_prev=1 ref_mbc=0 ref_vlc=1 role=VOICE_MIRROR_VLC has_sbx256=0 has_prssentr=0 bytes=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=1 seq=4 kind=MI sf=1 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+83118    1.732 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED629988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=1 seq=5 kind=EMB sf=2 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=1 seq=6 kind=MI sf=2 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+100398    2.092 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=1 seq=7 kind=EMB sf=3 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=1 seq=8 kind=MI sf=3 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+117678    2.452 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=2 seq=1 kind=EMB sf=4 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=2 kind=MI sf=4 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+134957    2.812 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=2 seq=3 kind=EMB sf=5 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=4 kind=MI sf=5 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+152238    3.172 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=1 raw=03000257C0B71EFA20
+
+[VEDA LCDROP] slot=1 type=3 crc=1 irr=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E raw=03000257C0B71EFA20
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 1. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=5 kind=MI sf=6 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+169517    3.532 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=2 seq=6 kind=EMB sf=7 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=7 kind=MI sf=7 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+186798    3.892 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=3 seq=1 kind=EMB sf=8 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=2 kind=MI sf=8 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+204078    4.252 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=3 seq=3 kind=EMB sf=9 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=4 kind=MI sf=9 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+221357    4.612 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=3 seq=5 kind=EMB sf=10 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=6 kind=MI sf=10 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+238637    4.972 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=3 seq=7 kind=EMB sf=11 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=8 kind=MI sf=11 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+255917    5.332 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=4 seq=1 kind=EMB sf=12 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=2 kind=MI sf=12 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+273197    5.692 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=4 seq=3 kind=EMB sf=13 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=4 kind=MI sf=13 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+290478    6.052 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=4 seq=5 kind=EMB sf=14 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=6 kind=MI sf=14 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+307758    6.412 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=4 seq=7 kind=EMB sf=15 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=8 kind=MI sf=15 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+325037    6.772 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=5 seq=1 kind=EMB sf=16 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=2 kind=MI sf=16 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+342317    7.132 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=5 seq=3 kind=EMB sf=17 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=4 kind=MI sf=17 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+359597    7.492 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=5 seq=5 kind=EMB sf=18 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=6 kind=MI sf=18 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+376878    7.852 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=5 seq=7 kind=EMB sf=19 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=8 kind=MI sf=19 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+394158    8.212 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=6 seq=1 kind=EMB sf=20 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=2 kind=MI sf=20 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+411438    8.572 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=6 seq=3 kind=EMB sf=21 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=4 kind=MI sf=21 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+428718    8.932 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=6 seq=5 kind=EMB sf=22 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=6 kind=MI sf=22 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+445996    9.292 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=6 seq=7 kind=EMB sf=23 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=8 kind=MI sf=23 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+463277    9.652 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=7 seq=1 kind=EMB sf=24 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=2 kind=MI sf=24 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+480557   10.012 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=7 seq=3 kind=EMB sf=25 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=4 kind=MI sf=25 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+497837   10.372 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=7 seq=5 kind=EMB sf=26 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=6 kind=MI sf=26 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+515116   10.732 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=7 seq=7 kind=EMB sf=27 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=8 kind=MI sf=27 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+532397   11.092 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=8 seq=1 kind=EMB sf=28 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=2 kind=MI sf=28 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+549677   11.452 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=8 seq=3 kind=EMB sf=29 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=4 kind=MI sf=29 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+566956   11.812 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=8 seq=5 kind=EMB sf=30 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=6 kind=MI sf=30 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+584237   12.172 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=8 seq=7 kind=EMB sf=31 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=8 kind=MI sf=31 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+601516   12.532 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=9 seq=1 kind=EMB sf=32 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=9 seq=2 kind=MI sf=32 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+618796   12.892 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=9 seq=3 kind=EMB sf=33 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=9 seq=4 kind=MI sf=33 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+636077   13.252 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=9 seq=5 kind=EMB sf=34 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=9 seq=6 kind=MI sf=34 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+653356   13.612 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=9 seq=7 kind=EMB sf=35 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=9 seq=8 kind=MI sf=35 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+670636   13.972 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=10 seq=1 kind=EMB sf=36 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=10 seq=2 kind=MI sf=36 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+687917   14.332 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=10 seq=3 kind=EMB sf=37 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=10 seq=4 kind=MI sf=37 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+705196   14.692 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=10 seq=5 kind=EMB sf=38 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=10 seq=6 kind=MI sf=38 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+722477   15.052 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=10 seq=7 kind=EMB sf=39 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=10 seq=8 kind=MI sf=39 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+739756   15.412 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=11 seq=1 kind=EMB sf=40 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=11 seq=2 kind=MI sf=40 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+757036   15.772 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=11 seq=3 kind=EMB sf=41 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=11 seq=4 kind=MI sf=41 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+774316   16.132 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=11 seq=5 kind=EMB sf=42 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=11 seq=6 kind=MI sf=42 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+791595   16.492 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=11 seq=7 kind=EMB sf=43 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=11 seq=8 kind=MI sf=43 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+808876   16.852 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=12 seq=1 kind=EMB sf=44 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=12 seq=2 kind=MI sf=44 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+826156   17.212 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=12 seq=3 kind=EMB sf=45 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=12 seq=4 kind=MI sf=45 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+843436   17.572 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=12 seq=5 kind=EMB sf=46 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=12 seq=6 kind=MI sf=46 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+860716   17.932 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=12 seq=7 kind=EMB sf=47 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=12 seq=8 kind=MI sf=47 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+877996   18.292 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=13 seq=1 kind=EMB sf=48 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=13 seq=2 kind=MI sf=48 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+895276   18.652 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=13 seq=3 kind=EMB sf=49 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=13 seq=4 kind=MI sf=49 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+912555   19.012 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=13 seq=5 kind=EMB sf=50 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=13 seq=6 kind=MI sf=50 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+929835   19.372 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000257C0B71EFA20
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5702 w4=B7C0 w6=FA1E
+
+[VEDA RAW] slot=1 sess=13 seq=7 kind=EMB sf=51 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000257C0B71EFA20
+[32m SLOT 1 TGT=5750967 SRC=2030112 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=13 seq=8 kind=MI sf=51 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+947115   19.732 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x02 info=50F302E301DE52A067C6F82ABA8410A277434AD155CD900BD0
+
+[VEDA DB] slot=1 databurst=0x02 ms=1 stereo=1 payload_algid=0x00| TLC vp =  TLC  
+[VEDA HARDCORE] db=0x02 len=12 crc=1 fec_err=0 raw=03EC0216414020A2D315FFAF
+
+[VEDA RAW] slot=1 sess=13 seq=9 kind=TLC sf=51 len=9 crc=1 irr=0 db=02 aux=03 EC 02 00 raw=03EC0216414020A2D3
+
+[VEDA CAND] slot=1 seq=3 src=TLC02 sf=51 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=TAIL_TLC has_sbx256=0 has_prssentr=0 bytes=03EC0216414020A2D3
+
+[VEDA PATH] slot=1 sess=1 reason=tail pattern=VLC_VOICE_TAIL_TLC sf=1..51 mbc_seq=0 vlc_seq=1 voice_seq=2 tail_seq=3 tail=2 db06=0 db07=0 mbc48=0 kx_try=0
+[33m 
+ SLOT 1 Unknown LC  FLCO=0x03 FID=0xEC [0m[VEDA KX] Resetting buffer due to TLC (End of Call)
+
+Sync: no sync
+1005644   20.951 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 [31m| CACH/Burst FEC ERR[0m
+1008553   21.012 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=5B3A06831B5A1C00735381404C44520C81103E13D976D0CD90
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=0300021D0F510E05EC7019A3
+
+[VEDA RAW] slot=1 sess=1 seq=1 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=0300021D0F510E05EC
+
+[VEDA CAND] slot=1 seq=1 src=VLC01 sf=0 len=9 prev=NONE same_prev=0 ref_mbc=0 ref_vlc=0 role=PREVOICE_VLC has_sbx256=0 has_prssentr=0 bytes=0300021D0F510E05EC
+[32m 
+ SLOT 1 TGT=1904465 SRC=919020 
+VEDA IDS slot=1 id_a=0x1D0F51 (1904465) id_b=0x0E05EC (919020)
+
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=1D02 w4=510F w6=050E sm=0 len_lo=0 len_hi=0 raw_src=919020 raw_tgt=1904465
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=1D02 w4=510F w6=050E can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=919020 raw_tgt=1904465
+
+[VEDA BASE] tag=VLC slot=1 sf=0/51 tg=1904465 src=919020 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=1D02 w4=510F w6=050E sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+1011433   21.072 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=5B3A06831B5A1C00735381404C44520C81103E13D976D0CD90
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=0300021D0F510E05EC7019A3
+
+[VEDA RAW] slot=1 sess=1 seq=2 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=0300021D0F510E05EC
+[32m 
+ SLOT 1 TGT=1904465 SRC=919020 
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=1D02 w4=510F w6=050E sm=0 len_lo=0 len_hi=0 raw_src=919020 raw_tgt=1904465
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=1D02 w4=510F w6=050E can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=919020 raw_tgt=1904465
+
+[VEDA BASE] tag=VLC slot=1 sf=0/51 tg=1904465 src=919020 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=1D02 w4=510F w6=050E sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added 36 bytes. Pos: 36/64
+1014314   21.132 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA KX ATTEMPT] Feeding 64 bytes: 526800BDDCEE1E5CF0EF35041C9101EE57F7D5DD57DFDBD0E8ED3F1DE5D7A93B5AFD3B6D64ED00C8D56583BBBF5F5E49DF65BC3A002240F060373935BC0BACC6
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300021D0F510E05EC
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1D02 w4=510F w6=050E
+
+[VEDA RAW] slot=1 sess=2 seq=1 kind=EMB sf=52 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300021D0F510E05EC
+
+[VEDA CAND] slot=1 seq=2 src=VC_EMB sf=52 len=9 prev=VLC01 same_prev=1 ref_mbc=0 ref_vlc=1 role=VOICE_MIRROR_VLC has_sbx256=0 has_prssentr=0 bytes=0300021D0F510E05EC
+[32m SLOT 1 TGT=1904465 SRC=919020 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=2 kind=MI sf=52 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1031594   21.492 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000F31239BD
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300021D0F510E05EC
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1D02 w4=510F w6=050E
+
+[VEDA RAW] slot=1 sess=2 seq=3 kind=EMB sf=53 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300021D0F510E05EC
+[32m SLOT 1 TGT=1904465 SRC=919020 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=4 kind=MI sf=53 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1048874   21.852 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300021D0F510E05EC
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1D02 w4=510F w6=050E
+
+[VEDA RAW] slot=1 sess=2 seq=5 kind=EMB sf=54 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300021D0F510E05EC
+[32m SLOT 1 TGT=1904465 SRC=919020 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=6 kind=MI sf=54 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1066154   22.212 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300021D0F510E05EC
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1D02 w4=510F w6=050E
+
+[VEDA RAW] slot=1 sess=2 seq=7 kind=EMB sf=55 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300021D0F510E05EC
+[32m SLOT 1 TGT=1904465 SRC=919020 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=8 kind=MI sf=55 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1083434   22.572 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300021D0F510E05EC
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1D02 w4=510F w6=050E
+
+[VEDA RAW] slot=1 sess=3 seq=1 kind=EMB sf=56 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300021D0F510E05EC
+[32m SLOT 1 TGT=1904465 SRC=919020 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=2 kind=MI sf=56 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1100713   22.932 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x02 info=48A331C913AB5D0A853750A029961F26E57C0A852922D81240
+
+[VEDA DB] slot=1 databurst=0x02 ms=1 stereo=1 payload_algid=0x00| TLC vp =  TLC  
+[VEDA HARDCORE] db=0x02 len=12 crc=1 fec_err=0 raw=03F70221DA9061400B745B9E
+
+[VEDA RAW] slot=1 sess=3 seq=3 kind=TLC sf=56 len=9 crc=1 irr=0 db=02 aux=03 F7 02 00 raw=03F70221DA9061400B
+
+[VEDA CAND] slot=1 seq=3 src=TLC02 sf=56 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=TAIL_TLC has_sbx256=0 has_prssentr=0 bytes=03F70221DA9061400B
+
+[VEDA PATH] slot=1 sess=2 reason=tail pattern=VLC_VOICE_TAIL_TLC sf=52..56 mbc_seq=0 vlc_seq=1 voice_seq=2 tail_seq=3 tail=2 db06=0 db07=0 mbc48=0 kx_try=0
+[33m 
+ SLOT 1 Unknown LC  FLCO=0x03 FID=0xF7 [0m[VEDA KX] Resetting buffer due to TLC (End of Call)
+
+Sync: no sync
+1145328   23.861 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 [31m| CACH/Burst FEC ERR[0m
+1148238   23.922 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=56ED362B759E00889EF31F21DFC6778D21106C366166085F70
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=03000275B7140754E5A3D7EB
+
+[VEDA RAW] slot=1 sess=1 seq=1 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=03000275B7140754E5
+
+[VEDA CAND] slot=1 seq=1 src=VLC01 sf=0 len=9 prev=NONE same_prev=0 ref_mbc=0 ref_vlc=0 role=PREVOICE_VLC has_sbx256=0 has_prssentr=0 bytes=03000275B7140754E5
+[32m 
+ SLOT 1 TGT=7714580 SRC=480485 
+VEDA IDS slot=1 id_a=0x75B714 (7714580) id_b=0x0754E5 (480485)
+
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 sm=0 len_lo=0 len_hi=0 raw_src=480485 raw_tgt=7714580
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=480485 raw_tgt=7714580
+
+[VEDA BASE] tag=VLC slot=1 sf=0/56 tg=7714580 src=480485 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+1151118   23.982 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=56ED362F759E00889EF31F21DFC6778D21106C366166085F70
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=03000275B7140754E5A3D7EB
+
+[VEDA RAW] slot=1 sess=1 seq=2 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=03000275B7140754E5
+[32m 
+ SLOT 1 TGT=7714580 SRC=480485 
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 sm=0 len_lo=0 len_hi=0 raw_src=480485 raw_tgt=7714580
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=480485 raw_tgt=7714580
+
+[VEDA BASE] tag=VLC slot=1 sf=0/56 tg=7714580 src=480485 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=7502 w4=14B7 w6=5407 sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added 36 bytes. Pos: 36/64
+1153999   24.042 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA KX ATTEMPT] Feeding 64 bytes: 685100F92D9231F8BC8266B6767BCD4B47F7D5DD57DFD54875E33A11FCDD9B9B1ECA73B09B90009CE2877D2C99FDC1C922AE363F602300C173F737E12094E463
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=2 seq=1 kind=EMB sf=57 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+
+[VEDA CAND] slot=1 seq=2 src=VC_EMB sf=57 len=9 prev=VLC01 same_prev=1 ref_mbc=0 ref_vlc=1 role=VOICE_MIRROR_VLC has_sbx256=0 has_prssentr=0 bytes=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=2 kind=MI sf=57 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1171278   24.402 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000F31239BD
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=2 seq=3 kind=EMB sf=58 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=4 kind=MI sf=58 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1188558   24.762 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=2 seq=5 kind=EMB sf=59 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=6 kind=MI sf=59 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1205838   25.122 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=2 seq=7 kind=EMB sf=60 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=8 kind=MI sf=60 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1223118   25.482 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=3 seq=1 kind=EMB sf=61 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=2 kind=MI sf=61 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1240398   25.842 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=3 seq=3 kind=EMB sf=62 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=4 kind=MI sf=62 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1257678   26.202 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=3 seq=5 kind=EMB sf=63 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=6 kind=MI sf=63 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1274958   26.562 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=3 seq=7 kind=EMB sf=64 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=8 kind=MI sf=64 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1292238   26.922 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=4 seq=1 kind=EMB sf=65 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=2 kind=MI sf=65 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1309518   27.282 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=4 seq=3 kind=EMB sf=66 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=4 kind=MI sf=66 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1326798   27.642 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=4 seq=5 kind=EMB sf=67 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=6 kind=MI sf=67 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1344077   28.002 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=4 seq=7 kind=EMB sf=68 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=8 kind=MI sf=68 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1361358   28.362 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=5 seq=1 kind=EMB sf=69 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=2 kind=MI sf=69 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1378637   28.722 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=5 seq=3 kind=EMB sf=70 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=4 kind=MI sf=70 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1395918   29.082 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=5 seq=5 kind=EMB sf=71 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=6 kind=MI sf=71 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1413198   29.442 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=03000275B7140754E5
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=7502 w4=14B7 w6=5407
+
+[VEDA RAW] slot=1 sess=5 seq=7 kind=EMB sf=72 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=03000275B7140754E5
+[32m SLOT 1 TGT=7714580 SRC=480485 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=8 kind=MI sf=72 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1430477   29.802 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=13 raw=F5DEBBD7144C9324C9
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=13 b0=F5 b1=DE w2=D7BB w4=4C14 w6=2493 raw=F5DEBBD7144C9324C9
+[31m SLOT 1 Protected LC  FLCO=0x35 FID=0xDE [0m[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 13. 
+[0m
+KV|IV set from MI: 00000000 ... 00000000
+1462159   30.462 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=10 raw=0300000055475F4AAA
+
+[VEDA LCDROP] slot=1 type=3 crc=1 irr=10 b0=03 b1=00 w2=0000 w4=4755 w6=4A5F raw=0300000055475F4AAA
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 10. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1479439   30.822 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED629988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300035A554757CEAA
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5A03 w4=4755 w6=CE57
+
+[VEDA RAW] slot=1 sess=6 seq=1 kind=EMB sf=75 len=9 crc=1 irr=0 db=EB aux=03 00 03 00 raw=0300035A554757CEAA
+
+[VEDA CAND] slot=1 seq=3 src=VC_EMB sf=75 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=VOICE_EMB_NEW has_sbx256=0 has_prssentr=0 bytes=0300035A554757CEAA
+[32m SLOT 1 TGT=5920071 SRC=5754538 
+VEDA IDS slot=1 id_a=0x5A5547 (5920071) id_b=0x57CEAA (5754538)
+Private Priority 3 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=2 kind=MI sf=75 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1496718   31.182 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=2 raw=0300035A554757CEAA
+
+[VEDA LCDROP] slot=1 type=3 crc=1 irr=2 b0=03 b1=00 w2=5A03 w4=4755 w6=CE57 raw=0300035A554757CEAA
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 2. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED489988 D:000; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=3 kind=MI sf=76 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED489988
+
+[VEDA] SBRC-MI slot=1 I=ED489988
+
+KV|IV set from MI: 00000000 ... 00000000
+1513998   31.542 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED489988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300035A554757CEAA
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5A03 w4=4755 w6=CE57
+
+[VEDA RAW] slot=1 sess=6 seq=4 kind=EMB sf=77 len=9 crc=1 irr=0 db=EB aux=03 00 03 00 raw=0300035A554757CEAA
+[32m SLOT 1 TGT=5920071 SRC=5754538 Private Priority 3 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=5 kind=MI sf=77 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1531279   31.902 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED629988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300035A554757CEAA
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=5A03 w4=4755 w6=CE57
+
+[VEDA RAW] slot=1 sess=6 seq=6 kind=EMB sf=78 len=9 crc=1 irr=0 db=EB aux=03 00 03 00 raw=0300035A554757CEAA
+[32m SLOT 1 TGT=5920071 SRC=5754538 Private Priority 3 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=7 kind=MI sf=78 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1548558   32.262 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x02 info=43521AE71BC73D7BCE62F8635391AD8A9E6844279DF1410CC0
+
+[VEDA DB] slot=1 databurst=0x02 ms=1 stereo=1 payload_algid=0x00| TLC vp =  TLC  
+[VEDA HARDCORE] db=0x02 len=12 crc=1 fec_err=0 raw=0353030692F93A4FA9D3DC3C
+
+[VEDA RAW] slot=1 sess=6 seq=8 kind=TLC sf=78 len=9 crc=1 irr=0 db=02 aux=03 53 03 00 raw=0353030692F93A4FA9
+
+[VEDA CAND] slot=1 seq=4 src=TLC02 sf=78 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=TAIL_TLC has_sbx256=0 has_prssentr=0 bytes=0353030692F93A4FA9
+
+[VEDA PATH] slot=1 sess=3 reason=tail pattern=VLC_VOICE_TAIL_TLC sf=57..78 mbc_seq=0 vlc_seq=1 voice_seq=2 tail_seq=4 tail=2 db06=0 db07=0 mbc48=0 kx_try=0
+[33m 
+ SLOT 1 Unknown LC  FLCO=0x03 FID=0x53 [0m[VEDA KX] Resetting buffer due to TLC (End of Call)
+
+Sync: no sync
+1645657   34.285 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 [31m| CACH/Burst FEC ERR[0m
+1648567   34.345 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=5ECB04292DDE75404E43430364C4B6846F0CBE14E169007C20
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=030002176FE64FCC82CE5338
+
+[VEDA RAW] slot=1 sess=1 seq=1 kind=VLC sf=0 len=9 crc=1 irr=0 db=01 aux=03 00 02 00 raw=030002176FE64FCC82
+
+[VEDA CAND] slot=1 seq=1 src=VLC01 sf=0 len=9 prev=NONE same_prev=0 ref_mbc=0 ref_vlc=0 role=PREVOICE_VLC has_sbx256=0 has_prssentr=0 bytes=030002176FE64FCC82
+[32m 
+ SLOT 1 TGT=1535974 SRC=5229698 
+VEDA IDS slot=1 id_a=0x176FE6 (1535974) id_b=0x4FCC82 (5229698)
+
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F sm=0 len_lo=0 len_hi=0 raw_src=5229698 raw_tgt=1535974
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=5229698 raw_tgt=1535974
+
+[VEDA BASE] tag=VLC slot=1 sf=0/78 tg=1535974 src=5229698 sess_valid=0 stream_valid=0 kx_pos=0 vendor_mi_valid=0 vendor_mi32=00000000 eff_mi=0000000000000000 last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Priority 2 Call [0m 
+[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added 36 bytes. Pos: 36/64
+1651447   34.405 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA KX ATTEMPT] Feeding 64 bytes: 32C000B32672B40290008995AB26AD1CF7F7D5DD57DFDA93D02C12E27F4FF3A82CE9AA15986C0011C885C15CAE7DA1E36D644C1BF022D14170C73F5A699D6809
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=030002176FE64FCC82
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F
+
+[VEDA RAW] slot=1 sess=2 seq=1 kind=EMB sf=79 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=030002176FE64FCC82
+
+[VEDA CAND] slot=1 seq=2 src=VC_EMB sf=79 len=9 prev=VLC01 same_prev=1 ref_mbc=0 ref_vlc=1 role=VOICE_MIRROR_VLC has_sbx256=0 has_prssentr=0 bytes=030002176FE64FCC82
+[32m SLOT 1 TGT=1535974 SRC=5229698 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=2 kind=MI sf=79 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1668727   34.765 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000F31239BD
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=030002176FE64FCC82
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F
+
+[VEDA RAW] slot=1 sess=2 seq=3 kind=EMB sf=80 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=030002176FE64FCC82
+[32m SLOT 1 TGT=1535974 SRC=5229698 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=4 kind=MI sf=80 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1686007   35.125 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=030002176FE64FCC82
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F
+
+[VEDA RAW] slot=1 sess=2 seq=5 kind=EMB sf=81 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=030002176FE64FCC82
+[32m SLOT 1 TGT=1535974 SRC=5229698 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=6 kind=MI sf=81 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1703287   35.485 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=030002176FE64FCC82
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F
+
+[VEDA RAW] slot=1 sess=2 seq=7 kind=EMB sf=82 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=030002176FE64FCC82
+[32m SLOT 1 TGT=1535974 SRC=5229698 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=2 seq=8 kind=MI sf=82 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1720567   35.845 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=030002176FE64FCC82
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=1702 w4=E66F w6=CC4F
+
+[VEDA RAW] slot=1 sess=3 seq=1 kind=EMB sf=83 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=030002176FE64FCC82
+[32m SLOT 1 TGT=1535974 SRC=5229698 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=2 kind=MI sf=83 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+1737846   36.205 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x02 info=5DD60A5B249703A372342E49B8D61B2F3504C4641128C813B0
+
+[VEDA DB] slot=1 databurst=0x02 ms=1 stereo=1 payload_algid=0x00| TLC vp =  TLC  
+[VEDA HARDCORE] db=0x02 len=12 crc=1 fec_err=0 raw=033F01102A4C61D30209A7FD
+
+[VEDA RAW] slot=1 sess=3 seq=3 kind=TLC sf=83 len=9 crc=1 irr=0 db=02 aux=03 3F 01 00 raw=033F01102A4C61D302
+
+[VEDA CAND] slot=1 seq=3 src=TLC02 sf=83 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=TAIL_TLC has_sbx256=0 has_prssentr=0 bytes=033F01102A4C61D302
+
+[VEDA PATH] slot=1 sess=4 reason=tail pattern=VLC_VOICE_TAIL_TLC sf=79..83 mbc_seq=0 vlc_seq=1 voice_seq=2 tail_seq=3 tail=2 db06=0 db07=0 mbc48=0 kx_try=0
+[33m 
+ SLOT 1 Unknown LC  FLCO=0x03 FID=0x3F [0m[VEDA KX] Resetting buffer due to TLC (End of Call)
+
+1746488   36.385 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=6C2A0883209254A01AB12A615FC6BD07F218AE05814CD8F0D0
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=0300000D4C8E29DE48DF9BAA
+
+[VEDA RAW] slot=1 sess=3 seq=4 kind=VLC sf=83 len=9 crc=1 irr=0 db=01 aux=03 00 00 00 raw=0300000D4C8E29DE48
+
+[VEDA CAND] slot=1 seq=4 src=VLC01 sf=83 len=9 prev=TLC02 same_prev=0 ref_mbc=0 ref_vlc=0 role=PREVOICE_VLC has_sbx256=0 has_prssentr=0 bytes=0300000D4C8E29DE48
+[32m 
+ SLOT 1 TGT=871566 SRC=2743880 
+VEDA IDS slot=1 id_a=0x0D4C8E (871566) id_b=0x29DE48 (2743880)
+
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+[VEDA BASE] tag=VLC slot=1 sf=83/83 tg=871566 src=2743880 sess_valid=1 stream_valid=1 kx_pos=0 vendor_mi_valid=1 vendor_mi32=F31239BD eff_mi=00000000F31239BD last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Call [0m 
+1749368   36.445 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=4C2A08A7099654A01AB16A615FC6BD07F218AE05814CD8F0D0
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=0300000D4C8E29DE48DF9BAA
+
+[VEDA RAW] slot=1 sess=3 seq=5 kind=VLC sf=83 len=9 crc=1 irr=0 db=01 aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m 
+ SLOT 1 TGT=871566 SRC=2743880 
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+[VEDA BASE] tag=VLC slot=1 sf=83/83 tg=871566 src=2743880 sess_valid=1 stream_valid=1 kx_pos=0 vendor_mi_valid=1 vendor_mi32=F31239BD eff_mi=00000000F31239BD last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Call [0m 
+1752248   36.505 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x01 info=4C2A08A7099654A01AB16A615FC6BD07F218AE05814CD8F0D0
+
+[VEDA DB] slot=1 databurst=0x01 ms=1 stereo=1 payload_algid=0x00| VLC vp =  VLC  
+[VEDA HARDCORE] db=0x01 len=12 crc=1 fec_err=0 raw=0300000D4C8E29DE48DF9BAA
+
+[VEDA RAW] slot=1 sess=3 seq=6 kind=VLC sf=83 len=9 crc=1 irr=0 db=01 aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m 
+ SLOT 1 TGT=871566 SRC=2743880 
+[VEDA HTRY] slot=1 src=2 svc=0 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+VEDA HDR MISS slot=1 src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 can_norm=0 norm_attempted=0 norm_changed=0 norm_rc=0 sm=0 len_lo=0 len_hi=0 raw_src=2743880 raw_tgt=871566
+
+[VEDA BASE] tag=VLC slot=1 sf=83/83 tg=871566 src=2743880 sess_valid=1 stream_valid=1 kx_pos=0 vendor_mi_valid=1 vendor_mi32=F31239BD eff_mi=00000000F31239BD last_hdr_valid=1 last_hdr_src=2 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 sm=0 len_lo=0 len_hi=0 f9_count=0
+Private Call [0m 
+[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added 36 bytes. Pos: 36/64
+1755128   36.565 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA KX ATTEMPT] Feeding 64 bytes: 4EC000C3EA343732037A15C36899EDCFD7F7D5DD57DFD07B3454522E3DFBB22A72038DB67E68802A1BEFD13FEC23D23FBCF8B610F020611090F73B707FA254E2
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=3 seq=7 kind=EMB sf=84 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+
+[VEDA CAND] slot=1 seq=5 src=VC_EMB sf=84 len=9 prev=VLC01 same_prev=1 ref_mbc=0 ref_vlc=0 role=VOICE_EMB_NEW has_sbx256=0 has_prssentr=0 bytes=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=8 kind=MI sf=84 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1772408   36.925 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED629988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=3 seq=9 kind=EMB sf=85 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=10 kind=MI sf=85 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1789688   37.285 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=3 seq=11 kind=EMB sf=86 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=3 seq=12 kind=MI sf=86 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1806968   37.645 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=4 seq=1 kind=EMB sf=87 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=2 kind=MI sf=87 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1824248   38.005 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=4 seq=3 kind=EMB sf=88 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=4 kind=MI sf=88 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1841529   38.365 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=4 seq=5 kind=EMB sf=89 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=6 kind=MI sf=89 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1858809   38.725 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=4 seq=7 kind=EMB sf=90 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=4 seq=8 kind=MI sf=90 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1876089   39.085 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=5 seq=1 kind=EMB sf=91 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=2 kind=MI sf=91 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1893369   39.445 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=5 seq=3 kind=EMB sf=92 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=4 kind=MI sf=92 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1910647   39.805 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=5 seq=5 kind=EMB sf=93 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=6 kind=MI sf=93 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1927928   40.165 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=5 seq=7 kind=EMB sf=94 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=5 seq=8 kind=MI sf=94 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1945208   40.525 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=6 seq=1 kind=EMB sf=95 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=2 kind=MI sf=95 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+1962487   40.885 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=12 raw=57C8A9154C531B9FCC
+
+[VEDA LCDROP] slot=1 type=3 crc=1 irr=12 b0=57 b1=C8 w2=15A9 w4=534C w6=9F1B raw=57C8A9154C531B9FCC
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 12. 
+[0m
+KV|IV set from MI: 00000000 ... 00000000
+1991292   41.485 |  Sync: +DMR MS/DM MODE/MONO | Color Code=12 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=10 raw=014201049C326C9998
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=10 b0=01 b1=42 w2=0401 w4=329C w6=996C raw=014201049C326C9998
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 10. 
+[0m
+KV|IV set from MI: 00000000 ... 00000000
+2014327   41.965 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=6 seq=3 kind=EMB sf=98 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=6 seq=4 kind=MI sf=98 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+2031608   42.325 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=1 raw=0300000D4C8E29DE48
+
+[VEDA LCDROP] slot=1 type=3 crc=1 irr=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29 raw=0300000D4C8E29DE48
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 1. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+2048889   42.685 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=3 raw=0300600D4C8E29DE48
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=3 b0=03 b1=00 w2=0D60 w4=8E4C w6=DE29 raw=0300600D4C8E29DE48
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 3. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:8; I:ED229988 D:72D; [0m FEC ERR 8. Power 0
+
+[VEDA] SBRC-MI slot=1 I=ED229988
+ irr_err 8;
+KV|IV set from MI: 00000000 ... 00000000
+2066169   43.045 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED229988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=9 raw=15E00000000E23D248
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=9 b0=15 b1=E0 w2=0000 w4=0E00 w6=D223 raw=15E00000000E23D248
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 9. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:8; I:ED029988 D:000; [0m FEC ERR 8. Power 0
+
+[VEDA] SBRC-MI slot=1 I=ED029988
+ irr_err 8;
+KV|IV set from MI: 00000000 ... 00000000
+2083448   43.405 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED029988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=7 seq=1 kind=EMB sf=102 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=2 kind=MI sf=102 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+2100728   43.765 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000ED629988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=7 seq=3 kind=EMB sf=103 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:ED629988 D:72D; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=4 kind=MI sf=103 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=ED629988
+
+[VEDA] SBRC-MI slot=1 I=ED629988
+
+KV|IV set from MI: 00000000 ... 00000000
+2118007   44.125 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300000D4C8E29DE48
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=0D00 w4=8E4C w6=DE29
+
+[VEDA RAW] slot=1 sess=7 seq=5 kind=EMB sf=104 len=9 crc=1 irr=0 db=EB aux=03 00 00 00 raw=0300000D4C8E29DE48
+[32m SLOT 1 TGT=871566 SRC=2743880 Private Call [0m 
+KV|IV set from MI: 00000000 ... 00000000
+2135288   44.485 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=11 raw=0309200D4C8E299A48
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=11 b0=03 b1=09 w2=0D20 w4=8E4C w6=9A29 raw=0309200D4C8E299A48
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 11. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:CD229888 D:000; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=7 seq=6 kind=MI sf=105 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=CD229888
+
+[VEDA] SBRC-MI slot=1 I=CD229888
+
+KV|IV set from MI: 00000000 ... 00000000
+2152568   44.845 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000CD229888
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=7 raw=0600000D034E294648
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=7 b0=06 b1=00 w2=0D00 w4=4E03 w6=4629 raw=0600000D034E294648
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 7. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:8; I:B8629989 D:72D; [0m FEC ERR 8. Power 0
+
+[VEDA] SBRC-MI slot=1 I=B8629989
+ irr_err 8;
+KV|IV set from MI: 00000000 ... 00000000
+2169847   45.205 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 [31m| CACH/Burst FEC ERR[0m
+2175610   45.325 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000B8629989
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300024142134E15FB
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=4102 w4=1342 w6=154E
+
+[VEDA RAW] slot=1 sess=8 seq=1 kind=EMB sf=107 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300024142134E15FB
+
+[VEDA CAND] slot=1 seq=6 src=VC_EMB sf=107 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=VOICE_EMB_NEW has_sbx256=0 has_prssentr=0 bytes=0300024142134E15FB
+[32m SLOT 1 TGT=4276755 SRC=5117435 
+VEDA IDS slot=1 id_a=0x414213 (4276755) id_b=0x4E15FB (5117435)
+Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=2 kind=MI sf=107 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+2192891   45.685 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000F31239BD
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=7 raw=0DC0600C0300C6DFFF
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=7 b0=0D b1=C0 w2=0C60 w4=0003 w6=DFC6 raw=0DC0600C0300C6DFFF
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 7. 
+[0m
+KV|IV set from MI: 00000000 ... 00000000
+2224571   46.345 |  Sync: +DMR MS/DM MODE/MONO | Color Code=13 | VC* 
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=8 raw=0A00010C43297B0275
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=8 b0=0A b1=00 w2=0C01 w4=2943 w6=027B raw=0A00010C43297B0275
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 8. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:8; I:B876D988 D:72D; [0m FEC ERR 8. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=3 kind=MI sf=109 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=B876D988
+
+[VEDA] SBRC-MI slot=1 I=B876D988
+ irr_err 8;
+KV|IV set from MI: 00000000 ... 00000000
+2241853   46.705 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000B876D988
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=10 raw=03000000DB36CDB36C
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=10 b0=03 b1=00 w2=0000 w4=36DB w6=B3CD raw=03000000DB36CDB36C
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 10. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:10; I:F97799D8 D:72D; [0m FEC ERR 10. Power 0
+
+[VEDA RAW] slot=1 sess=8 seq=4 kind=MI sf=110 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F97799D8
+
+[VEDA] SBRC-MI slot=1 I=F97799D8
+ irr_err 10;
+KV|IV set from MI: 00000000 ... 00000000
+2259132   47.065 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000F97799D8
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=0 fec_err=6 raw=1FE0010CE3697B0275
+
+[VEDA LCDROP] slot=1 type=3 crc=0 irr=6 b0=1F b1=E0 w2=0C01 w4=69E3 w6=027B raw=1FE0010CE3697B0275
+[31m SLOT 1 FLCO FEC ERR[0m[31m (FEC ERR) 6. 
+[0m
+[31m SLOT 1 SB/RC (FEC ERR) E:6; I:CD63988A D:72D; [0m FEC ERR 6. Power 0
+
+[VEDA] SBRC-MI slot=1 I=CD63988A
+
+KV|IV set from MI: 00000000 ... 00000000
+2276412   47.425 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 [31m| CACH/Burst FEC ERR[0m
+2279291   47.485 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | VC* 
+
+[VEDA] MI APPLIED slot=1 mi=00000000CD63988A
+
+[VEDA RAW BURST] db=0xEB info=00000000000000000000000000000000000000000000000000
+
+[VEDA DB] slot=1 databurst=0xEB ms=1 stereo=1 payload_algid=0x00
+[VEDA HARDCORE] db=0xEB len=9 crc=1 fec_err=0 raw=0300024142134E15FB
+
+[VEDA EMB8] slot=1 b0=03 b1=00 w2=4102 w4=1342 w6=154E
+
+[VEDA RAW] slot=1 sess=9 seq=1 kind=EMB sf=112 len=9 crc=1 irr=0 db=EB aux=03 00 02 00 raw=0300024142134E15FB
+[32m SLOT 1 TGT=4276755 SRC=5117435 Private Priority 2 Call [0m 
+[31m SLOT 1 SB/RC (FEC ERR) E:7; I:F31239BD D:68A; [0m FEC ERR 7. Power 0
+
+[VEDA RAW] slot=1 sess=9 seq=2 kind=MI sf=112 len=4 crc=0 irr=0 db=00 aux=00 00 00 00 raw=F31239BD
+
+[VEDA] SBRC-MI slot=1 I=F31239BD
+
+KV|IV set from MI: 00000000 ... 00000000
+2296570   47.845 |  Sync: +DMR MS/DM MODE/MONO | Color Code=00 | Color Code=00 
+[VEDA RAW BURST] db=0x02 info=41F5218D61E776FAF2F393C19CD09981750AB604A913D06070
+
+[VEDA DB] slot=1 databurst=0x02 ms=1 stereo=1 payload_algid=0x00| TLC vp =  TLC  
+[VEDA HARDCORE] db=0x02 len=12 crc=1 fec_err=0 raw=03130261E4E30079016D3BAA
+
+[VEDA RAW] slot=1 sess=9 seq=3 kind=TLC sf=112 len=9 crc=1 irr=0 db=02 aux=03 13 02 00 raw=03130261E4E3007901
+
+[VEDA CAND] slot=1 seq=7 src=TLC02 sf=112 len=9 prev=VC_EMB same_prev=0 ref_mbc=0 ref_vlc=0 role=TAIL_TLC has_sbx256=0 has_prssentr=0 bytes=03130261E4E3007901
+
+[VEDA PATH] slot=1 sess=5 reason=tail pattern=VLC_VOICE_TAIL_TLC sf=84..112 mbc_seq=0 vlc_seq=4 voice_seq=5 tail_seq=7 tail=2 db06=0 db07=0 mbc48=0 kx_try=0
+[33m 
+ SLOT 1 Unknown LC  FLCO=0x03 FID=0x13 [0m[VEDA KX] Resetting buffer due to TLC (End of Call)
+
+Sync: no sync
+
+End of /home/dgm/IDA/Recording/audio_414250000Hz_17-35-53_17-04-2026.wav
+[SCOUT] opts.run_scout 1, state.ngroups 7!!!! SC.ngroups 7, valid_pairs_cnt 4
+ SC.ngroups 7, valid_pairs_cnt 4
+[SCOUT] JSON saved: ./scout.json (groups=7)
+
+Total audio errors: 5762
+Total header errors: 0
+Total irrecoverable header errors: 0
+Exiting.
