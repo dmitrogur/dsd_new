@@ -359,12 +359,25 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
-  int veda_voice_done = 0;
-  if (opts->isVEDA)
-  {
-    veda_voice_done = veda_try_decrypt_voice_triplet(opts, state, 0,
-                                                     ambe_fr, ambe_fr2, ambe_fr3);
-  }
+int veda_voice_done = 0;
+if (opts->isVEDA) {
+    veda_set_debug(opts->veda_debug);
+
+    if (opts->veda_key_set) {
+        veda_set_cps_key16(opts->veda_master_key);
+    }
+
+    veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
+
+    veda_voice_done = veda_ms_on_voice_triplet(
+        opts,
+        state,
+        0,
+        ambe_fr,
+        ambe_fr2,
+        ambe_fr3
+    );
+}
 
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
@@ -624,12 +637,6 @@ if (opts->isVEDA) {
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, vc, m1, m2, m3);
 
-if (opts->isVEDA) {
-    veda_ms_on_voice_triplet(
-        opts, state, 0,
-        ambe_fr, ambe_fr2, ambe_fr3
-    );
-}
 
 if (opts->isVEDA && !veda_voice_done)
 {
@@ -996,12 +1003,25 @@ if (opts->isVEDA) {
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
-  int veda_voice_done = 0;
-  if (opts->isVEDA)
-  {
-    veda_voice_done = veda_try_decrypt_voice_triplet(opts, state, 0,
-                                                     ambe_fr, ambe_fr2, ambe_fr3);
-  }
+int veda_voice_done = 0;
+if (opts->isVEDA) {
+    veda_set_debug(opts->veda_debug);
+
+    if (opts->veda_key_set) {
+        veda_set_cps_key16(opts->veda_master_key);
+    }
+
+    veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
+
+    veda_voice_done = veda_ms_on_voice_triplet(
+        opts,
+        state,
+        0,
+        ambe_fr,
+        ambe_fr2,
+        ambe_fr3
+    );
+}
 
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
@@ -1092,13 +1112,6 @@ if (opts->isVEDA) {
   //collect the mi fragment
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, 1, m1, m2, m3);
-
-if (opts->isVEDA) {
-    veda_ms_on_voice_triplet(
-        opts, state, 0,
-        ambe_fr, ambe_fr2, ambe_fr3
-    );
-}
 
 if (opts->isVEDA && !veda_voice_done)
 {

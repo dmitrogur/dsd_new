@@ -222,157 +222,35 @@ void veda_ms_set_position(uint32_t superframe, uint32_t burst_index, uint32_t se
     v->ms.seq = seq;
 }
 
-int veda_ms_on_voice_triplet(
-    void *opts,
-    void *state,
-    int slot,
-    char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
-    char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
-    char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS])
+int veda_ms_on_voice_triplet(dsd_opts *opts, dsd_state *state, int slot, char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS], char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS], char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS])
 {
     (void)opts;
     (void)state;
-
-    if (slot != VEDA_MS_SLOT_INDEX) {
-        if (g_veda_ctx.debug) {
-            fprintf(stderr, "\n[VEDA MS] ignoring non-MS slot index=%d\n", slot);
-        }
-        return VEDA_RC_OK;
-    }
-
-    g_veda_ctx.ms.voice_triplet_count++;
-
-    if (g_veda_ctx.debug) {
-        int b1 = veda_ambe_count_bits(ambe_fr);
-        int b2 = veda_ambe_count_bits(ambe_fr2);
-        int b3 = veda_ambe_count_bits(ambe_fr3);
-
-        fprintf(stderr,
-                "\n[VEDA MS VOICE] hyp=%s internal_slot=%d display_slot=%d sf=%u triplet=%u bits=%d/%d/%d\n",
-                veda_hypothesis_name(g_veda_ctx.hypothesis),
-                VEDA_MS_SLOT_INDEX,
-                VEDA_MS_DISPLAY_SLOT,
-                g_veda_ctx.ms.superframe,
-                g_veda_ctx.ms.voice_triplet_count,
-                b1, b2, b3);
-    }
-
-    return veda_hypothesis_run_ms(opts, state, slot, ambe_fr, ambe_fr2, ambe_fr3);
-}
-
-int veda_hypothesis_run_ms(
-    void *opts,
-    void *state,
-    int slot,
-    char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
-    char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
-    char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS])
-{
-    (void)opts;
-    (void)state;
-    (void)slot;
     (void)ambe_fr;
     (void)ambe_fr2;
     (void)ambe_fr3;
 
-    switch (g_veda_ctx.hypothesis) {
-    case VEDA_HYP_COLLECT:
-        /* Collect mode must never modify AMBE. */
-        return VEDA_RC_OK;
+    veda_context_t *v = &g_veda_ctx;
 
-    case VEDA_HYP_MAIN_TREE:
-        if (!g_veda_ctx.cps_key_valid) {
-            if (g_veda_ctx.debug) fprintf(stderr, "\n[VEDA WAIT_CPS16] main-tree needs --veda-key CPS16\n");
-            return VEDA_RC_WAIT_KEY32;
-        }
-        if (g_veda_ctx.debug) {
-            fprintf(stderr, "\n[VEDA MAIN-TREE] skeleton only: KX/split model not implemented yet\n");
-        }
-        return VEDA_RC_NOT_IMPLEMENTED;
+    v->voice_try_count++;
 
-    case VEDA_HYP_RUNTIME_BRIDGE:
-        if (g_veda_ctx.debug) {
-            fprintf(stderr, "\n[VEDA RUNTIME-BRIDGE] waiting for IDA proof: runtime/blob/DMRB -> key32/voice path\n");
-        }
-        return VEDA_RC_WAIT_IDA_PROOF;
-
-    case VEDA_HYP_CASE8_PROOF:
-        if (g_veda_ctx.debug) {
-            fprintf(stderr, "\n[VEDA CASE8-PROOF] side branch only; not a voice key32 path\n");
-        }
-        return VEDA_RC_WAIT_IDA_PROOF;
-
-    case VEDA_HYP_AUTO:
-        if (g_veda_ctx.debug) {
-            fprintf(stderr, "\n[VEDA AUTO] not implemented; use collect/main-tree/runtime-bridge/case8-proof\n");
-        }
-        return VEDA_RC_NOT_IMPLEMENTED;
-
-    default:
-        if (g_veda_ctx.debug) fprintf(stderr, "\n[VEDA ERROR] unknown hypothesis\n");
-        return VEDA_RC_ERROR;
+    if (v->debug) {
+        fprintf(stderr, "[VEDA2 MS VOICE] slot=%d hyp=%d try=%u cps=%d mi=%d vlc=%d emb=%d\n", slot, (int)v->hypothesis, v->voice_try_count, v->cps_key_valid, v->ms.mi32_valid, v->ms.vlc_valid, v->ms.emb_valid);
     }
-}
 
-int veda_kx_init_context_model(veda_context_t *v)
-{
-    (void)v;
-    /* Firmware analogue: dmr_kx_init_context("Noise_Npsk0_hydro1", ...).
-     * TODO/IDA: prove how CPS-key16/CPS-derived enters this context.
-     */
-    return VEDA_RC_NOT_IMPLEMENTED;
-}
+    if (v->hypothesis == VEDA_HYP_COLLECT) return 0;
 
-int veda_kx_npsk1_initiator_model(veda_context_t *v)
-{
-    (void)v;
-    /* Firmware analogue: veda_kx_npsk1_initiator.
-     * TODO/IDA: prove exact args and service/static/random material.
-     */
-    return VEDA_RC_NOT_IMPLEMENTED;
-}
+    if (!v->cps_key_valid) {
+        if (v->debug) fprintf(stderr, "[VEDA2 WAIT_CPS16]\n");
+        return 0;
+    }
 
-int veda_kx_npsk1_responder_model(veda_context_t *v)
-{
-    (void)v;
-    /* Firmware analogue: veda_kx_npsk0_responder / responder branch.
-     * TODO/IDA: prove naming/variant and RX/MS role.
-     */
-    return VEDA_RC_NOT_IMPLEMENTED;
-}
+    if (!v->stream.key32_valid) {
+        if (v->debug) fprintf(stderr, "[VEDA2 WAIT_KEY32] source=not_ready\n");
+        return 0;
+    }
 
-int veda_kx_split_model(veda_context_t *v, veda_kx_split_result_t *out)
-{
-    (void)v;
-    if (out != NULL) memset(out, 0, sizeof(*out));
-    /* Firmware analogue: veda_kx_split -> seed32/out0/out1.
-     * TODO/IDA: prove output layout and consumers base/base+0x20.
-     */
-    return VEDA_RC_NOT_IMPLEMENTED;
-}
-
-int veda_stream_init_model(
-    veda_stream_ctx_t *ctx,
-    const uint8_t *key32,
-    const uint8_t *seed8,
-    uint32_t tweak0,
-    uint32_t tweak1,
-    veda_key32_source_t key32_source)
-{
-    int rc;
-    if (ctx == NULL || key32 == NULL || seed8 == NULL) return VEDA_RC_ERROR;
-
-    memset(ctx, 0, sizeof(*ctx));
-    memcpy(ctx->key32, key32, VEDA_KEY32_BYTES);
-    memcpy(ctx->seed8, seed8, VEDA_SEED8_BYTES);
-    ctx->key32_valid = 1;
-    ctx->seed8_valid = 1;
-    ctx->key32_source = key32_source;
-
-    rc = veda_stream256_init_model(ctx, seed8, key32);
-    if (rc != VEDA_RC_OK) return rc;
-
-    return veda_stream256_apply_tweak64_model(ctx, tweak0, tweak1);
+    return 0;
 }
 
 int veda_stream256_init_model(

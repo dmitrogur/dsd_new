@@ -180,8 +180,8 @@ void veda_ms_set_position(uint32_t superframe, uint32_t burst_index, uint32_t se
  * For collect mode this must not modify AMBE frames.
  */
 int veda_ms_on_voice_triplet(
-    void *opts,
-    void *state,
+    dsd_opts *opts,
+    dsd_state *state,
     int slot,
     char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
     char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
