@@ -2077,6 +2077,22 @@
       continue;
     }
     
+if (strcmp(argv[src], "--veda-hypothetes") == 0) {
+  opts.isVEDA = 1;
+  src++;
+  if (src < argc) {
+    if (strcmp(argv[src], "collect") == 0) opts.veda_hypothesis = 0;
+    else if (strcmp(argv[src], "main-tree") == 0) opts.veda_hypothesis = 1;
+    else if (strcmp(argv[src], "runtime-bridge") == 0) opts.veda_hypothesis = 2;
+    else if (strcmp(argv[src], "case8-proof") == 0) opts.veda_hypothesis = 3;
+    else if (strcmp(argv[src], "auto") == 0) opts.veda_hypothesis = 4;
+    else opts.veda_hypothesis = 0;
+    fprintf(stderr, "VEDA hypothesis: %s\n", argv[src]);
+    src++;
+    continue;
+  }
+  continue;
+}
     if (strcmp(argv[src], "--veda-session") == 0) {
       src++;
       if (src < argc) {

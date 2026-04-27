@@ -91,6 +91,7 @@ typedef struct {
     uint8_t crc_ok;
     uint8_t fec_err;
     uint8_t irr;
+
 } veda_ms_candidate_t;
 
 /* Result of KX/split model.
@@ -151,6 +152,7 @@ struct veda_context_t {
     int ms_only;
     int initialized;
 };
+
 
 /* Global experimental context accessors.
  * Keeping the test context here avoids expanding dsd_state while the new runner
@@ -239,6 +241,9 @@ int veda_stream_cfb128_crypt_model(
 int veda_key_primary_material_init_model(veda_case8_proof_t *case8);
 int veda_case8_build_key32_candidate_model(veda_case8_proof_t *case8);
 int veda_case8_build_tweak64_candidate_model(veda_case8_proof_t *case8);
+
+
+
 
 #ifdef __cplusplus
 }
