@@ -9,7 +9,7 @@
 #include "dmr_const.h"
 #include "avr_kv.h"
 #include "dsd_veda.h"
-// #include "veda.h"
+#include "veda.h"
 #include <string.h>
 #include <stdlib.h>
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords

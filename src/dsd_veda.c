@@ -163,7 +163,7 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
     }
 }
 
-int veda_try_decrypt_voice_triplet(dsd_opts *opts,
+int veda_try_decrypt_voice_triplet2(dsd_opts *opts,
                                    dsd_state *state,
                                    int slot,
                                    char ambe_fr[4][24],

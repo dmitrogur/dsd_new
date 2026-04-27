@@ -90,6 +90,7 @@ extern volatile uint8_t exitflag; //fix for issue #136
 
 #include <sys/time.h>
 
+typedef struct veda_context_t veda_context_t;
 // быстрый helper в мс
 typedef int64_t time_ms_t;
 static inline time_ms_t dsd_now_ms(void) {
@@ -868,6 +869,9 @@ typedef struct
   uint8_t veda_manual_session_key[32];
   uint8_t veda_manual_set; // Флаг, что юзер ввел сессию вручную
 
+  uint8_t veda_hypothesis; /* 0=collect, 1=main-tree, 2=runtime-bridge, 3=case8-proof, 4=auto */
+
+  
 } dsd_opts;
 
 typedef struct
@@ -1515,7 +1519,7 @@ typedef struct
   uint16_t veda_raw_seq[2];
   veda_raw_evt_t veda_raw_evt[2][VEDA_RAW_MAX_EVTS];
 
-  // veda_context_t veda;
+  veda_context_t *veda;
 } dsd_state;
 
 /*

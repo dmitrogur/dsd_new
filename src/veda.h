@@ -1,6 +1,6 @@
 #ifndef VEDA_H
 #define VEDA_H
-
+#include "dsd.h"
 /*
  * veda.h - VEDA MS-only experimental hypothesis runner for dsd_new.
  *
@@ -134,23 +134,23 @@ typedef struct {
     int tweak_valid;
 } veda_case8_proof_t;
 
-typedef struct {
+struct veda_context_t {
     veda_hypothesis_t hypothesis;
 
-    uint8_t cps_key16[VEDA_CPS_KEY16_BYTES];
+    uint8_t cps_key16[16];
     int cps_key_valid;
-
-    int debug;
-    int ms_only;
 
     veda_ms_candidate_t ms;
     veda_kx_split_result_t kx;
     veda_stream_ctx_t stream;
-    veda_case8_proof_t case8;
 
-    uint32_t key32_candidate_count;
     uint32_t voice_try_count;
-} veda_context_t;
+    uint32_t key32_candidate_count;
+
+    int debug;
+    int ms_only;
+    int initialized;
+};
 
 /* Global experimental context accessors.
  * Keeping the test context here avoids expanding dsd_state while the new runner
