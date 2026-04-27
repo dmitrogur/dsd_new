@@ -1,0 +1,245 @@
+#ifndef VEDA_H
+#define VEDA_H
+
+/*
+ * veda.h - VEDA MS-only experimental hypothesis runner for dsd_new.
+ *
+ * IMPORTANT INTEGRATION RULE:
+ *   Do NOT paste this file into dsd.h.
+ *   Do NOT include dsd.h from this header.
+ *   This header is self-contained on purpose, so it can be included from
+ *   dmr_ms.c / option parser / other C files without creating typedef cycles.
+ *
+ * Current scope:
+ *   - MS / Direct Mode / Mono only;
+ *   - --veda-key is CPS-key16 / NPSK root material, not key32;
+ *   - key32 must be produced by a hypothesis/builder, not passed by CLI;
+ *   - functions ending with _model mirror firmware / Hex-Rays pseudocode layers.
+ */
+
+#include <stdint.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef VEDA_MAX_FIELD_BYTES
+#define VEDA_MAX_FIELD_BYTES 32
+#endif
+
+#define VEDA_CPS_KEY16_BYTES   16
+#define VEDA_KEY32_BYTES       32
+#define VEDA_SEED8_BYTES        8
+#define VEDA_TWEAK64_BYTES      8
+#define VEDA_KX_SEED32_BYTES   32
+#define VEDA_AMBE_ROWS          4
+#define VEDA_AMBE_COLS         24
+#define VEDA_MS_SLOT_INDEX      0
+#define VEDA_MS_DISPLAY_SLOT    1
+
+typedef enum {
+    VEDA_HYP_COLLECT = 0,
+    VEDA_HYP_MAIN_TREE,
+    VEDA_HYP_RUNTIME_BRIDGE,
+    VEDA_HYP_CASE8_PROOF,
+    VEDA_HYP_AUTO,
+    VEDA_HYP_UNKNOWN
+} veda_hypothesis_t;
+
+typedef enum {
+    VEDA_RC_OK = 0,
+    VEDA_RC_ERROR = -1,
+    VEDA_RC_NOT_IMPLEMENTED = -2,
+    VEDA_RC_WAIT_KEY32 = -3,
+    VEDA_RC_WAIT_IDA_PROOF = -4
+} veda_rc_t;
+
+typedef enum {
+    VEDA_KEY32_SRC_NONE = 0,
+    VEDA_KEY32_SRC_OUT0,
+    VEDA_KEY32_SRC_OUT1,
+    VEDA_KEY32_SRC_RUNTIME_BRIDGE,
+    VEDA_KEY32_SRC_CASE8_SIDE_PROOF
+} veda_key32_source_t;
+
+/* Candidate fields collected from DMR MS/VEDA stream.
+ * These are not proven algorithm fields. They are inputs for hypotheses.
+ */
+typedef struct {
+    uint8_t vlc_raw[VEDA_MAX_FIELD_BYTES];
+    int vlc_len;
+    int vlc_valid;
+
+    uint8_t emb_raw[VEDA_MAX_FIELD_BYTES];
+    int emb_len;
+    int emb_valid;
+
+    uint32_t mi32;
+    int mi32_valid;
+    char mi32_source[24];
+
+    uint32_t id_a;
+    uint32_t id_b;
+    int ids_valid;
+
+    uint32_t superframe;
+    uint32_t burst_index;
+    uint32_t seq;
+    uint32_t voice_triplet_count;
+
+    uint8_t crc_ok;
+    uint8_t fec_err;
+    uint8_t irr;
+} veda_ms_candidate_t;
+
+/* Result of KX/split model.
+ * out0/out1 are internal results, never external CLI inputs.
+ */
+typedef struct {
+    uint8_t seed32[VEDA_KX_SEED32_BYTES];
+    uint8_t out0[VEDA_KEY32_BYTES];
+    uint8_t out1[VEDA_KEY32_BYTES];
+
+    int seed32_valid;
+    int out0_valid;
+    int out1_valid;
+} veda_kx_split_result_t;
+
+typedef struct {
+    uint32_t st[12];
+
+    uint8_t key32[VEDA_KEY32_BYTES];
+    uint8_t seed8[VEDA_SEED8_BYTES];
+
+    uint32_t tweak0;
+    uint32_t tweak1;
+
+    int key32_valid;
+    int seed8_valid;
+    int tweak_valid;
+    int stream_valid;
+
+    veda_key32_source_t key32_source;
+} veda_stream_ctx_t;
+
+typedef struct {
+    uint8_t primary16[16];
+    uint8_t key32_candidate[VEDA_KEY32_BYTES];
+    uint32_t mix0;
+    uint32_t mix1;
+
+    int primary16_valid;
+    int key32_candidate_valid;
+    int tweak_valid;
+} veda_case8_proof_t;
+
+typedef struct {
+    veda_hypothesis_t hypothesis;
+
+    uint8_t cps_key16[VEDA_CPS_KEY16_BYTES];
+    int cps_key_valid;
+
+    int debug;
+    int ms_only;
+
+    veda_ms_candidate_t ms;
+    veda_kx_split_result_t kx;
+    veda_stream_ctx_t stream;
+    veda_case8_proof_t case8;
+
+    uint32_t key32_candidate_count;
+    uint32_t voice_try_count;
+} veda_context_t;
+
+/* Global experimental context accessors.
+ * Keeping the test context here avoids expanding dsd_state while the new runner
+ * is still unstable.
+ */
+veda_context_t *veda_get_context(void);
+void veda_init_context(veda_context_t *v);
+void veda_reset_global_context(void);
+
+const char *veda_hypothesis_name(veda_hypothesis_t h);
+veda_hypothesis_t veda_hypothesis_from_string(const char *s);
+void veda_set_hypothesis(veda_hypothesis_t h);
+void veda_set_debug(int debug);
+void veda_set_cps_key16(const uint8_t key16[VEDA_CPS_KEY16_BYTES]);
+
+/* MS-only collector API. */
+void veda_ms_reset(veda_context_t *v);
+void veda_ms_collect_vlc(const uint8_t *raw, int len, int crc_ok, int fec_err);
+void veda_ms_collect_emb(const uint8_t *raw, int len, int crc_ok, int fec_err);
+void veda_ms_collect_mi32(uint32_t mi32, const char *source);
+void veda_ms_collect_ids(uint32_t id_a, uint32_t id_b);
+void veda_ms_set_position(uint32_t superframe, uint32_t burst_index, uint32_t seq);
+
+/* Main hook for dmr_ms.c, called before processMbeFrame().
+ * opts/state are void* intentionally: veda.h must not depend on dsd.h because
+ * current dsd.h uses anonymous typedef structs for dsd_opts/dsd_state.
+ * For collect mode this must not modify AMBE frames.
+ */
+int veda_ms_on_voice_triplet(
+    void *opts,
+    void *state,
+    int slot,
+    char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
+    char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
+    char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS]
+);
+
+int veda_hypothesis_run_ms(
+    void *opts,
+    void *state,
+    int slot,
+    char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
+    char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
+    char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS]
+);
+
+/* Firmware-like model function prototypes.
+ * These mirror names/layers found in the firmware pseudocode. Some are still
+ * skeletons and intentionally return VEDA_RC_NOT_IMPLEMENTED until ASM/dataflow
+ * proof is available.
+ */
+int veda_kx_init_context_model(veda_context_t *v);
+int veda_kx_npsk1_initiator_model(veda_context_t *v);
+int veda_kx_npsk1_responder_model(veda_context_t *v);
+int veda_kx_split_model(veda_context_t *v, veda_kx_split_result_t *out);
+
+int veda_stream_init_model(
+    veda_stream_ctx_t *ctx,
+    const uint8_t *key32,
+    const uint8_t *seed8,
+    uint32_t tweak0,
+    uint32_t tweak1,
+    veda_key32_source_t key32_source
+);
+
+int veda_stream256_init_model(
+    veda_stream_ctx_t *ctx,
+    const uint8_t *seed8,
+    const uint8_t *key32
+);
+
+int veda_stream256_apply_tweak64_model(
+    veda_stream_ctx_t *ctx,
+    uint32_t tweak0,
+    uint32_t tweak1
+);
+
+int veda_stream_cfb128_crypt_model(
+    veda_stream_ctx_t *ctx,
+    uint8_t *buf,
+    size_t len
+);
+
+int veda_key_primary_material_init_model(veda_case8_proof_t *case8);
+int veda_case8_build_key32_candidate_model(veda_case8_proof_t *case8);
+int veda_case8_build_tweak64_candidate_model(veda_case8_proof_t *case8);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* VEDA_H */

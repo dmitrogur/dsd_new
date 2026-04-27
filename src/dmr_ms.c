@@ -9,33 +9,23 @@
 #include "dmr_const.h"
 #include "avr_kv.h"
 #include "dsd_veda.h"
+// #include "veda.h"
 #include <string.h>
+#include <stdlib.h>
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
 
-static void dmr_ms_unpack_cach_bits_from_dibits(const char *cach_dibits,
-                                                uint8_t cach_bits[25])
-{
-  static const int cach_interleave[24] = {
-    0, 7, 8, 9, 1, 10,
-    11, 12, 2, 13, 14, 15,
-    3, 16, 4, 17, 18, 19,
-    5, 20, 21, 22, 6, 23
-  };
+extern void veda_burst288_stream_write(uint8_t db, const uint8_t raw36[36]);
 
+static void log_ms_voic_288(int vc, const uint8_t raw36[36])
+{
   int i;
 
-  memset(cach_bits, 0, 25);
-
-  if (cach_dibits == NULL)
-    return;
-
-  for (i = 0; i < 12; i++)
-  {
-    uint8_t dibit = (uint8_t)cach_dibits[i] & 0x03;
-    cach_bits[cach_interleave[(i * 2) + 0]] = (uint8_t)((dibit >> 1) & 0x01);
-    cach_bits[cach_interleave[(i * 2) + 1]] = (uint8_t)(dibit & 0x01);
-  }
+  fprintf(stderr, "\n[%d] [MS VOIC_288] db=0xEB ", vc);
+  for (i = 0; i < 36; i++)
+    fprintf(stderr, "%02X", raw36[i]);
+  fprintf(stderr, "\n");
 }
+
 
 //A subroutine for processing MS voice
 void dmrMS (dsd_opts * opts, dsd_state * state)
@@ -559,7 +549,10 @@ if (opts->isVEDA) {
         if (dibit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
         if (dibit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
     }
-    
+    if (opts->veda_debug) {
+      log_ms_voic_288(vc, raw_36);
+      veda_burst288_stream_write(0xEB, raw_36);      
+    }
     // Накапливаем первые 64 байта в начале сессии
     int slot = state->currentslot & 1;
     if (state->veda_kx_pos[slot] < 64) {
@@ -630,6 +623,13 @@ if (opts->isVEDA) {
   //collect the mi fragment
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, vc, m1, m2, m3);
+
+if (opts->isVEDA) {
+    veda_ms_on_voice_triplet(
+        opts, state, 0,
+        ambe_fr, ambe_fr2, ambe_fr3
+    );
+}
 
 if (opts->isVEDA && !veda_voice_done)
 {
@@ -900,7 +900,6 @@ if (opts->run_scout)
   }
 }
 */
-
 if (opts->isVEDA) {
       uint8_t raw_36[36]; 
       memset(raw_36, 0, 36);
@@ -910,7 +909,11 @@ if (opts->isVEDA) {
           if (d_bit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
           if (d_bit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
       }
-      
+      if (opts->veda_debug) {
+        log_ms_voic_288(1, raw_36);
+        veda_burst288_stream_write(0xEB, raw_36);        
+      }
+        
       int slot = state->currentslot & 1;
       if (state->veda_kx_pos[slot] < 64) {
           int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
@@ -1090,12 +1093,21 @@ if (opts->isVEDA) {
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, 1, m1, m2, m3);
 
+if (opts->isVEDA) {
+    veda_ms_on_voice_triplet(
+        opts, state, 0,
+        ambe_fr, ambe_fr2, ambe_fr3
+    );
+}
+
 if (opts->isVEDA && !veda_voice_done)
 {
     veda_debug_voice_wait(opts, state, 0,
                           state->indx_SF,
                           state->total_sf[0]);
 }
+
+
 
   //errors due to skipping other slot
   // cach_err = dmr_cach (opts, state, cachdata);

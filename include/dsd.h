@@ -1515,6 +1515,7 @@ typedef struct
   uint16_t veda_raw_seq[2];
   veda_raw_evt_t veda_raw_evt[2][VEDA_RAW_MAX_EVTS];
 
+  // veda_context_t veda;
 } dsd_state;
 
 /*
