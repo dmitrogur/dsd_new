@@ -354,3 +354,45 @@ int veda_case8_build_tweak64_candidate_model(veda_case8_proof_t *case8)
     if (!case8->tweak_valid) return VEDA_RC_WAIT_IDA_PROOF;
     return VEDA_RC_OK;
 }
+
+void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur)
+{
+    veda_context_t *v = &g_veda_ctx;
+    int n;
+
+    if (!payload || payload_len == 0) return;
+
+    n = payload_len;
+    if (n > VEDA_MAX_FIELD_BYTES) n = VEDA_MAX_FIELD_BYTES;
+
+    if (source_type == VEDA_CAND_VLC01) {
+        memcpy(v->ms.vlc_raw, payload, n);
+        v->ms.vlc_len = n;
+        v->ms.vlc_valid = 1;
+    } else if (source_type == VEDA_CAND_VC_EMB) {
+        memcpy(v->ms.emb_raw, payload, n);
+        v->ms.emb_len = n;
+        v->ms.emb_valid = 1;
+    }
+
+    v->ms.superframe = (uint32_t)sf_cur;
+
+    if (v->debug) {
+        fprintf(stderr, "[VEDA2 CAND] src=%u sf=%d len=%d raw=", source_type, sf_cur, n);
+        for (int i = 0; i < n; i++) fprintf(stderr, "%02X", payload[i]);
+        fprintf(stderr, "\n");
+    }
+}
+
+void veda_ms_collect_kx64(const uint8_t *payload64)
+{
+    veda_context_t *v = &g_veda_ctx;
+
+    if (!payload64) return;
+
+    if (v->debug) {
+        fprintf(stderr, "[VEDA2 KX64] raw=");
+        for (int i = 0; i < 64; i++) fprintf(stderr, "%02X", payload64[i]);
+        fprintf(stderr, "\n");
+    }
+}

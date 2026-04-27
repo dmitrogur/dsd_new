@@ -173,6 +173,8 @@ void veda_ms_collect_emb(const uint8_t *raw, int len, int crc_ok, int fec_err);
 void veda_ms_collect_mi32(uint32_t mi32, const char *source);
 void veda_ms_collect_ids(uint32_t id_a, uint32_t id_b);
 void veda_ms_set_position(uint32_t superframe, uint32_t burst_index, uint32_t seq);
+void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur);
+void veda_ms_collect_kx64(const uint8_t *payload64);
 
 /* Main hook for dmr_ms.c, called before processMbeFrame().
  * opts/state are void* intentionally: veda.h must not depend on dsd.h because

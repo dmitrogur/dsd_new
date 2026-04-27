@@ -1,4 +1,5 @@
 #include "dsd_veda.h"
+#include "veda.h"
 
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
 static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
@@ -77,7 +78,8 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload_64
 
     // 2. Генерируем статику (как в IDA)
     hydro_kx_keygen_deterministic(&static_kp, primary_material);
-
+    
+    veda_ms_collect_kx64(payload_64_bytes);
     // 3. Вызываем правильный протокол: KK или XX (в Hydrogen нет прямого эквивалента Npsk0, 
     // но hydro_kx_xx_2 или hydro_kx_kk_2 с нужными параметрами делают то же самое. 
     // В идеале нам нужно вызвать именно ту функцию, которую расписал твой спец:
@@ -724,6 +726,8 @@ void veda_note_candidate(dsd_opts *opts,
 
     cand->seq_in_session = state->veda_candidate_seq[slot];
     memcpy(cand->raw_payload, payload, n);
+
+    veda_ms_collect_candidate(source_type, payload, n, sf_cur);
 
     /* запоминаем опорные объекты начала сеанса */
     if (source_type == VEDA_CAND_MBC05 && !state->veda_ref_mbc[slot].valid)
