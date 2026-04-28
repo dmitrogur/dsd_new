@@ -72,7 +72,7 @@ void anytone_bp_keystream_creation(dsd_state * state, char * input)
 
 }
 
-void straight_mod_xor_keystream_creation(dsd_state * state, char * input)
+void straight_mod_xor_keystream_creation2(dsd_state * state, char * input)
 {
   uint16_t len = 0;
   char * curr;
@@ -123,4 +123,58 @@ void straight_mod_xor_keystream_creation(dsd_state * state, char * input)
   if (curr == NULL)
     fprintf (stderr, "Straight KS String Malformed! No KS Created!\n");
 
+}
+
+// void forced_alg26_keystream(dsd_state * state, char * input) {
+void straight_mod_xor_keystream_creation(dsd_state * state, char * input)
+{
+    uint16_t len = 0;
+    char * curr;
+    
+    // Парсим только длину и ключ, ALG_ID игнорируем - всегда используем 0x26
+    curr = strtok(input, ":");
+    if (curr != NULL) {
+        sscanf(curr, "%hd", &len);
+    } else {
+        fprintf(stderr, "Error: Missing length parameter!\n");
+        return;
+    }
+    
+    // Пропускаем ALG_ID (второй параметр)
+    curr = strtok(NULL, ":");
+    
+    // Парсим ключ
+    curr = strtok(NULL, ":");
+    if (curr == NULL) {
+        fprintf(stderr, "Error: Missing key parameter!\n");
+        return;
+    }
+    
+    // Ограничение длины как в оригинальной функции
+    if (len > 882) len = 882;
+    
+    // Преобразование ключа
+    uint8_t ks_bytes[112];
+    uint8_t ks_bits[896];
+    memset(ks_bytes, 0, sizeof(ks_bytes));
+    memset(ks_bits, 0, sizeof(ks_bits));
+    
+    uint16_t unpack_len = (len + 7) / 8;
+    parse_raw_user_string(curr, ks_bytes);
+    unpack_byte_array_into_bit_array(ks_bytes, ks_bits, unpack_len);
+    
+    // Загрузка ключевого потока
+    for (uint16_t i = 0; i < len; i++) {
+        state->static_ks_bits[0][i] = ks_bits[i];
+        state->static_ks_bits[1][i] = ks_bits[i];
+    }
+    
+    state->straight_ks = 1;
+    state->straight_mod = (int)len;
+    
+    fprintf(stderr, "FORCED ALG_ID 0x26 Keystream: %d bits - ", len);
+    for (uint16_t i = 0; i < unpack_len; i++) {
+        fprintf(stderr, "%02X", ks_bytes[i]);
+    }
+    fprintf(stderr, "\n");
 }

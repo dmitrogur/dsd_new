@@ -130,13 +130,11 @@ void ncursesMenu (dsd_opts * opts, dsd_state * state)
     closePulseOutput (opts);
   }
 
-  #ifndef __APPLE__
   //close OSS output
   if (opts->audio_out_type == 2 || opts->audio_out_type == 5)
   {
     close (opts->audio_out_fd);
   }
-  #endif
 
   if (opts->audio_in_type == 0) //close pulse input if it is the specified input method
   {
@@ -1417,6 +1415,7 @@ void ncursesMenu (dsd_opts * opts, dsd_state * state)
         opts->inverted_dpmr = 1;
         opts->inverted_x2tdma = 1;
         opts->inverted_ysf = 1;
+        opts->inverted_m17 = 1;
       }
       else
       {
@@ -1424,6 +1423,7 @@ void ncursesMenu (dsd_opts * opts, dsd_state * state)
         opts->inverted_dpmr = 0;
         opts->inverted_x2tdma = 0;
         opts->inverted_ysf = 0;
+        opts->inverted_m17 = 0;
       }
 
     }
@@ -1587,12 +1587,10 @@ void ncursesMenu (dsd_opts * opts, dsd_state * state)
     openPulseOutput (opts);
   }
 
-  #ifndef __APPLE__
   if (opts->audio_out_type == 2 || opts->audio_out_type == 5)
   {
     openOSSOutput (opts);
   }
-  #endif
 
 
   if (opts->audio_in_type == 0) //reopen pulse input if it is the specified input method

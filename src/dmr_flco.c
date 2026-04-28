@@ -2,14 +2,251 @@
  * dmr_flco.c
  * DMR Full Link Control, Short Link Control, TACT/CACH and related funtions
  *
- * Portions of link control/voice burst/vlc/tlc from LouisErigHerve
- * Source: https://github.com/LouisErigHerve/dsd/blob/master/src/dmr_sync.c
- *
- * LWVMOBILE
- * 2022-12 DSD-FME Florida Man Edition
+ * DMH/IPP
  *-----------------------------------------------------------------------------*/
 
 #include "dsd.h"
+#include "avr_kv.h"
+#include "dsd_veda.h"
+
+static uint8_t dmr_cach_frag_mask[2] = {0, 0};
+
+static void veda_note_f9_lc(dsd_opts *opts, dsd_state *state, int slot,
+                            uint8_t type, const uint8_t lc_bytes[9],
+                            uint8_t flco, uint8_t fid, uint8_t so)
+{
+  int pos;
+  int i, j;
+
+  if (!opts || !state || !lc_bytes)
+    return;
+
+  if (!opts->isVEDA)
+    return;
+
+  if (slot < 0 || slot > 1)
+    return;
+
+  pos = state->veda_f9_lc_count[slot];
+
+  if (pos >= 4)
+  {
+    for (i = 1; i < 4; i++)
+    {
+      memcpy(state->veda_f9_lc_bytes[slot][i - 1],
+             state->veda_f9_lc_bytes[slot][i], 9);
+      state->veda_f9_lc_type[slot][i - 1] =
+          state->veda_f9_lc_type[slot][i];
+    }
+    pos = 3;
+  }
+
+  memcpy(state->veda_f9_lc_bytes[slot][pos], lc_bytes, 9);
+  state->veda_f9_lc_type[slot][pos] = type;
+
+  if (state->veda_f9_lc_count[slot] < 4)
+    state->veda_f9_lc_count[slot]++;
+
+  if (opts->veda_debug)
+  {
+    fprintf(stderr,
+            "\n[VEDA F9] slot=%d idx=%d type=%u flco=%02X fid=%02X so=%02X bytes=",
+            slot + 1, pos, type, flco, fid, so);
+
+    for (i = 0; i < 9; i++)
+      fprintf(stderr, "%02X", lc_bytes[i]);
+
+    fprintf(stderr, "\n[VEDA F9 SEQ] slot=%d count=%u",
+            slot + 1, state->veda_f9_lc_count[slot]);
+
+    for (i = 0; i < state->veda_f9_lc_count[slot]; i++)
+    {
+      fprintf(stderr, "\n  [%d] type=%u ", i,
+              state->veda_f9_lc_type[slot][i]);
+
+      for (j = 0; j < 9; j++)
+        fprintf(stderr, "%02X",
+                state->veda_f9_lc_bytes[slot][i][j]);
+    }
+
+    fprintf(stderr, "\n");
+  }
+}
+
+static void veda_trace_bad_lc_candidate(dsd_opts *opts, dsd_state *state,
+                                        int slot, const uint8_t *lc_bits,
+                                        uint8_t lc_type,
+                                        uint32_t crc_ok,
+                                        uint32_t irrecoverable_errors)
+{
+  uint8_t lc_bytes[9];
+  uint16_t w2, w4, w6;
+  int i;
+
+  if (!opts || !state || !lc_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  if (slot < 0 || slot > 1)
+    return;
+
+  /* интересуют только LC/EMB, которые НЕ прошли clean-path */
+  if (crc_ok == 1 && irrecoverable_errors == 0)
+    return;
+
+  /* только VLC/TLC/EMB */
+  if (lc_type != 1 && lc_type != 2 && lc_type != 3)
+    return;
+
+  for (i = 0; i < 9; i++)
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+
+  w2 = (uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8);
+  w4 = (uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8);
+  w6 = (uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8);
+
+  fprintf(stderr,
+          "\n[VEDA LCDROP] slot=%d type=%u crc=%u irr=%u "
+          "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
+          slot + 1,
+          (unsigned)lc_type,
+          (unsigned)crc_ok,
+          (unsigned)irrecoverable_errors,
+          (unsigned)lc_bytes[0],
+          (unsigned)lc_bytes[1],
+          (unsigned)w2,
+          (unsigned)w4,
+          (unsigned)w6);          
+
+  for (i = 0; i < 9; i++)
+    fprintf(stderr, "%02X", lc_bytes[i]);
+
+  fprintf(stderr, "\n");
+  
+}
+
+static void veda_trace_cach_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *cach_bits,
+                                  uint8_t tact_valid,
+                                  uint8_t at,
+                                  uint8_t slot_hint,
+                                  uint8_t lcss,
+                                  int sf_cur)
+{
+  uint8_t raw[4] = {0, 0, 0, 0};
+  int i;
+
+  if (!opts || !state || !cach_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  for (i = 0; i < 3; i++)
+    raw[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[i * 8], 8);
+
+  raw[3] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[24], 1);
+
+  fprintf(stderr,
+          "\n[VEDA CACH] sf=%d tact=%u at=%u slot=%u lcss=%u raw=%02X%02X%02X%01X\n",
+          sf_cur,
+          (unsigned)tact_valid,
+          (unsigned)at,
+          (unsigned)((slot_hint < 2) ? (slot_hint + 1) : 0),
+          (unsigned)lcss,
+          (unsigned)raw[0],
+          (unsigned)raw[1],
+          (unsigned)raw[2],
+          (unsigned)raw[3]);
+}
+
+static void veda_trace_slco_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *slco_raw_bits,
+                                  const uint8_t *slco_bits,
+                                  uint8_t h1, uint8_t h2, uint8_t h3, uint8_t crc,
+                                  int sf_cur)
+{
+  uint8_t raw[9] = {0};
+  uint8_t di[9] = {0};
+  uint8_t slco_bytes[6] = {0};
+  uint8_t slco = 0;
+  int i;
+
+  if (!opts || !state || !slco_raw_bits || !slco_bits)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  for (i = 0; i < 8; i++)
+  {
+    raw[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_raw_bits[i * 8], 8);
+    di[i]  = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[i * 8], 8);
+  }
+
+  raw[8] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_raw_bits[64], 4);
+  di[8]  = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[64], 4);
+
+  for (i = 0; i < 5; i++)
+    slco_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[i * 8], 8);
+
+  slco_bytes[5] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[32], 4);
+  slco = (uint8_t)ConvertBitIntoBytes((uint8_t *)&slco_bits[0], 4);
+
+  fprintf(stderr,
+          "\n[VEDA SLCO RAW] sf=%d h1=%u h2=%u h3=%u crc=%u slco=%X "
+          "raw=%02X%02X%02X%02X%02X%02X%02X%02X%01X "
+          "di=%02X%02X%02X%02X%02X%02X%02X%02X%01X "
+          "slc=%02X%02X%02X%02X%02X%01X\n",
+          sf_cur,
+          (unsigned)h1, (unsigned)h2, (unsigned)h3, (unsigned)crc,
+          (unsigned)slco,
+          (unsigned)raw[0], (unsigned)raw[1], (unsigned)raw[2], (unsigned)raw[3],
+          (unsigned)raw[4], (unsigned)raw[5], (unsigned)raw[6], (unsigned)raw[7], (unsigned)raw[8],
+          (unsigned)di[0], (unsigned)di[1], (unsigned)di[2], (unsigned)di[3],
+          (unsigned)di[4], (unsigned)di[5], (unsigned)di[6], (unsigned)di[7], (unsigned)di[8],
+          (unsigned)slco_bytes[0], (unsigned)slco_bytes[1], (unsigned)slco_bytes[2],
+          (unsigned)slco_bytes[3], (unsigned)slco_bytes[4], (unsigned)slco_bytes[5]);
+}
+
+static void veda_try_handle_lc_header(dsd_opts *opts, dsd_state *state,
+                                      int slot, const uint8_t *lc_bits,
+                                      uint8_t lc_type,
+                                      uint32_t crc_ok,
+                                      uint32_t irrecoverable_errors)
+{
+  uint8_t lc_bytes[8];
+  veda_air_header_t hdr;
+  int i;
+
+  if (!opts || !state || !lc_bits)
+    return;
+
+  if (!opts->isVEDA)
+    return;
+
+  if (irrecoverable_errors != 0 || crc_ok != 1)
+    return;
+
+  /* Пока даём второй вход только из VLC/TLC */
+  if (lc_type != 1 && lc_type != 2)
+    return;
+
+  for (i = 0; i < 8; i++)
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+
+  hdr.b0 = lc_bytes[0];
+  hdr.b1 = lc_bytes[1];
+  hdr.w2 = (uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8);
+  hdr.w4 = (uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8);
+  hdr.w6 = (uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8);
+
+  (void)veda_try_handle_header(opts, state, slot, &hdr,
+                               (lc_type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC);
+}
+
 
 //combined flco handler (vlc, tlc, emb), minus the superfluous structs and strings
 void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t CRCCorrect, uint32_t * IrrecoverableErrors, uint8_t type)
@@ -18,7 +255,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 
   //force slot to 0 if using dmr mono handling
   if (opts->dmr_mono == 1) state->currentslot = 0;
-
+  //IPP
+  uint8_t slot = state->currentslot;
+  if (slot < 2) state->flco_fec_err[slot] = 0;
   uint8_t pf = 0;
   uint8_t reserved = 0;
   uint8_t flco = 0;
@@ -31,6 +270,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   int is_cap_plus = 0;
   int is_alias = 0;
   int is_gps = 0;
+  char ipp_buf[256];//IPP
   UNUSED(capsite);
 
   //XPT 'Things'
@@ -45,7 +285,6 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   uint8_t tg_hash = 0; //value of the hashed TG
   UNUSED3(xpt_res_a, xpt_res_b, xpt_res_c);
 
-  uint8_t slot = state->currentslot;
   uint8_t unk = 0; //flag for unknown FLCO + FID combo
 
   pf = (uint8_t)(lc_bits[0]); //Protect Flag -- Hytera XPT uses this to signify which TS the PDU is on
@@ -55,6 +294,146 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   so = (uint8_t)ConvertBitIntoBytes(&lc_bits[16], 8); //Service Options
   target = (uint32_t)ConvertBitIntoBytes(&lc_bits[24], 24); //Target or Talk Group
   source = (uint32_t)ConvertBitIntoBytes(&lc_bits[48], 24);
+  
+    if (opts->isVEDA)
+  {
+    veda_trace_bad_lc_candidate(opts, state, slot, lc_bits, type,
+                                CRCCorrect, *IrrecoverableErrors);
+  }
+
+  if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
+  {
+  uint8_t lc_bytes[9];
+  int i;
+
+  for (i = 0; i < 9; i++) {
+    lc_bytes[i] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&lc_bits[i * 8], 8);
+  }
+  if (opts->veda_debug && type == 3)
+  {
+      fprintf(stderr,
+            "\n[VEDA EMB8] slot=%d b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X\n",
+            slot + 1,
+            (unsigned)lc_bytes[0],
+            (unsigned)lc_bytes[1],
+            (unsigned)((uint16_t)lc_bytes[2] | ((uint16_t)lc_bytes[3] << 8)),
+            (unsigned)((uint16_t)lc_bytes[4] | ((uint16_t)lc_bytes[5] << 8)),
+            (unsigned)((uint16_t)lc_bytes[6] | ((uint16_t)lc_bytes[7] << 8)));
+  }
+
+  /* стандартный DMR-разбор уже в target/source */
+
+  /* альтернативные кандидаты из сырых байт */
+  /*
+  uint32_t alt_tgt_be_24 = 0;
+  uint32_t alt_src_be_24 = 0;
+  uint32_t alt_tgt_le_24 = 0;
+  uint32_t alt_src_le_24 = 0;
+
+  alt_tgt_be_24 = ((uint32_t)lc_bytes[3] << 16) |
+                  ((uint32_t)lc_bytes[4] << 8)  |
+                  ((uint32_t)lc_bytes[5]);
+
+  alt_src_be_24 = ((uint32_t)lc_bytes[6] << 16) |
+                  ((uint32_t)lc_bytes[7] << 8)  |
+                  ((uint32_t)lc_bytes[8]);
+
+  alt_tgt_le_24 = ((uint32_t)lc_bytes[5] << 16) |
+                  ((uint32_t)lc_bytes[4] << 8)  |
+                  ((uint32_t)lc_bytes[3]);
+
+  alt_src_le_24 = ((uint32_t)lc_bytes[8] << 16) |
+                  ((uint32_t)lc_bytes[7] << 8)  |
+                  ((uint32_t)lc_bytes[6]);
+  
+  fprintf(stderr,
+    "\nVEDA LC RAW slot=%d type=%u flco=%02X fid=%02X so=%02X "
+    "b=[%02X %02X %02X %02X %02X %02X %02X %02X %02X] "
+    "std_tgt=%u std_src=%u "
+    "be_tgt24=%u be_src24=%u "
+    "le_tgt24=%u le_src24=%u\n",
+    slot + 1, type, flco, fid, so,
+    lc_bytes[0], lc_bytes[1], lc_bytes[2], lc_bytes[3], lc_bytes[4],
+    lc_bytes[5], lc_bytes[6], lc_bytes[7], lc_bytes[8],
+    target, source,
+    alt_tgt_be_24, alt_src_be_24,
+    alt_tgt_le_24, alt_src_le_24);
+  */  
+
+  if (opts->isVEDA && (type == 1 || type == 2 || type == 3))
+  {
+      uint8_t raw_kind = VEDA_RAW_NONE;
+
+      if (type == 1) raw_kind = VEDA_RAW_VLC;
+      else if (type == 2) raw_kind = VEDA_RAW_TLC;
+      else if (type == 3) raw_kind = VEDA_RAW_EMB;
+
+      veda_raw_log_lc(opts, state, slot,
+                      raw_kind,
+                      lc_bytes, 9,
+                      (uint8_t)CRCCorrect,
+                      (uint8_t)(*IrrecoverableErrors),
+                      flco, fid, so,
+                      state->indx_SF);
+  }    
+
+if (type == 1)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_VLC01,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
+else if (type == 2 && fid == 0xF9)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_TLC_F9,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
+else if (type == 2)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_TLC02,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
+else if (type == 3)
+{
+    veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_VC_EMB,
+                        lc_bytes,
+                        9,
+                        state->indx_SF);
+}
+
+  if (opts->isVEDA && *IrrecoverableErrors == 0 && CRCCorrect == 1)
+  {
+    if (fid == 0xF9)
+    {
+      veda_note_f9_lc(opts, state, slot, type, lc_bytes, flco, fid, so);
+    }
+  }
+
+  }
+
+
+  if (opts->run_scout) {
+    if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
+      avr_scout_on_lc_update(state, state->currentslot, target, source);
+    }
+  }  
 
   //Kenwood w/ Scrambler Application on DMR (disable this if clash with other link control, its obscure)
   uint8_t is_kenwood_sc = 0;
@@ -72,20 +451,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       so ^= 0x40;
   }
 
-  //Kirisun
-  if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && fid == 0x0A) //&& (so & 0x40) == 0x40
-  {
-      //disable late entry for DMRA, Flag 3 if encrypted, 0 if not
-      if (so & 0x40)
-        opts->dmr_le = 3;
-      else opts->dmr_le = 0;
-  }
-
   //read ahead a little to get this for the xpt flag
   if (*IrrecoverableErrors == 0 && flco == 0x09 && fid == 0x68)
   {
     sprintf (state->dmr_branding, "%s", "  Hytera");
     sprintf (state->dmr_branding_sub, "XPT ");
+    ippl_adds("flco_info", "Hytera XPT"); //IPP
   }
 
   //bug fix for Hytera Enhanced link control (go by the checksum in the message)
@@ -108,6 +479,10 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     if (type == 3) fprintf (stderr, "%s", KRED);
     fprintf (stderr, " SLOT %d", state->currentslot+1);
     fprintf (stderr, " Protected LC ");
+    //IPP
+    sprintf (ipp_buf, "Protected LC slt =%u", state->currentslot+1); 
+    ippl_adds("flco_info", ipp_buf);
+
     goto END_FLCO;
   }
 
@@ -172,6 +547,10 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       if (type == 3) fprintf (stderr, "%s", KCYN);
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Motorola");
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Motorola");
+
+      ippl_adds("flco_info", "Motorola");//IPP
       unk = 1;
       goto END_FLCO;
     }
@@ -183,6 +562,8 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Data Terminator (TD_LC) ");
       fprintf (stderr, "%s", KNRM);
+
+      ippl_adds("flco_info", "TD_LC");//IPP
 
       //reset data header format storage
       state->data_header_format[slot] = 7;
@@ -212,6 +593,11 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       if (type == 3) fprintf (stderr, "%s", KCYN);
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Tait");
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Tait");
+        
+      ippl_adds("flco_info", "Tait");//IPP
+
       unk = 1;
       goto END_FLCO;
     }
@@ -226,6 +612,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     {
       target = (uint32_t)ConvertBitIntoBytes(&lc_bits[32], 16); //16-bit allocation
       source = (uint32_t)ConvertBitIntoBytes(&lc_bits[56], 16); //16-bit allocation
+      
+      if (opts->run_scout) {
+        if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
+          avr_scout_on_lc_update(state, state->currentslot, target, source);
+        }  
+      }
 
       //the crc8 hash is the value represented in the CSBK when dealing with private calls
       for (int i = 0; i < 16; i++) target_hash[i] = lc_bits[32+i];
@@ -243,6 +635,14 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 
       target = (uint32_t)ConvertBitIntoBytes(&lc_bits[32], 16); //16-bit allocation
       source = (uint32_t)ConvertBitIntoBytes(&lc_bits[56], 16); //16-bit allocation
+      
+
+      if (opts->run_scout) {
+        // Передавать LC в Scout только если FEC/CRC норм и значения вменяемые
+        if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
+          avr_scout_on_lc_update(state, state->currentslot, target, source);
+        }  
+      }
 
       //the bits that are left behind
       xpt_res_a = (uint8_t)ConvertBitIntoBytes(&lc_bits[20], 4); //after the xpt_int channel, before the free repeater channel -- call being established = 7; call connected = 0; ??
@@ -256,17 +656,33 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, " SLOT %d ", state->currentslot+1);
       if (opts->payload == 1) fprintf(stderr, "FLCO=0x%02X FID=0x%02X ", flco, fid);
       fprintf (stderr, "TGT=%u SRC=%u ", target, source);
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Hytera");
 
       fprintf (stderr, "Hytera XPT ");
+      //IPP
+      ippl_addu("kTGT", target); 
+      ippl_addu("kSRC", source);
+      ippl_adds("flco_info", "Hytera XPT");
+      
 
       //Group ID ranges from 1 to 240; emergency group call ID ranges from 250 to 254; all call ID is 255.
       if (reserved == 1)
       {
         fprintf (stderr, "Group "); //according to observation
-        if (target > 248 && target < 255) fprintf (stderr, "Emergency ");
-        if (target == 255) fprintf (stderr, "All ");
+        if (target > 248 && target < 255){
+           fprintf (stderr, "Emergency ");
+           ippl_adds("kCall", "Emergency");//IPP
+        }
+        if (target == 255) {
+          fprintf (stderr, "All ");
+          ippl_adds("kCall", "All"); //IPP
+        };
       }
-      else fprintf (stderr, "Private "); //according to observation
+      else {
+        fprintf (stderr, "Private "); //according to observation
+        ippl_adds("kCall", "Private");
+      }
       fprintf (stderr, "Call Alert "); //Alert or Grant
 
       //reorganized all the 'extra' data to a second line and added extra verbosity
@@ -306,6 +722,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       goto END_FLCO;
     }
 
+
     //Hytera XPT 'Others' -- moved the patent opcodes here as well for now
     if ( fid == 0x68 && (flco == 0x13 || flco == 0x31 || flco == 0x2E || flco == 0x2F) )
     {
@@ -314,19 +731,24 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       if (type == 3) fprintf (stderr, "%s", KCYN);
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Hytera ");
+      ippl_adds("flco_info", "Hytera");//IPP
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Hytera");
       unk = 1;
       goto END_FLCO;
     }
 
     //unknown other manufacturer or OTA ENC, etc.
-    //removed tait from the list, added hytera 0x08, added Kirisun and KW Scrambler LC
-    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && fid != 0x0A && is_kenwood_sc == 0)
+    //removed tait from the list, added hytera 0x08
+    // if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && is_kenwood_sc == 0)
+    if (fid != 0 && fid != 0x68 && fid != 0x10 && fid != 0x08 && fid != 0xF9 && is_kenwood_sc == 0)    
     {
       if (type == 1) fprintf (stderr, "%s \n", KYEL);
       if (type == 2) fprintf (stderr, "%s \n", KYEL);
       if (type == 3) fprintf (stderr, "%s", KYEL);
       fprintf (stderr, " SLOT %d", state->currentslot+1);
       fprintf (stderr, " Unknown LC ");
+      ippl_adds("flco_info", "Unknown LC");//IPP
       unk = 1;
       goto END_FLCO;
     }
@@ -343,6 +765,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, " Slot %d Alg: %02X; KEY ID: %02X; MI(40): %010llX;", slot+1, alg, key, mi);
       fprintf (stderr, " Hytera Enhanced; ");
+      ippl_adds("flco_info", "Hytera Enhanced");//IPP
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Hytera");
 
       if (slot == 0 && state->R != 0)
         fprintf (stderr, "Key: %010llX; ", state->R);
@@ -497,6 +922,38 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 
     fprintf (stderr, " SLOT %d ", state->currentslot+1);
     fprintf(stderr, "TGT=%u SRC=%u ", target, source);
+
+      if (opts->run_scout) {
+        // avr_scout_on_lc_update(state, state->currentslot, target, source);
+        // Передавать LC в Scout только если FEC/CRC норм и значения вменяемые
+        if (*IrrecoverableErrors == 0 && CRCCorrect == 1 && target != 0 && source != 0) {    
+          avr_scout_on_lc_update(state, state->currentslot, target, source);
+        }  
+      };
+
+    if (opts->isVEDA && target && source)
+    {
+      uint8_t src_kind = (type == 2) ? VEDA_HDRSRC_TLC : VEDA_HDRSRC_VLC;
+      veda_note_raw_src_tgt_ex(state, slot, source, target, src_kind);
+    }
+
+    veda_try_handle_lc_header(opts, state, slot, lc_bits, type, CRCCorrect, *IrrecoverableErrors);
+  
+if (opts->isVEDA && opts->veda_debug)
+{
+    int sf_cur = state->indx_SF;
+    int sf_total = (slot >= 0 && slot < 2) ? state->total_sf[slot] : 0;
+
+    if (type == 1)
+        veda_trace_baseline(opts, state, slot, "VLC", sf_cur, sf_total);
+    else if (type == 2 && fid == 0xF9)
+        veda_trace_baseline(opts, state, slot, "TLC-F9", sf_cur, sf_total);
+    else if (type == 2)
+        veda_trace_baseline(opts, state, slot, "TLC", sf_cur, sf_total);
+}    
+    //IPP
+    ippl_addu("kTGT", target); 
+    ippl_addu("kSRC", source);
     if (opts->payload == 1 && is_xpt == 1 && flco == 0x3) fprintf(stderr, "HASH=%d ", tg_hash);
     if (opts->payload == 1) fprintf(stderr, "FLCO=0x%02X FID=0x%02X SVC=0x%02X ", flco, fid, so);
 
@@ -506,19 +963,31 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     //0x20 on the Embedded Voice Burst Sync seems to indicate a Moto (non-specific) Group Call in progress
     //its possible that both EMB FID 0x10 FLCO 0x20 and 0x23 are just Moto but non-specific (observed 0x20 on Tier 2)
 
-    if (fid == 0x68) sprintf (state->call_string[slot], " Hytera  ");
-
+    if (fid == 0xF9)
+    {
+      fprintf(stderr, "VEDA-F9  2");
+      ippl_adds("flco_info", "VEDA-F9");
+    }
+    else if (fid == 0x68) {
+      sprintf (state->call_string[slot], " Hytera  ");
+      ippl_adds("flco_info", "Hytera");//IPP   
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Hytera");
+    }  
     else if (flco == 0x4 || flco == 0x5 || flco == 0x7 || flco == 0x23) //Cap+ Things
     {
       // sprintf (state->call_string[slot], " Cap+");
       sprintf (state->call_string[slot], "%s","");
       fprintf (stderr, "Cap+ ");
+      ippl_adds("flco_info", "Cap+");//IPP
+
       if (flco == 0x4)
       {
         // strcat (state->call_string[slot], " Grp");
         sprintf (state->call_string[slot], "   Group ");
         fprintf (stderr, "Group ");
         state->gi[slot] = 0;
+        ippl_adds("kCall", "Group");//IPP
       }
       else
       {
@@ -526,6 +995,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
         sprintf (state->call_string[slot], " Private ");
         fprintf (stderr, "Private ");
         state->gi[slot] = 1;
+        ippl_adds("kCall", "Private");//IPP
       }
     }
     else if (flco == 0x3) //UU_V_Ch_Usr
@@ -533,12 +1003,14 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       sprintf (state->call_string[slot], " Private ");
       fprintf (stderr, "Private ");
       state->gi[slot] = 1;
+      ippl_adds("kCall", "Private");//IPP
     }
     else //Grp_V_Ch_Usr -- still valid on hytera VLC
     {
       sprintf (state->call_string[slot], "   Group ");
       fprintf (stderr, "Group ");
       state->gi[slot] = 0;
+      ippl_adds("kCall", "Group");
     }
 
     if(so & 0x80)
@@ -546,6 +1018,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       strcat (state->call_string[slot], " Emergency  ");
       fprintf (stderr, "%s", KRED);
       fprintf(stderr, "Emergency ");
+      ippl_adds("kCall", "Emergency");//IPP
     }
     else strcat (state->call_string[slot], "            ");
 
@@ -555,6 +1028,8 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       // strcat (state->call_string[slot], " Encrypted");
       fprintf (stderr, "%s", KRED);
       fprintf(stderr, "Encrypted ");
+      ippl_add("kEncrypted", "1");//IPP
+
 
       //experimental TG LO/B if ENC trunked following disabled //DMR -- LO Trunked Enc Calls WIP; #121
       if (opts->p25_trunk == 1 && opts->trunk_tune_enc_calls == 0) //&& type != 2
@@ -614,24 +1089,29 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
         //REMUS! Uncomment Line Below if desired
         // strcat (state->call_string[slot], " TXI");
         fprintf(stderr, "TXI ");
+        // ippl_adds("flco_info", "TXI");//IPP
+
       }
       if ( (fid == 0x10) && (so & 0x10) ) //Motorola FID 0x10 Only
       {
         //REMUS! Uncomment Line Below if desired
         // strcat (state->call_string[slot], " RPT");
         fprintf(stderr, "RPT "); //Short way of saying the next SF's VC6 will be pre-empted/repeat frames for the TXI backwards channel
+        // ippl_adds("flco_info", "RPT");//IPP
       }
       if(so & 0x08)
       {
         //REMUS! Uncomment Line Below if desired
         // strcat (state->call_string[slot], "-BC   ");
         fprintf(stderr, "Broadcast ");
+        ippl_adds("flco_info", "Broadcast");//IPP
       }
       if(so & 0x04)
       {
         //REMUS! Uncomment Line Below if desired
         // strcat (state->call_string[slot], "-OVCM ");
         fprintf(stderr, "OVCM ");
+        ippl_adds("flco_info", "OVCM");//IPP
       }
       if(so & 0x03)
       {
@@ -640,45 +1120,66 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
           //REMUS! Uncomment Line Below if desired
           // strcat (state->call_string[slot], "-P1");
           fprintf(stderr, "Priority 1 ");
+          ippl_adds("flco_info", "Priority 1");//IPP
+          state->Priority1++;
         }
         else if((so & 0x03) == 0x02)
         {
           //REMUS! Uncomment Line Below if desired
           // strcat (state->call_string[slot], "-P2");
           fprintf(stderr, "Priority 2 ");
+          ippl_adds("flco_info", "Priority 2");//IPP
+          state->Priority2++;
+
         }
         else if((so & 0x03) == 0x03)
         {
           //REMUS! Uncomment Line Below if desired
           // strcat (state->call_string[slot], "-P3");
           fprintf(stderr, "Priority 3 ");
+          ippl_adds("flco_info", "Priority 3");//IPP
+          state->Priority3++;
         }
         else /* We should never go here */
         {
           //REMUS! Uncomment Line Below if desired
           // strcat (state->call_string[slot], "  ");
           fprintf(stderr, "No Priority ");
+          // ippl_adds("flco_info", "No Priority");//IPP
+
         }
       }
     }
 
     //should rework this back into the upper portion
-    if (fid == 0x0A) fprintf (stderr, "Kirisun ");
-    if (fid == 0x68) fprintf (stderr, "Hytera ");
-    if (is_xpt) fprintf (stderr, "XPT ");
+    if (fid == 0x68) {
+      if (state->dmr_branding[0])
+        sprintf (state->dmr_branding, "%s", "Hytera");
+      fprintf (stderr, "Hytera ");
+      ippl_adds("flco_info", "Hytera");//IPP
+    }  
+    if (is_xpt){
+       fprintf (stderr, "XPT ");
+       ippl_adds("flco_info", "XPT");//IPP
+    }   
     if (fid == 0x68 && flco == 0x00)
     {
       fprintf (stderr, "Group ");
       state->gi[slot] = 0;
+      ippl_adds("flco_info", "Group");//IPP
     }
     if (fid == 0x68 && flco == 0x03)
     {
       fprintf (stderr, "Private ");
       state->gi[slot] = 1;
+      ippl_adds("flco_info", "Private");//IPP
+      // veda_try_handle_lc_header(opts, state, slot, ...);
     }
 
-    if (is_kenwood_sc)
+    if (is_kenwood_sc) {
       fprintf(stderr, "Kenwood Scrambler ");
+      ippl_adds("flco_info", "Kenwood Scrambler");//IPP
+    }  
 
     fprintf(stderr, "Call ");
 
@@ -690,6 +1191,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       {
         fprintf (stderr, "%s ", KYEL);
         fprintf (stderr, "Rest LSN: %d", restchannel);
+        //IPP
+        sprintf (ipp_buf, "Rest LSN: %d", restchannel); 
+        ippl_adds("flco_info", ipp_buf);
       }
     }
 
@@ -703,6 +1207,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       {
         fprintf (stderr, "%s", KCYN);
         fprintf (stderr, "[%s] ", state->group_array[i].groupName);
+        //IPP
+        sprintf (ipp_buf, "[%s] ", state->group_array[i].groupName); 
+        ippl_adds("flco_info", ipp_buf);
         fprintf (stderr, "%s", KNRM);
       }
     }
@@ -715,6 +1222,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     {
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key %lld ", state->K);
+      //IPP
+      sprintf (ipp_buf, "Key %lld ", state->K);
+      ippl_adds("flco_info", ipp_buf);
       fprintf (stderr, "%s ", KNRM);
     }
 
@@ -722,6 +1232,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     {
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key %lld ", state->K);
+      //IPP
+      sprintf (ipp_buf, "Key %lld ", state->K);
+      ippl_adds("flco_info", ipp_buf);
       fprintf (stderr, "%s ", KNRM);
     }
 
@@ -730,6 +1243,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       if (state->K2 != 0) fprintf (stderr, "\n ");
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key %010llX ", state->K1);
+      // ippl_adds("flco_info", "KeyGRP");//IPP
       if (state->K2 != 0) fprintf (stderr, "%016llX ", state->K2);
       if (state->K4 != 0) fprintf (stderr, "%016llX %016llX", state->K3, state->K4);
       fprintf (stderr, "%s ", KNRM);
@@ -740,6 +1254,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       if (state->K2 != 0) fprintf (stderr, "\n ");
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key %010llX ", state->K1);
+      // ippl_adds("flco_info", "KeyGRP");//IPP
       if (state->K2 != 0) fprintf (stderr, "%016llX ", state->K2);
       if (state->K4 != 0) fprintf (stderr, "%016llX %016llX", state->K3, state->K4);
       fprintf (stderr, "%s ", KNRM);
@@ -749,6 +1264,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     {
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key %010llX ", state->R);
+      // ippl_adds("flco_info", "KeyGRP");//IPP
       fprintf (stderr, "%s ", KNRM);
     }
 
@@ -773,22 +1289,27 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
       fprintf (stderr, "%s ", KNRM);
     }
 
-    if (slot == 0 && (state->payload_algid == 0x25 || state->payload_algid == 0x24) && state->aes_key_loaded[0] == 1)
+    if (slot == 0 && (state->payload_algid == 0x25 || state->payload_algid == 0x24 || state->payload_algid == 0x23) && state->aes_key_loaded[0] == 1)
     {
       fprintf (stderr, "\n ");
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key: %016llX %016llX ", state->A1[0], state->A2[0]);
-      if (state->payload_algid == 0x25)
-        fprintf (stderr, "%016llX %016llX", state->A3[0], state->A4[0]);
+      if (state->payload_algid == 0x23)
+        fprintf (stderr, "%016llX", state->A3[0]);
+      else    
+        if (state->payload_algid == 0x25)
+          fprintf (stderr, "%016llX %016llX", state->A3[0], state->A4[0]);
       fprintf (stderr, "%s ", KNRM);
     }
 
-    if (slot == 1 && (state->payload_algidR == 0x25 || state->payload_algidR == 0x24) && state->aes_key_loaded[1] == 1)
+    if (slot == 1 && (state->payload_algidR == 0x25 || state->payload_algidR == 0x24 || state->payload_algid == 0x23) && state->aes_key_loaded[1] == 1)
     {
       fprintf (stderr, "\n ");
       fprintf (stderr, "%s", KYEL);
       fprintf (stderr, "Key: %016llX %016llX ", state->A1[1], state->A2[1]);
-      if (state->payload_algidR == 0x25)
+      if (state->payload_algid == 0x23)
+        fprintf (stderr, "%016llX", state->A3[0]);      
+      else if (state->payload_algidR == 0x25)
         fprintf (stderr, "%016llX %016llX", state->A3[1], state->A4[1]);
       fprintf (stderr, "%s ", KNRM);
     }
@@ -804,6 +1325,9 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
   {
     fprintf(stderr, " FLCO=0x%02X FID=0x%02X ", flco, fid);
     fprintf (stderr, "%s", KNRM);
+    //IPP
+    sprintf(ipp_buf, " FLCO=0x%02X FID=0x%02X ", flco, fid); 
+    ippl_adds("flco_info", ipp_buf);
   }
 
   if(*IrrecoverableErrors != 0)
@@ -811,8 +1335,12 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
     if (type != 3) fprintf (stderr, "\n");
     fprintf (stderr, "%s", KRED);
     fprintf (stderr, " SLOT %d", state->currentslot+1);
-    fprintf (stderr, " FLCO FEC ERR ");
+    fprintf (stderr, " FLCO FEC ERR");
+    //IPP
+    // ippl_add("err", "1"); 
+    // ippl_add("errv", "FLCO FEC ERR"); // IPP_ERR   
     fprintf (stderr, "%s", KNRM);
+    if (slot < 2) state->flco_fec_err[slot] = 1;
   }
 
 
@@ -834,10 +1362,14 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
   //tact pdu
   uint8_t tact_bits[7];
-  uint8_t at = 0; //access type, set to 1 during continuous transmission mode
-  uint8_t slot = 2; //tdma time slot
-  uint8_t lcss = 0; //link control start stop (9.3.3) NOTE: There is no Single fragment LC defined for CACH signalling
-  UNUSED2(at, slot);
+  
+  uint8_t at = 0;
+  uint8_t slot = (uint8_t)(state->currentslot & 1);
+  uint8_t lcss = 0;
+  UNUSED(at);
+
+  int frag_slot = state->currentslot & 1;
+  uint8_t *frag_mask = &dmr_cach_frag_mask[frag_slot];
 
   //cach_bits are already de-interleaved upon initial collection (still needs secodary slco de-interleave)
   for (i = 0; i < 7; i++)
@@ -846,6 +1378,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
   }
 
   //run hamming 7_4 on the tact_bits (redundant, since we do it earlier, but need the lcss)
+  /*
   if ( Hamming_7_4_decode (tact_bits) )
   {
     at = tact_bits[0]; //any useful tricks with this? csbk on/off etc?
@@ -854,6 +1387,17 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     tact_valid = 1; //set to 1 for valid, else remains 0.
     //fprintf (stderr, "AT=%d LCSS=%d - ", at, lcss); //debug print
   }
+  */
+  if (Hamming_7_4_decode(tact_bits))
+  {
+    at = tact_bits[0];
+    slot = tact_bits[1] & 0x01;
+    lcss = (tact_bits[2] << 1) | tact_bits[3];
+    tact_valid = 1;
+
+    frag_slot = slot & 0x01;
+    frag_mask = &dmr_cach_frag_mask[frag_slot];
+  }  
   else //probably skip/memset/zeroes with else statement?
   {
     //do something?
@@ -861,11 +1405,34 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     //return (err);
   }
 
+  veda_trace_cach_probe(opts, state, cach_bits,
+                        tact_valid, at, slot, lcss, state->indx_SF);
+
+if (opts->isVEDA)
+{
+    uint8_t cach_raw[4] = {0};
+    uint32_t tact_raw = 0;
+
+    for (int b = 0; b < 3; b++)
+        cach_raw[b] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[b * 8], 8);
+    cach_raw[3] = (uint8_t)ConvertBitIntoBytes((uint8_t *)&cach_bits[24], 1);
+
+    tact_raw = ((uint32_t)cach_raw[0] << 16) |
+               ((uint32_t)cach_raw[1] << 8)  |
+               ((uint32_t)cach_raw[2]);
+
+    veda_raw_log_cach(opts, state, frag_slot,
+                      tact_raw,
+                      tact_valid, at, slot, lcss,
+                      cach_raw, 4,
+                      state->indx_SF);
+}                        
   //determine counter value based on lcss value
   if (lcss == 0) //run as single block/fragment NOTE: There is no Single fragment LC defined for CACH signalling (but is mentioned in the manual table)
   {
     //reset the full cach, even if we aren't going to use it, may be beneficial for next time
     state->dmr_cach_counter = 0; //first fragment, set to zero.
+    *frag_mask = 0;
     memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
 
     //seperate
@@ -896,16 +1463,55 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     return (err);
   }
 
-  if (lcss == 1) //first block, reset counters and memset
+  if (lcss == 1) /* first */
   {
-    //reset the full cach and counter
     state->dmr_cach_counter = 0;
-    memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
+    *frag_mask = 0x01;
+    memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+
+    if (opts->isVEDA && opts->veda_debug)
+    {
+      fprintf(stderr,
+              "\n[VEDA CACH ASM] sf=%d slot=%d first mask=%X counter=%u lcss=%u\n",
+              state->indx_SF,
+              frag_slot + 1,
+              (unsigned)(*frag_mask & 0x0F),
+              (unsigned)state->dmr_cach_counter,
+              (unsigned)lcss);
+    }
   }
-  if (lcss == 3) state->dmr_cach_counter++; //continuation, so increment counter by one.
-  if (lcss == 2) //final segment - assemble, de-interleave, hamming, crc, and execute
+  else if (lcss == 3) /* continuation */
+  {
+    if ((*frag_mask & 0x01) == 0)
+    {
+        state->dmr_cach_counter = 0;
+        *frag_mask = 0;
+        memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+
+        if (opts->isVEDA && opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA CACH ASM] sf=%d slot=%d orphan-continuation mask=%X counter=%u lcss=%u\n",
+                    state->indx_SF,
+                    frag_slot + 1,
+                    (unsigned)(*frag_mask & 0x0F),
+                    (unsigned)state->dmr_cach_counter,
+                    (unsigned)lcss);
+        }
+     return 1;
+    }
+               
+    state->dmr_cach_counter++;
+
+    if (state->dmr_cach_counter == 1)
+      *frag_mask |= 0x02; /* frag1 seen */
+    else if (state->dmr_cach_counter == 2)
+      *frag_mask |= 0x04; /* frag2 seen */
+  }
+  else if (lcss == 2) /* final */
   {
     state->dmr_cach_counter = 3;
+    *frag_mask |= 0x08; /* frag3 seen */
   }
 
   //sanity check
@@ -914,6 +1520,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     //zero out complete fragment array
     lcss = 5; //toss away value
     state->dmr_cach_counter = 0;
+    *frag_mask = 0;
     memset (state->dmr_cach_fragment, 1, sizeof (state->dmr_cach_fragment));
     err = 1;
     return (err);
@@ -927,6 +1534,30 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 
   if (lcss == 2) //last block arrived, compile, hamming, crc and send off to dmr_slco
   {
+    //isVEDA
+    if ((*frag_mask & 0x01) == 0)
+    {
+        state->dmr_cach_counter = 0;
+        *frag_mask = 0;
+        memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));
+
+        if (opts->isVEDA && opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA CACH ASM] sf=%d slot=%d orphan-final mask=%X counter=%u lcss=%u\n",
+                    state->indx_SF,
+                    frag_slot + 1,
+                    (unsigned)(*frag_mask & 0x0F),
+                    (unsigned)state->dmr_cach_counter,
+                    (unsigned)lcss);
+        }
+
+        return 1;
+    }
+
+    state->dmr_cach_counter = 3;
+    *frag_mask |= 0x08;
+    
     //assemble
     for (j = 0; j < 4; j++)
     {
@@ -935,7 +1566,8 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
         slco_raw_bits[i+(17*j)] = state->dmr_cach_fragment[j][i];
       }
     }
-
+    
+    crc = crc8_ok(slco_bits, 36);
     //De-interleave method, hamming, and crc from Boatbod OP25
 
     //De-interleave
@@ -969,6 +1601,11 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
     //run crc8
     crc = crc8_ok(slco_bits, 36);
 
+        veda_trace_slco_probe(opts, state,
+                          slco_raw_bits, slco_bits,
+                          h1, h2, h3, crc,
+                          state->indx_SF);
+
     //only run SLCO on good everything
     if (h1 && h2 && h3 && crc) dmr_slco (opts, state, slco_bits);
     else
@@ -979,12 +1616,19 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
       else fprintf (stderr, "\n");
       fprintf (stderr, "%s", KRED);
       fprintf (stderr, " SLCO CRC ERR");
+      //IPP
+      ippl_add("err", "1"); 
+      ippl_add("errv", "SLCO CRC ERR");      
       fprintf (stderr, "%s", KNRM);
       if (opts->payload == 1 && state->dmrburstL == 16 && state->currentslot == 0) //if current slot is voice with payload enabled
         fprintf (stderr, "\n");
       else if (opts->payload == 1 && state->dmrburstR == 16 && state->currentslot == 1) //if current slot is voice with payload enabled
         fprintf (stderr, "\n");
     }
+
+    state->dmr_cach_counter = 0;
+    *frag_mask = 0;
+    memset(state->dmr_cach_fragment, 1, sizeof(state->dmr_cach_fragment));    
 
   }
   return (err); //return err value based on success or failure, even if we aren't checking it
@@ -993,6 +1637,7 @@ uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25])
 void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
 {
   long int ccfreq = 0;
+  char ipp_buf[256];//IPP
 
   int i;
   uint8_t slco_bytes[6]; //completed byte blocks for payload print
@@ -1007,6 +1652,21 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
   uint8_t reg = slco_bits[18]; //registration required/not required or normalchanneltype/composite cch
   uint16_t csc = (uint16_t)ConvertBitIntoBytes(&slco_bits[19], 9); //common slot counter, 0-511
   UNUSED(netsite);
+
+  if (opts->isVEDA && opts->veda_debug)
+  {
+    fprintf(stderr,
+            "\n[VEDA SLCO] sf=%d slco=%X model=%u bytes=%02X%02X%02X%02X%02X%01X\n",
+            state->indx_SF,
+            (unsigned)slco,
+            (unsigned)model,
+            (unsigned)slco_bytes[0],
+            (unsigned)slco_bytes[1],
+            (unsigned)slco_bytes[2],
+            (unsigned)slco_bytes[3],
+            (unsigned)slco_bytes[4],
+            (unsigned)slco_bytes[5]);
+  }
 
   uint16_t net = 0;
 	uint16_t site = 0;
@@ -1158,17 +1818,31 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
   {
     fprintf (stderr, " Activity Update"); //102 361-2 7.1.3.2
     fprintf (stderr, " TS1: %s; Hash: %d;", ts1_str, ts1_hash);
+    //IPP
+    sprintf (ipp_buf, " TS1: %s; Hash: %d;", ts1_str, ts1_hash); 
+    ippl_adds("flco_info", ipp_buf);
+
     fprintf (stderr, " TS2: %s; Hash: %d;", ts2_str, ts2_hash);
+    //IPP
+    sprintf (ipp_buf, " TS2: %s; Hash: %d;", ts2_str, ts2_hash); 
+    ippl_adds("flco_info", ipp_buf);
   }
   else if (slco == 0x9)
   {
     fprintf (stderr, " SLCO Connect Plus Traffic Channel - Net ID: %d Site ID: %d", con_netid, con_siteid);
+    //IPP
+    sprintf (ipp_buf, " SLCO Connect Plus Traffic Channel - Net ID: %d Site ID: %d", con_netid, con_siteid); 
+    ippl_adds("flco_info", ipp_buf);
+
     sprintf (state->dmr_site_parms, "%d-%d ", con_netid, con_siteid);
   }
 
   else if (slco == 0xA)
   {
     fprintf (stderr, " SLCO Connect Plus Control Channel - Net ID: %d Site ID: %d", con_netid, con_siteid);
+    //IPP
+    sprintf (ipp_buf, " SLCO Connect Plus Control Channel - Net ID: %d Site ID: %d", con_netid, con_siteid); 
+    ippl_adds("flco_info", ipp_buf);
     sprintf (state->dmr_site_parms, "%d-%d ", con_netid, con_siteid);
 
     //if using rigctl we can set an unknown cc frequency by polling rigctl for the current frequency
@@ -1194,6 +1868,9 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
   else if (slco == 0xF)
   {
     fprintf (stderr, " SLCO Capacity Plus Site: %d - Rest LSN: %d - RS: %02X", capsite, restchannel, cap_reserved);
+    //IPP
+    sprintf (ipp_buf, " SLCO Capacity Plus: %d", capsite); 
+    ippl_adds("flco_info", ipp_buf);
 
     //extra handling for TG hold while trunking enabled
     if (state->tg_hold != 0 && opts->p25_trunk == 1) //logic seems to be fixed now for new rest lsn logic and other considerations
@@ -1261,6 +1938,9 @@ void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[])
     //NOTE: on really busy systems, this free repeater assignment can lag due to the 4 TS requirment to get SLC
     // fprintf (stderr, " SLCO Hytera XPT - Free LCN %d ", xpt_free);
     sprintf (state->dmr_branding_sub, "XPT ");
+    //IPP
+    sprintf (ipp_buf, " SLCO Hytera XPT"); 
+    ippl_adds("flco_info", ipp_buf);
 
     //add string for ncurses terminal display
     sprintf (state->dmr_site_parms, "Free LCN - %d ", xpt_free);

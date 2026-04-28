@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------
+  /*-------------------------------------------------------------------------------
 * dsd_events.c
 * DSD-FME event history init, watchdog, push, and related functions
 *
@@ -49,6 +49,8 @@ void init_event_history (Event_History_I * event_struct, uint8_t start, uint8_t 
     sprintf (event_struct->Event_History_Items[i].text_message, "%s", "BUMBLEBEETUNA");
     sprintf (event_struct->Event_History_Items[i].event_string, "%s", "BUMBLEBEETUNA");
     sprintf (event_struct->Event_History_Items[i].internal_str, "%s", "BUMBLEBEETUNA");
+    event_struct->Event_History_Items[i].kid=0;
+    event_struct->Event_History_Items[i].kv_smooth=0;
   }
 }
 
@@ -91,6 +93,8 @@ void push_event_history (Event_History_I * event_struct)
     sprintf (event_struct->Event_History_Items[i].text_message, "%s", event_struct->Event_History_Items[i-1].text_message);
     sprintf (event_struct->Event_History_Items[i].event_string, "%s", event_struct->Event_History_Items[i-1].event_string);
     sprintf (event_struct->Event_History_Items[i].internal_str, "%s", event_struct->Event_History_Items[i-1].internal_str);
+    event_struct->Event_History_Items[i].kid = event_struct->Event_History_Items[i-1].kid;
+    event_struct->Event_History_Items[i].kv_smooth = event_struct->Event_History_Items[i-1].kv_smooth;
   }
 }
 
@@ -329,7 +333,6 @@ void watchdog_event_current (dsd_opts * opts, dsd_state * state, uint8_t slot)
     key_id = (uint16_t)state->payload_keyidR;
     mi = state->payload_miR;
   }
-
   //if P25 (if not P25, then these will all be zero anyways)
   sys_id1 = state->p2_wacn;
   sys_id2 = state->p2_sysid;
@@ -632,7 +635,10 @@ void watchdog_event_current (dsd_opts * opts, dsd_state * state, uint8_t slot)
     sprintf (event_struct->Event_History_Items[0].s_name, "%s", s_name);
     sprintf (event_struct->Event_History_Items[0].t_mode, "%s", t_mode);
     sprintf (event_struct->Event_History_Items[0].s_mode, "%s", s_mode);
-    
+
+    event_struct->Event_History_Items[0].kid = (uint8_t)state->payload_keyid;
+    event_struct->Event_History_Items[0].kv_smooth = opts->kv_smooth;
+
   }
 
   //Craft an event string for ncurses event history, and a more complex string for logging
@@ -695,7 +701,7 @@ void watchdog_event_current (dsd_opts * opts, dsd_state * state, uint8_t slot)
 
     if (state->ea_mode == 1)
     {
-      sprintf (event_string, "%s %s %s TGT: %07d; SRC: %07d; LCN: %02d; SITE: %d:%d.%04X; %s; ", datestr, timestr, sys_string, target_id, source_id, channel, sys_id1, sys_id2, sys_id3, sup_str);
+      sprintf (event_string, "%s %s %s TGT: %07d; SRC: %07d; LCN: %02d; SITE: %d:%d.%04X; %s;", datestr, timestr, sys_string, target_id, source_id, channel, sys_id1, sys_id2, sys_id3, sup_str);
     }
     else
     {
@@ -843,6 +849,8 @@ void watchdog_event_datacall (dsd_opts * opts, dsd_state * state, uint32_t src, 
   state->event_history_s[slot].Event_History_Items[0].target_id = dst;
   state->event_history_s[slot].Event_History_Items[0].channel = 0;
   state->event_history_s[slot].Event_History_Items[0].event_time = time(NULL);
+  state->event_history_s[slot].Event_History_Items[0].kid = 0;
+  state->event_history_s[slot].Event_History_Items[0].kv_smooth = 0;
 
   //date and time strings //getTimeN(time(NULL)); //getDateN(time(NULL));
   char * timestr = getTimeN(time(NULL));

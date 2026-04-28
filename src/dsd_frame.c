@@ -20,6 +20,13 @@
 #define NULL 0
 #endif
 
+#include "p25p1_check_nid.h"
+#include "avr_kv.h"
+#include "avr-log.h"
+
+static bool flag_branding = false;
+static bool batch_run_executed = false;
+
 void
 printFrameInfo (dsd_opts * opts, dsd_state * state)
 {
@@ -66,6 +73,7 @@ processFrame (dsd_opts * opts, dsd_state * state)
   nac[12] = 0;
   duid[2] = 0;
   j = 0;
+  state->is_simulation_active = 0;
 
   if (state->rf_mod == 1)
     {
@@ -77,6 +85,9 @@ processFrame (dsd_opts * opts, dsd_state * state)
       state->maxref = state->max;
       state->minref = state->min;
     }
+  
+  if(DEBUG)
+    fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d, state->slot %d \n", state->synctype, opts->errorbars, (state->currentslot & 1));
 
   //NXDN FSW
   if ((state->synctype == 28) || (state->synctype == 29))
@@ -112,7 +123,10 @@ processFrame (dsd_opts * opts, dsd_state * state)
       if (state->dmr_mfid == 0x10) ; //sprintf (state->dmr_branding, "%s",  "Motorola");
       else if (state->dmr_mfid == 0x68) sprintf (state->dmr_branding, "%s", "  Hytera");
       else if (state->dmr_mfid == 0x58) sprintf (state->dmr_branding, "%s", "    Tait");
-
+      else if (state->dmr_mfid == 0x08) sprintf (state->dmr_branding, "%s", "Hytera");
+      else if (state->dmr_mfid == 0x0A) sprintf (state->dmr_branding, "%s", "Kirisun");
+      else if (state->dmr_mfid == 0x77) sprintf (state->dmr_branding, "%s", "Vertex Standard");
+      
       //disabling these due to random data decodes setting an odd mfid, could be legit, but only for that one packet?
       //or, its just a decode error somewhere
       // else if (state->dmr_mfid == 0x20) sprintf (state->dmr_branding, "%s", "JVC Kenwood");
@@ -130,15 +144,23 @@ processFrame (dsd_opts * opts, dsd_state * state)
       // else if (state->dmr_mfid == 0x3C) sprintf (state->dmr_branding, "%s", "Radio Activity");
       // else if (state->dmr_mfid == 0x77) sprintf (state->dmr_branding, "%s", "Vertex Standard");
 
+      if (state->dmr_branding != "" && !flag_branding)
+      {
+        /// fprintf(stderr, "\n[FRAME INFO] branding - %s\n", state->dmr_branding);
+        ippl_adds("flco_info", state->dmr_branding);
+        flag_branding = true;
+      }      
       //disable so radio id doesn't blink in and out during ncurses and aggressive_framesync
       state->nac = 0;
-
+      if(DEBUG)
+        fprintf(stderr, " [KV] >>> state->synctype %d, opts->errorbars %d\n", state->synctype, opts->errorbars);
+        
       if (opts->errorbars == 1)
       {
         if (opts->verbose > 0)
         {
           level = (int) state->max / 164;
-          //fprintf (stderr,"inlvl: %2i%% ", level);
+          // fprintf (stderr,"inlvl: %2i%% ", level);
         }
       }
       if ( (state->synctype == 11) || (state->synctype == 12) || (state->synctype == 32) ) //DMR Voice Modes
@@ -201,6 +223,25 @@ processFrame (dsd_opts * opts, dsd_state * state)
           dmr_data_sync (opts, state);
         }
       }
+      if (opts->kv_csv_path[0] != '\0') {
+          const uint8_t slot = (state->currentslot & 1);
+          // Используем this_ms из dsd_frame.c или просто true, если это некритично для отчета
+          // bool this_ms = true;     
+          fprintf(stderr, "!!!! opts->kv_csv_path batch_run_executed %d min sf = %d, kv_batch_enable %d\n", batch_run_executed, avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF), opts->kv_batch_enable);
+          if (opts->kv_batch_enable && !batch_run_executed && avr_scout_has_series_with_min_sf(slot, AVR_SCOUT_MAX_SF)) {      
+            batch_run_executed = 1;
+            if (!avr_scout_is_series_ready(slot)) {              
+              fprintf(stderr, "!avr_scout_is_series_ready(slot)!!!\n");
+              scout_series_finalize_and_store(opts, state, slot);
+            }        
+            // avr_scout_flush(opts, state, this_ms);
+            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION RUNNING <<<\n");
+            avr_kv_batch_run(opts, state);
+            fprintf(stderr, "[KV-BATCH] >>> SINGLE EXECUTION FINISHED <<<\n");      
+            // Останавливаем программу после анализа
+            exit(0);
+          }
+      }  
       return;
     }
     //X2-TDMA
@@ -260,10 +301,11 @@ processFrame (dsd_opts * opts, dsd_state * state)
       processYSF(opts, state);
       return;
     }
-    //M17 STR
-    else if (state->synctype == 16)
+    //M17
+    else if ((state->synctype == 16) || (state->synctype == 9)  || (state->synctype == 17) || (state->synctype == 8)  ||
+             (state->synctype == 76) || (state->synctype == 77) || (state->synctype == 86) || (state->synctype == 87) ||
+             (state->synctype == 99) || (state->synctype == 98) )
     {
-      processM17STR(opts, state);
       return;
     }
     //P25 P2

@@ -1,20 +1,85 @@
 /*-------------------------------------------------------------------------------
  * dmr_csbk.c
  * DMR Control Signal Data PDU (CSBK, MBC) Handler and Related Functions
- *
- * Portions of Connect+ code reworked from Boatbod OP25
- * Source: https://github.com/boatbod/op25/blob/master/op25/gr-op25_repeater/lib/dmr_slot.cc
- *
- * Portions of Capacity+ code reworked from Eric Cottrell
- * Source: https://github.com/LinuxSheeple-E/dsd/blob/Feature/DMRECC/dmr_csbk.c
- *
- * LWVMOBILE
- * 2023-12 DSD-FME Florida Man Edition
+ * DMH/IPP
  *-----------------------------------------------------------------------------*/
 
 #include "dsd.h"
+
+static void veda_try_handle_csbk_header(dsd_opts *opts, dsd_state *state, const uint8_t *cs_pdu)
+{
+  veda_air_header_t hdr;
+
+  if (!opts || !state || !cs_pdu)
+    return;
+
+  if (!opts->isVEDA)
+    return;
+
+  hdr.b0 = cs_pdu[0];
+  hdr.b1 = cs_pdu[1];
+  hdr.w2 = (uint16_t)cs_pdu[2] | ((uint16_t)cs_pdu[3] << 8);
+  hdr.w4 = (uint16_t)cs_pdu[4] | ((uint16_t)cs_pdu[5] << 8);
+  hdr.w6 = (uint16_t)cs_pdu[6] | ((uint16_t)cs_pdu[7] << 8);
+
+  (void)veda_try_handle_header(opts, state, state->currentslot, &hdr, VEDA_HDRSRC_CSBK);
+}
+
+static void veda_trace_csbk_probe(dsd_opts *opts, dsd_state *state,
+                                  const uint8_t *cs_pdu,
+                                  uint8_t csbk_o, uint8_t csbk_fid,
+                                  uint8_t csbk_pf)
+{
+  uint8_t service_like = 0;
+  int slot;
+  int i;
+
+  if (!opts || !state || !cs_pdu)
+    return;
+
+  if (!opts->isVEDA || !opts->veda_debug)
+    return;
+
+  slot = state->currentslot & 1;
+
+  switch (csbk_o)
+  {
+    case 4:   /* UU_V_Req */
+    case 5:   /* UU_Ans_Req */
+    case 28:  /* C_AHOY */
+    case 30:  /* C_ACKVIT */
+    case 31:  /* C_RAND */
+    case 32:
+    case 33:
+    case 34:
+    case 35:  /* ACK family */
+    case 42:  /* P_MAINT */
+    case 47:  /* P_PROTECT */
+    case 56:  /* BS_Dwn_Act / variant */
+    case 61:  /* Preamble */
+      service_like = 1;
+      break;
+    default:
+      break;
+  }
+
+  fprintf(stderr,
+          "\n[VEDA CSBK RAW] slot=%d op=%02X fid=%02X pf=%u svc_like=%u b=",
+          slot + 1,
+          (unsigned)csbk_o,
+          (unsigned)csbk_fid,
+          (unsigned)csbk_pf,
+          (unsigned)service_like);
+
+  for (i = 0; i < 12; i++)
+    fprintf(stderr, "%02X", cs_pdu[i]);
+
+  fprintf(stderr, "\n");
+}
+
 #define PCLEAR_TUNE_AWAY //disable if slower return is preferred
 //function for handling Control Signalling PDUs (CSBK, MBC) messages
+
 void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8_t cs_pdu[], uint32_t CRCCorrect, uint32_t IrrecoverableErrors)
 {
 
@@ -56,9 +121,17 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
     //in the middle of voice call on current Control Channel (con+ and t3)
     state->last_cc_sync_time = time(NULL);
 
+    if (opts->isVEDA)
+        veda_trace_csbk_probe(opts, state, cs_pdu,
+                              (uint8_t)csbk_o,
+                              (uint8_t)csbk_fid,
+                              (uint8_t)csbk_pf);
+
     if (csbk_pf == 0) //okay to run
     {
-
+        if (opts->isVEDA)
+          veda_try_handle_csbk_header(opts, state, cs_pdu);
+          
       //set overarching manufacturer in use when non-standard feature id set is up
       if (csbk_fid != 0) state->dmr_mfid = csbk_fid;
 
@@ -109,6 +182,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED2(st1, st3);
 
+        if(opts->isVEDA)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
         //broadcast calls show no tgt/src info in ETSI manaual, but seem to correspond with same values in embedded link control
         // if (csbk_o == 50)
         // {
@@ -623,6 +698,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED(reserved);
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
 
         if (gi)  fprintf (stderr, " Group");
         if (!gi) fprintf (stderr, " Private");
@@ -988,8 +1065,10 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint8_t svc_kind = (uint8_t)ConvertBitIntoBytes(&cs_pdu_bits[28], 4); //'Call' Type
         uint32_t ahoy_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t ahoy_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-
-        UNUSED(ahoy_bf);
+        if (opts->isVEDA && ahoy_target && ahoy_source)
+          veda_note_raw_src_tgt(state, state->currentslot, ahoy_source, ahoy_target);
+        
+          UNUSED(ahoy_bf);
         UNUSED(svc_flag);
         UNUSED(als_flag);
 
@@ -1080,6 +1159,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint8_t  pm_res2 = cs_pdu_bits[31];
         uint32_t pm_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24); //should be TSI (clear the call)
         uint32_t pm_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA && pm_target && pm_source)
+          veda_note_raw_src_tgt(state, state->currentslot, pm_source, pm_target);
 
         if (pm_kind == 0) fprintf (stderr, "Disconnect; ");
         else fprintf (stderr, " Res Kind: %02X", pm_kind);
@@ -1118,7 +1199,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
           uint32_t ack_target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
           uint32_t ack_source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
-
+          if (opts->isVEDA && ack_target && ack_source)
+            veda_note_raw_src_tgt(state, state->currentslot, ack_source, ack_target);
           //response_info and reason_code start to get really convoluted on decoding them
           //for each opcode, so I am just going to put the values out to the console,
           //look at ETSI TS 102 361-4 V1.12.1 7.2.7 for more info
@@ -1148,6 +1230,10 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
 
@@ -1158,6 +1244,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+        
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
       }
@@ -1175,6 +1264,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
 
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
 
       }
@@ -1186,6 +1278,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         //Inbound CSBK only from MS source to 'wake' the repeater up (best that I understand)
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+
         fprintf (stderr, "Target [%d] - Source [%d] ", target, source);
       }
 
@@ -1200,7 +1295,9 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
         uint32_t target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[32], 24);
         uint32_t source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[56], 24);
         UNUSED2(res, blocks);
-
+        if (opts->isVEDA && target && source)
+          veda_note_raw_src_tgt(state, state->currentslot, source, target);
+          
         uint8_t target_hash[24];
         uint8_t tg_hash = 0;
 
@@ -1235,6 +1332,8 @@ void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8
           if (gi == 0) target = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[40], 16);
           source = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[64], 16);
           int rest = (uint32_t)ConvertBitIntoBytes(&cs_pdu_bits[60], 4);
+          if (opts->isVEDA && target && source)
+            veda_note_raw_src_tgt(state, state->currentslot, source, target);
           fprintf (stderr, "Source: %d - Target: %d - Rest LSN: %d", source, target, rest);
         }
         else fprintf (stderr, "Source: %d - Target: %d ", source, target);

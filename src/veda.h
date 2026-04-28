@@ -218,6 +218,9 @@ extern "C"
     void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur);
     void veda_ms_collect_kx64(const uint8_t *payload64);
 
+    int veda_rx_pack_ms_payload216(dsd_state *state, uint8_t out27[27]);
+    int veda_rx_unpack_ms_payload216(dsd_state *state, const uint8_t in27[27]);    
+
     int veda_try_build_key32_main_tree(veda_context_t *v, veda_key_candidate_t *kc);
     /* Main hook for dmr_ms.c, called before processMbeFrame().
      * opts/state are void* intentionally: veda.h must not depend on dsd.h because
@@ -240,10 +243,12 @@ extern "C"
         char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
         char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS]);
 
-    int veda_build_seed_tweak_from_candidate(veda_context_t *v, veda_seed_tweak_profile_t profile, uint8_t seed8[VEDA_SEED8_BYTES], 
+    int veda_build_seed_tweak_from_candidate(veda_context_t *v, veda_seed_tweak_profile_t profile, 
+        uint8_t seed8[VEDA_SEED8_BYTES], 
         uint32_t *tweak0, uint32_t *tweak1);
+    int veda_rx_try_payload216(veda_context_t *v, dsd_state *state);        
 
-
+    int veda_rx_rebuild_ms_ambe_from_payload(dsd_state *state, char ambe_fr[4][24], char ambe_fr2[4][24], char ambe_fr3[4][24]);
     /* Firmware-like model function prototypes.
      * These mirror names/layers found in the firmware pseudocode. Some are still
      * skeletons and intentionally return VEDA_RC_NOT_IMPLEMENTED until ASM/dataflow

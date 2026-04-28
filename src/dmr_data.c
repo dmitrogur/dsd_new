@@ -16,6 +16,206 @@
  */
 
 #include "dsd.h"
+#include "dsd_veda.h"
+
+
+static FILE *g_288_hex_fp = NULL;
+static FILE *g_288_bit_fp = NULL;
+static unsigned g_288_session_no = 0;
+static int g_288_is_open = 0;
+
+static void pack_bits_to_bytes(const uint8_t *bits, int nbits, uint8_t *out)
+{
+  int i;
+  int nbytes = (nbits + 7) / 8;
+
+  memset(out, 0, nbytes);
+
+  for (i = 0; i < nbits; i++)
+  {
+    if (bits[i] & 1)
+      out[i >> 3] |= (uint8_t)(1u << (7 - (i & 7)));
+  }
+}
+
+static void build_ms_data_raw36(const uint8_t cachdata[25],
+                                const char info[196],
+                                const char syncdata[48],
+                                const unsigned char SlotType[20],
+                                uint8_t raw36[36])
+{
+  uint8_t bits288[288];
+  int i;
+
+  memset(bits288, 0, sizeof(bits288));
+
+  for (i = 0; i < 24; i++)
+    bits288[i] = cachdata[i] & 1;
+
+  for (i = 0; i < 98; i++)
+    bits288[24 + i] = info[i] & 1;
+
+  for (i = 0; i < 10; i++)
+    bits288[122 + i] = SlotType[i] & 1;
+
+  for (i = 0; i < 48; i++)
+    bits288[132 + i] = syncdata[i] & 1;
+
+  for (i = 0; i < 10; i++)
+    bits288[180 + i] = SlotType[10 + i] & 1;
+
+  for (i = 0; i < 98; i++)
+    bits288[190 + i] = info[98 + i] & 1;
+
+  pack_bits_to_bytes(bits288, 288, raw36);
+}
+
+static void log_ms_data_288(uint8_t db, const uint8_t raw36[36])
+{
+  int i;
+
+  fprintf(stderr, "[MS DATA 288] db=0x%02X ", db);
+  for (i = 0; i < 36; i++)
+    fprintf(stderr, "%02X", raw36[i]);
+  fprintf(stderr, "\n");
+}
+
+static void veda_burst288_close_files(void)
+{
+  if (g_288_hex_fp != NULL)
+  {
+    fclose(g_288_hex_fp);
+    g_288_hex_fp = NULL;
+  }
+
+  if (g_288_bit_fp != NULL)
+  {
+    fclose(g_288_bit_fp);
+    g_288_bit_fp = NULL;
+  }
+}
+
+static int veda_burst288_open_files(void)
+{
+  char path_hex[512];
+  char path_bit[512];
+  const char *home = getenv("HOME");
+
+  if (home == NULL || home[0] == '\0')
+    home = ".";
+
+  g_288_session_no++;
+  snprintf(path_hex, sizeof(path_hex), "%s/TYT_288_%u.hex", home, g_288_session_no);
+  snprintf(path_bit, sizeof(path_bit), "%s/TYT_288_%u.bit", home, g_288_session_no);
+
+  g_288_hex_fp = fopen(path_hex, "wb");
+  if (g_288_hex_fp == NULL)
+    return 0;
+
+  g_288_bit_fp = fopen(path_bit, "wb");
+  if (g_288_bit_fp == NULL)
+  {
+    fclose(g_288_hex_fp);
+    g_288_hex_fp = NULL;
+    return 0;
+  }
+
+  return 1;
+}
+
+void veda_burst288_stream_write(uint8_t db, const uint8_t raw36[36])
+{
+  int i, b;
+
+ if (db == 0x01 && !g_288_is_open)
+  {
+    if (!veda_burst288_open_files())
+      return;
+
+    g_288_is_open = 1;
+  }
+
+  if (g_288_hex_fp == NULL || g_288_bit_fp == NULL)
+    return;
+  if(db==0xEB || db==0x00) {
+    for (i = 0; i < 36; i++)
+      fprintf(g_288_hex_fp, "%02X", raw36[i]);
+
+    for (i = 0; i < 36; i++)
+    {
+      for (b = 7; b >= 0; b--)
+        fputc(((raw36[i] >> b) & 1) ? '1' : '0', g_288_bit_fp);
+    }
+  }
+  fflush(g_288_hex_fp);
+  fflush(g_288_bit_fp);
+
+
+  if (db == 0x02 && g_288_is_open)
+  {
+    veda_burst288_close_files();
+    g_288_is_open = 0;
+  }
+}
+/*
+static void pack_bits_to_bytes(const uint8_t *bits, int nbits, uint8_t *out)
+{
+  int i;
+  int nbytes = (nbits + 7) / 8;
+
+  memset(out, 0, nbytes);
+
+  for (i = 0; i < nbits; i++)
+  {
+    if (bits[i] & 1)
+      out[i >> 3] |= (uint8_t)(1u << (7 - (i & 7)));
+  }
+}
+
+static void log_ms_data_burst_288(uint8_t db,
+                                  const uint8_t cachdata[25],
+                                  const char info[196],
+                                  const char syncdata[48],
+                                  const unsigned char SlotType[20])
+{
+  uint8_t bits288[288];
+  uint8_t raw36[36];
+  int i;
+
+  memset(bits288, 0, sizeof(bits288));
+
+  // 24 bits CACH
+  for (i = 0; i < 24; i++)
+    bits288[i] = cachdata[i] & 1;
+
+  // 98 bits info A 
+  for (i = 0; i < 98; i++)
+    bits288[24 + i] = info[i] & 1;
+
+  // 10 bits slot type A 
+  for (i = 0; i < 10; i++)
+    bits288[122 + i] = SlotType[i] & 1;
+
+  // 48 bits sync/data sync 
+  for (i = 0; i < 48; i++)
+    bits288[132 + i] = syncdata[i] & 1;
+
+  // 10 bits slot type B
+  for (i = 0; i < 10; i++)
+    bits288[180 + i] = SlotType[10 + i] & 1;
+
+  // 98 bits info B
+  for (i = 0; i < 98; i++)
+    bits288[190 + i] = info[98 + i] & 1;
+
+  pack_bits_to_bytes(bits288, 288, raw36);
+
+  fprintf(stderr, "\n[MS DATA 288] db=0x%02X ", db);
+  for (i = 0; i < 36; i++)
+    fprintf(stderr, "%02X", raw36[i]);
+  fprintf(stderr, "\n");
+}
+*/
 
 void
 dmr_data_sync (dsd_opts * opts, dsd_state * state)
@@ -59,9 +259,8 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
     }
     else state->dmr_stereo_payload[i] = dibit;
 
-    cachdata[cachInterleave[(i*2)]]   = (1 & (dibit >> 1)); // bit 1
-    cachdata[cachInterleave[(i*2)+1]] = (1 & dibit);       // bit 0
-
+    cachdata[cachInterleave[(i * 2)]] = (1 & (dibit >> 1)); // bit 1
+    cachdata[cachInterleave[(i * 2) + 1]] = (1 & dibit);    // bit 0
   }
 
   //seperate tact bits from cach
@@ -210,11 +409,15 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
     {
       sprintf(state->slot1light, "[slot1]");
       sprintf(state->slot2light, " slot2 ");
+      
+      ippl_add("slot", "2");//IPP
     }
     else
     {
       sprintf(state->slot1light, " slot1 ");
       sprintf(state->slot2light, "[slot2]");
+
+      ippl_add("slot", "1");//IPP      
     }
   }
 
@@ -223,6 +426,7 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
     state->currentslot = 0;
     sprintf(state->slot1light, "[sLoT1]");
     sprintf(state->slot2light, "[DMODE]");
+    ippl_add("slot_TS", "1");//IPP     
   }
 
   else if(strcmp (sync, DMR_DIRECT_MODE_TS2_DATA_SYNC) == 0)
@@ -230,6 +434,7 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
     state->currentslot = 1;
     sprintf(state->slot1light, "[DMODE]");
     sprintf(state->slot2light, "[sLoT2]");
+    ippl_add("slot_TS", "2");//IPP
   }
 
   if (state->dmr_ms_mode == 0)
@@ -292,8 +497,18 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
     info[(2*i) + 98] = (1 & (dibit >> 1));  // bit 1
     info[(2*i) + 99] = (1 & dibit);         // bit 0
   }
+  
+  if(opts->veda_debug && (burst == 0x01 || burst == 0x02)) {
+    // log_ms_data_burst_288(burst, cachdata, info, syncdata, SlotType);
+    uint8_t raw36[36];
 
-  //
+    build_ms_data_raw36(cachdata, info, syncdata, SlotType, raw36);
+
+    log_ms_data_288(burst, raw36);
+
+    veda_burst288_stream_write(burst, raw36);
+  }
+
   dmr_data_burst_handler(opts, state, (uint8_t *)info, burst);
 
   //don't run cach on simplex or mono
@@ -309,6 +524,10 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
   if (SlotTypeOk == 0 || cach_okay != 1)
   {
     fprintf (stderr, "%s", KRED);
+    //IPP
+    ippl_add("err", "1"); 
+    ippl_add("errv", "CACH/Burst FEC ERR");
+        
     fprintf (stderr, "| CACH/Burst FEC ERR");
     fprintf (stderr, "%s", KNRM);
     fprintf (stderr, "\n");
@@ -341,5 +560,6 @@ dmr_data_sync (dsd_opts * opts, dsd_state * state)
       state->last_vc_sync_time = 0;
     }
   }
+  
   #endif
 }

@@ -958,6 +958,63 @@ void Golay_20_8_encode(unsigned char *origBits, unsigned char *encodedBits)
     }
 }
 
+// fec.c
+bool Golay_20_8_decode_report(unsigned char *rxBits, int *corrections, bool *uncorrectable)
+{
+    unsigned int syndromeI = 0;
+    int is = 0, i = 0;
+    int correction = 0;
+    if (uncorrectable) *uncorrectable = false;
+    if (corrections)   *corrections   = 0;
+
+    for (is = 0; is < 12; is++)
+    {
+        syndromeI += (((rxBits[0]  * Golay_20_8_m_H[20*is + 0])
+                     + (rxBits[1]  * Golay_20_8_m_H[20*is + 1])
+                     + (rxBits[2]  * Golay_20_8_m_H[20*is + 2])
+                     + (rxBits[3]  * Golay_20_8_m_H[20*is + 3])
+                     + (rxBits[4]  * Golay_20_8_m_H[20*is + 4])
+                     + (rxBits[5]  * Golay_20_8_m_H[20*is + 5])
+                     + (rxBits[6]  * Golay_20_8_m_H[20*is + 6])
+                     + (rxBits[7]  * Golay_20_8_m_H[20*is + 7])
+                     + (rxBits[8]  * Golay_20_8_m_H[20*is + 8])
+                     + (rxBits[9]  * Golay_20_8_m_H[20*is + 9])
+                     + (rxBits[10] * Golay_20_8_m_H[20*is + 10])
+                     + (rxBits[11] * Golay_20_8_m_H[20*is + 11])
+                     + (rxBits[12] * Golay_20_8_m_H[20*is + 12])
+                     + (rxBits[13] * Golay_20_8_m_H[20*is + 13])
+                     + (rxBits[14] * Golay_20_8_m_H[20*is + 14])
+                     + (rxBits[15] * Golay_20_8_m_H[20*is + 15])
+                     + (rxBits[16] * Golay_20_8_m_H[20*is + 16])
+                     + (rxBits[17] * Golay_20_8_m_H[20*is + 17])
+                     + (rxBits[18] * Golay_20_8_m_H[20*is + 18])
+                     + (rxBits[19] * Golay_20_8_m_H[20*is + 19])) % 2) << (11-is);
+    }
+
+    if (syndromeI > 0)
+    {
+        for (i = 0; i < 3; i++)
+        {
+            if (Golay_20_8_m_corr[syndromeI][i] == 0xFF) break;
+            rxBits[Golay_20_8_m_corr[syndromeI][i]] ^= 1;
+            correction++;
+        }
+
+        if (i == 0) { // нельзя исправить
+            if (uncorrectable) *uncorrectable = true;
+            return false;
+        }
+
+        if (correction > 2) { // ваш текущий порог
+            if (uncorrectable) *uncorrectable = true;
+            return false;
+        }
+    }
+
+    if (corrections) *corrections = correction;
+    return true;
+}
+
 // golay (20,8) hamming-weight of 6 reliably corrects at most 2 bit-errors
 bool Golay_20_8_decode(unsigned char *rxBits)
 {
@@ -1535,8 +1592,97 @@ bool QR_16_7_6_decode(unsigned char *rxBits)
 
 
 // ========================================================================================
+/*
+bool Hamming_7_4_decode_report(unsigned char *rxBits, int *corrected, bool *uncorrectable)
+{
+    unsigned int syndromeI = 0;
+    int is = 0;
+    int correction = 0;
 
+    if (corrected)    *corrected = 0;
+    if (uncorrectable) *uncorrectable = false;
 
+    for (is = 0; is < 3; is++)
+    {
+        syndromeI += (((rxBits[0] * Hamming_7_4_m_H[7*is + 0])
+                     + (rxBits[1] * Hamming_7_4_m_H[7*is + 1])
+                     + (rxBits[2] * Hamming_7_4_m_H[7*is + 2])
+                     + (rxBits[3] * Hamming_7_4_m_H[7*is + 3])
+                     + (rxBits[4] * Hamming_7_4_m_H[7*is + 4])
+                     + (rxBits[5] * Hamming_7_4_m_H[7*is + 5])
+                     + (rxBits[6] * Hamming_7_4_m_H[7*is + 6])) % 2) << (2-is);
+    }
+
+    if (syndromeI > 0)
+    {
+        if (Hamming_7_4_m_corr[syndromeI] == 0xFF)
+        {
+            if (uncorrectable) *uncorrectable = true;
+            return false;
+        }
+        rxBits[Hamming_7_4_m_corr[syndromeI]] ^= 1; // flip bit
+        correction++;
+
+        // в оригинале уже стоял «ограничитель» (>1 → fail)
+        if (correction > 1)
+        {
+            if (uncorrectable) *uncorrectable = true;
+            return false;
+        }
+    }
+
+    if (corrected) *corrected = correction;
+    return true;
+}
+bool QR_16_7_6_decode_report(unsigned char *rxBits, int *corrected, bool *uncorrectable)
+{
+    unsigned int syndromeI = 0;
+    int is = 0;
+    int i = 0;
+    int corrections = 0;
+
+    if (corrected)    *corrected = 0;
+    if (uncorrectable) *uncorrectable = false;
+
+    for (is = 0; is < 9; is++)
+    {
+        syndromeI += (((rxBits[0]  * QR_16_7_6_m_H[16*is + 0])
+                     + (rxBits[1]  * QR_16_7_6_m_H[16*is + 1])
+                     + (rxBits[2]  * QR_16_7_6_m_H[16*is + 2])
+                     + (rxBits[3]  * QR_16_7_6_m_H[16*is + 3])
+                     + (rxBits[4]  * QR_16_7_6_m_H[16*is + 4])
+                     + (rxBits[5]  * QR_16_7_6_m_H[16*is + 5])
+                     + (rxBits[6]  * QR_16_7_6_m_H[16*is + 6])
+                     + (rxBits[7]  * QR_16_7_6_m_H[16*is + 7])
+                     + (rxBits[8]  * QR_16_7_6_m_H[16*is + 8])
+                     + (rxBits[9]  * QR_16_7_6_m_H[16*is + 9])
+                     + (rxBits[10] * QR_16_7_6_m_H[16*is + 10])
+                     + (rxBits[11] * QR_16_7_6_m_H[16*is + 11])
+                     + (rxBits[12] * QR_16_7_6_m_H[16*is + 12])
+                     + (rxBits[13] * QR_16_7_6_m_H[16*is + 13])
+                     + (rxBits[14] * QR_16_7_6_m_H[16*is + 14])
+                     + (rxBits[15] * QR_16_7_6_m_H[16*is + 15])) % 2) << (8-is);
+    }
+
+    if (syndromeI > 0)
+    {
+        for (i = 0; i < 2; i++)
+        {
+            if (QR_16_7_6_m_corr[syndromeI][i] == 0xFF) break;
+            rxBits[QR_16_7_6_m_corr[syndromeI][i]] ^= 1;
+            corrections++;
+        }
+        if (i == 0) // ни одного исправления не применили — ошибка
+        {
+            if (uncorrectable) *uncorrectable = true;
+            return false;
+        }
+    }
+
+    if (corrected) *corrected = corrections;
+    return true;
+}
+*/
 /* This function init all FEC functions
  * it must be called once at startup */
 void InitAllFecFunction(void)

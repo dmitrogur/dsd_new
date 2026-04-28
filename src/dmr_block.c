@@ -8,6 +8,7 @@
 
 #include "dsd.h"
 #include "bp.h"
+#include "dsd_veda.h"
 
 #define DMR_PDU_DECRYPTION //disable to skip attempting to decrypt DMR PDUs
 
@@ -37,7 +38,9 @@ void dmr_dheader (dsd_opts * opts, dsd_state * state, uint8_t dheader[], uint8_t
 
     uint32_t target = (uint32_t)ConvertBitIntoBytes(&dheader_bits[16], 24); //destination llid
     uint32_t source = (uint32_t)ConvertBitIntoBytes(&dheader_bits[40], 24); //source llid
-
+  
+    if (opts->isVEDA && target && source)
+      veda_note_raw_src_tgt_ex(state, state->currentslot, source, target, VEDA_HDRSRC_DHEADER);
     //extra tgt/src handling for XPT
     uint8_t target_hash[24];
     uint8_t tg_hash = 0;
@@ -182,13 +185,13 @@ void dmr_dheader (dsd_opts * opts, dsd_state * state, uint8_t dheader[], uint8_t
     //mfid string handling
     if (dpf == 15)
     {
-      if      (p_mfid == 0x10) sprintf (mfid_string, "%s", "Moto"); //could just also be a generic catch all for DMRA
-      else if (p_mfid == 0x58) sprintf (mfid_string, "%s", "Tait");
-      else if (p_mfid == 0x68) sprintf (mfid_string, "%s", "Hytera");
-      else if (p_mfid == 0x08) sprintf (mfid_string, "%s", "Hytera");
-      else if (p_mfid == 0x06) sprintf (mfid_string, "%s", "Trid/Mot");
+      if      (p_mfid == 0x10) { sprintf (mfid_string, "%s", "Moto");     sprintf (state->dmr_branding, "%s", (char *) mfid_string);  }  //could just also be a generic catch all for DMRA
+      else if (p_mfid == 0x58) { sprintf (mfid_string, "%s", "Tait");     sprintf (state->dmr_branding, "%s", (char *) mfid_string);  }
+      else if (p_mfid == 0x68) { sprintf (mfid_string, "%s", "Hytera");   sprintf (state->dmr_branding, "%s", (char *) mfid_string);  }
+      else if (p_mfid == 0x08) { sprintf (mfid_string, "%s", "Hytera");   sprintf (state->dmr_branding, "%s", (char *) mfid_string);  } 
+      else if (p_mfid == 0x06) { sprintf (mfid_string, "%s", "Trid/Mot"); sprintf (state->dmr_branding, "%s", (char *) mfid_string);  }
       else if (p_mfid == 0x00) sprintf (mfid_string, "%s", "Standard");
-      else                     sprintf (mfid_string, "%s", "Other");
+      else                     sprintf (mfid_string, "%s", "Other"); 
     }
 
     //udt format string handling
@@ -429,6 +432,7 @@ void dmr_dheader (dsd_opts * opts, dsd_state * state, uint8_t dheader[], uint8_t
         if ((uint8_t)ConvertBitIntoBytes(&dheader_bits[17], 3) == 1) fprintf (stderr, " RC4;");
         if ((uint8_t)ConvertBitIntoBytes(&dheader_bits[17], 3) == 2) fprintf (stderr, " DES56;");
         if ((uint8_t)ConvertBitIntoBytes(&dheader_bits[17], 3) == 4) fprintf (stderr, " AES128;");
+        if ((uint8_t)ConvertBitIntoBytes(&dheader_bits[17], 3) == 3) fprintf (stderr, " AES192;");         
         if ((uint8_t)ConvertBitIntoBytes(&dheader_bits[17], 3) == 5) fprintf (stderr, " AES256;");
 
         if (state->currentslot == 0)
@@ -569,6 +573,9 @@ void dmr_udt_decoder (dsd_opts * opts, dsd_state * state, uint8_t * block_bytes,
   UNUSED4(udt_padnib, udt_zero, udt_sf, udt_pf);
   UNUSED(udt_op);
 
+  if (opts->isVEDA && udt_target && udt_source)
+    veda_note_raw_src_tgt_ex(state, state->currentslot, udt_source, udt_target, VEDA_HDRSRC_UDT);
+    
   //number of repititions required in various bit grabs
   int end = 3; UNUSED(end);
 
@@ -604,6 +611,10 @@ void dmr_udt_decoder (dsd_opts * opts, dsd_state * state, uint8_t * block_bytes,
   fprintf (stderr, "%s", KCYN);
   fprintf (stderr, "\n ");
   fprintf (stderr, "Slot %d - SRC: %d; TGT: %d; UDT ", slot+1, udt_source, udt_target);
+  //IPP
+  ippl_add("kCall", "UDT"); 
+  ippl_addi("kSRC", udt_source); 
+  ippl_addi("kTGT", udt_target);
 
   if (udt_format2 == 0x00)
   {
@@ -1076,6 +1087,7 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
         if (alg == 0) fprintf (stderr, " Moto BP;");
         if (alg == 1) fprintf (stderr, " RC4;");
         if (alg == 2) fprintf (stderr, " DES;");
+        if (alg == 3) fprintf (stderr, " AES192;");         
         if (alg == 4) fprintf (stderr, " AES128;");
         if (alg == 5) fprintf (stderr, " AES256;");
         if (alg == 7) fprintf (stderr, " VTX STD;");
@@ -1131,7 +1143,24 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
           des_multi_keystream_output (mi, R, ob, 1, nblocks);
           decrypted_pdu = 1;
         }
-
+        //=============  AES-192   ===============================
+        else if (alg == 3 && akl == 1 && mi != 0) //AES-192
+        {
+          int nblocks = (state->data_byte_ctr[slot] / 16) + 1;
+          aes_ofb_keystream_output (maes, kaes, ob, 1, nblocks);
+          decrypted_pdu = 1;
+        }
+        else if (alg == 3 && akl == 1 && mi == 0) //AES-192 
+        {
+          int nblocks = (state->data_byte_ctr[slot] / 16) + 0; //was +1
+          for (i = 0; i < nblocks; i++)
+          {
+            aes_ecb_bytewise_payload_crypt(state->dmr_pdu_sf[slot]+start, kaes, state->dmr_pdu_sf[slot]+start, 1, 0);
+            start += 16;
+          }
+          decrypted_pdu = 1;
+        }
+        //======================================================== 
         else if (alg == 4 && akl == 1 && mi != 0) //AES-128 OFB
         {
           int nblocks = (state->data_byte_ctr[slot] / 16) + 1;
@@ -1181,7 +1210,7 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
         else if (alg == 0)
         {
           uint16_t bp_key = 0;
-          if (state->K != 0) //state->M == 1 &&
+          if (state->K != 0) //state->forced_alg_id == 1 &&
           {
             //load the BP key into the output blocks (only need two)
             bp_key = BPK[state->K];
@@ -1385,6 +1414,75 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
     lb = block_bytes[0] >> 7; //last block flag
     pf = (block_bytes[0] >> 6) & 1;
 
+    if (opts->isVEDA && opts->veda_debug)
+    {
+      fprintf(stderr,
+              "\n[VEDA MBC BLK] slot=%d databurst=0x%02X blockcounter=%u blocks=%d lb=%u pf=%u hdr_valid=%u hdr_crc=%u first=%02X bytes=",
+              slot + 1,
+              databurst,
+              blockcounter,
+              blocks,
+              lb,
+              pf,
+              (unsigned)state->data_header_valid[slot],
+              (unsigned)state->data_block_crc_valid[slot][0],
+              block_bytes[0]);
+
+      for (int x = 0; x < block_len; x++)
+        fprintf(stderr, "%02X", block_bytes[x]);
+
+      fprintf(stderr, "\n");
+    }    
+
+    if (opts->isVEDA && databurst == 0x05 && blockcounter == 1)
+    {
+    veda_trace_probe_air_header(opts,
+                                state,
+                                slot,
+                                block_bytes,
+                                block_len,
+                                "MBC_BLK0",
+                                state->indx_SF);
+    }
+    if (opts->isVEDA && databurst == 0x05 && blockcounter == 1 && block_len > 0)
+    {
+      veda_note_candidate(opts,
+                        state,
+                        slot,
+                        VEDA_CAND_MBC05,
+                        block_bytes,
+                        block_len,
+                        state->indx_SF);
+      
+      veda_raw_log_mbc(opts, state, slot,
+                 VEDA_RAW_MBC_BLK0, databurst,
+                 block_bytes, block_len,
+                 state->data_block_crc_valid[slot][0], 0,
+                 blockcounter, blocks, lb, pf,
+                 state->indx_SF);                      
+    }
+    // --- НОВАЯ ВСТАВКА ДЛЯ НАКОПЛЕНИЯ KX ИЗ MBC ---
+    if (opts->isVEDA && (databurst == 0x05 || databurst == 0x04))
+    {
+        // Копируем 12 байт текущего блока в накопительный KX-буфер
+        if (state->veda_kx_pos[slot] + 12 <= 48) 
+        {
+            memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], block_bytes, 12);
+            state->veda_kx_pos[slot] += 12;
+
+            if (opts->veda_debug) 
+                fprintf(stderr, "[VEDA KX-MBC] Accumulating: %d/48 bytes\n", state->veda_kx_pos[slot]);
+
+            // Если набрали достаточно для начала (32 байта для ключа или 48 для полного пакета)
+            // Пробуем вызвать деривацию. 
+            if (state->veda_kx_pos[slot] >= 32)
+            {
+                if (opts->veda_debug) 
+                  fprintf(stderr, "[VEDA KX] Calling derivation with %d bytes\n", state->veda_kx_pos[slot]);              
+                handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+            }
+        }
+    }    
     if (is_udt)
     {
       lb = 0; //set to zero, data header may erroneously the lb flag check above (IG)
@@ -1467,6 +1565,109 @@ void dmr_block_assembler (dsd_opts * opts, dsd_state * state, uint8_t block_byte
         fprintf (stderr, " %X - %X", CRCExtracted, CRCComputed);
         // fprintf (stderr, " Len: %d", ((blocks+0)*96)-16);
         fprintf (stderr, "%s", KNRM);
+      }
+
+      /* === VEDA MBC SUPERFRAME TRACE / KX TRY === */
+      if (opts->isVEDA && !is_udt)
+      {
+        int total_bytes = (blocks + 1) * block_len;
+
+        // Логируем ПОЛНЫЙ собранный суперфрейм (SF), без привязки к blockcounter == 1
+        if (total_bytes > 0) {
+          veda_raw_log_mbc(opts, state, slot,
+                 VEDA_RAW_MBC_SF, databurst,
+                 state->dmr_pdu_sf[slot], (uint8_t)total_bytes,
+                 (uint8_t)CRCCorrect, (uint8_t)IrrecoverableErrors,
+                 blockcounter, blocks, lb, pf,
+                 state->indx_SF); 
+        }         
+
+        if (opts->veda_debug)
+        {
+          fprintf(stderr,
+                  "\n[VEDA MBC SF] slot=%d blocks=%d total=%d lb=%u pf=%u crc=%u hdr_ok=%u bytes=",
+                  slot + 1,
+                  blocks,
+                  total_bytes,
+                  lb,
+                  pf,
+                  (unsigned)CRCCorrect,
+                  (unsigned)state->data_block_crc_valid[slot][0]);
+                 
+          for (int x = 0; x < total_bytes; x++)
+            fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+
+          fprintf(stderr, "\n");
+        }
+
+        if (total_bytes > 0)
+        {
+          veda_trace_probe_air_header(opts,
+                                state,
+                                slot,
+                                state->dmr_pdu_sf[slot],
+                                (uint8_t)total_bytes,
+                                "MBC_SF",
+                                state->indx_SF);
+        }        
+
+        if (opts->isVEDA && total_bytes >= 8)
+        {
+            uint8_t b0 = state->dmr_pdu_sf[slot][0];
+            uint8_t svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
+
+            if (svc)
+            {
+                state->veda_seen_svc_db04[slot]++;
+
+                if (opts->veda_debug)
+                {
+                    fprintf(stderr,
+                            "\n[VEDA MBC SVC] slot=%d sf=%d total=%d raw=",
+                            slot + 1,
+                            state->indx_SF,
+                            total_bytes);
+
+                    for (int x = 0; x < total_bytes && x < 16; x++)
+                        fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+                    fprintf(stderr, "\n");
+                }
+            }
+        }
+
+        if (total_bytes > 0)
+        {
+            veda_note_candidate(opts,
+                                state,
+                                slot,
+                                VEDA_CAND_MBC05, // Можно оставить это имя для истории
+                                state->dmr_pdu_sf[slot],
+                                (uint8_t)total_bytes,
+                                state->indx_SF);
+        }        
+
+        /*
+         * Пробуем KX только на полном MBC superframe:
+         *   - не UDT
+         *   - не protected
+         *   - CRC ок
+         *   - длина ровно 48 байт
+         */
+        if (!pf && CRCCorrect && total_bytes == 48)
+        {
+          state->veda_seen_mbc48[slot] = 1;
+          state->veda_kx_try_count[slot]++;          
+          if (opts->veda_debug)
+          {
+            fprintf(stderr, "\n[VEDA KX MBC] TRY slot=%d payload=",
+                    slot + 1);
+            for (int x = 0; x < 48; x++)
+              fprintf(stderr, "%02X", state->dmr_pdu_sf[slot][x]);
+            fprintf(stderr, "\n");
+          }
+
+          handle_veda_kx_packet(opts, state, state->dmr_pdu_sf[slot]);
+        }
       }
 
       //cspdu will only act on any fid/opcodes if good CRC to prevent falsing on control signalling
