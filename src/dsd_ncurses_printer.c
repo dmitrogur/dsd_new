@@ -1097,13 +1097,6 @@ ncursesPrinter (dsd_opts * opts, dsd_state * state)
       if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A2[0]); }
       attron(COLOR_PAIR(3));
     }
-    if (state->payload_algid == 0x23) //AES-192
-    {
-      attron(COLOR_PAIR(1));
-      printw("AES-192 ");
-      if (state->aes_key_loaded[0] != 0) { printw("KS: %016llX ", state->A3[0]); }
-      attron(COLOR_PAIR(3));
-    }     
     if (state->payload_algid == 0x84 || state->payload_algid == 0x25 || state->payload_algid == 0x05)
     {
       attron(COLOR_PAIR(1));

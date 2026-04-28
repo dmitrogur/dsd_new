@@ -1,31 +1,15 @@
-    /*-------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------
  * dmr_ms.c
  * DMR MS/Simplex/Direct Mode Voice Handling and Data Gathering Routines
  *
- * DMH/IPP
+ * LWVMOBILE
+ * 2022-12 DSD-FME Florida Man Edition
  *-----------------------------------------------------------------------------*/
 
 #include "dsd.h"
 #include "dmr_const.h"
-#include "avr_kv.h"
-#include "dsd_veda.h"
-#include "veda.h"
-#include <string.h>
-#include <stdlib.h>
+
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
-
-extern void veda_burst288_stream_write(uint8_t db, const uint8_t raw36[36]);
-
-static void log_ms_voic_288(int vc, const uint8_t raw36[36])
-{
-  int i;
-
-  fprintf(stderr, "\n[%d] [MS VOIC_288] db=0xEB ", vc);
-  for (i = 0; i < 36; i++)
-    fprintf(stderr, "%02X", raw36[i]);
-  fprintf(stderr, "\n");
-}
-
 
 //A subroutine for processing MS voice
 void dmrMS (dsd_opts * opts, dsd_state * state)
@@ -82,12 +66,8 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
 
   //Note: Manual dibit inversion required here since I didn't seperate inverted return from normal return in framesync,
   //so getDibit doesn't know to invert it before it gets here
-  //DMH
-  // kc_reset(state);
+
   for (j = 0; j < 6; j++) {
-  //IPP
-  ipp_last_sample_num();
-  
   state->dmrburstL = 16;
 
   memset (ambe_fr, 0, sizeof(ambe_fr));
@@ -114,6 +94,7 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
   {
     //do nothing since we aren't loop locked forever.
   }
+
   //internalslot = tact_bits[1];
   internalslot = 0;
 
@@ -123,7 +104,8 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
   x = rX;
   y = rY;
   z = rZ;
-  // First AMBE Frame, Full 36  -> dmr_stereo_payload[12..47]
+
+  //First AMBE Frame, Full 36
   for(i = 0; i < 36; i++)
   {
     dibit = getDibit(opts, state);
@@ -148,7 +130,6 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
   y = rY;
   z = rZ;
 
-  // Second AMBE Frame, Part 1 (18 dibits) -> dmr_stereo_payload[48..65]
   //Second AMBE Frame, First Half 18 dibits just before Sync or EmbeddedSignalling
   for(i = 0; i < 18; i++)
   {
@@ -186,25 +167,30 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
 
   }
 
+  //Kirisun Check VC-F for Enc Identifiers -- has bad fec, unless its loaded differently
+  //SEE: https://patents.google.com/patent/CN102307075A/en?q=(kirisun)&q=(dmr)&oq=kirisun
+  // if (opts->dmr_le == 3 && vc == 6)
+  // {
+  //   bool kokay = 0;
+  //   // kokay = Golay_24_12_decode(syncdata);
+  //   unsigned long long int kirisun = (unsigned long long int)ConvertBitIntoBytes(&syncdata[0], 48);
+  //   fprintf (stderr, "Kiri: %012llX; Golay Okay: %d; \n", kirisun, kokay);
+  // }
+
   for(i = 0; i < 8; i++) emb_pdu[i + 0] = syncdata[i];
   for(i = 0; i < 8; i++) emb_pdu[i + 8] = syncdata[i + 40];
 
   emb_ok = -1;
-  if (QR_16_7_6_decode(emb_pdu))
+  if(QR_16_7_6_decode(emb_pdu))
   {
     emb_ok = 1;
     cc = ((emb_pdu[0] << 3) + (emb_pdu[1] << 2) + (emb_pdu[2] << 1) + emb_pdu[3]);
     power = emb_pdu[4];
     lcss = ((emb_pdu[5] << 1) + emb_pdu[6]);
     state->dmr_color_code = state->color_code = cc;
-  }       
-  else
-  {
-    emb_ok = 0;
   }
 
   //Continue Second AMBE Frame, 18 after Sync or EmbeddedSignalling
-  // Second AMBE Frame, Part 2 (18 dibits) -> dmr_stereo_payload[90..107]
   for(i = 0; i < 18; i++)
   {
     dibit = getDibit(opts, state);
@@ -220,6 +206,7 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
     z++;
 
   }
+
   //Setup for Third AMBE Frame
   //Interleave Schedule
   w = rW;
@@ -227,7 +214,6 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
   y = rY;
   z = rZ;
 
-  // Third AMBE Frame, Full 36 -> dmr_stereo_payload[108..143]
   //Third AMBE Frame, Full 36
   for(i = 0; i < 36; i++)
   {
@@ -244,75 +230,7 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
     z++;
 
   }
-    //DMH
-/*
-if (opts->run_scout)  
-{
-  uint8_t enc27[27];
-  if (scout_pack_27bytes_from_frames(ambe_fr, ambe_fr2, ambe_fr3, enc27) == 0) {
-    // IV берем из текущего стейта (он уже выставлен для этого VC*)
-    avr_scout_on_vc(state, enc27, state->aes_iv);
-  }
-}
-*/  
-if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
-{
-    // 1) Ключ (как в dsd_mbe.c)
-    uint8_t aes_key[32];
-    for (int i = 0; i < 8; i++) {
-      aes_key[i+0]  = (state->A1[0] >> (56-(i*8))) & 0xFF;
-      aes_key[i+8]  = (state->A2[0] >> (56-(i*8))) & 0xFF;
-      aes_key[i+16] = (state->A3[0] >> (56-(i*8))) & 0xFF;
-      aes_key[i+24] = (state->A4[0] >> (56-(i*8))) & 0xFF;
-    }
 
-    // 2) РОВНО 216 ЗАШИФРОВАННЫХ БИТ (4 диапазона). НИКАКОГО syncdata!
-    uint8_t enc_bits[216];
-    int bit_idx = 0;
-
-    for (int i = 12;  i < 48;  i++) { enc_bits[bit_idx++] = (state->dmr_stereo_payload[i] >> 1) & 1;
-                                      enc_bits[bit_idx++] =  state->dmr_stereo_payload[i]       & 1; }
-    for (int i = 48;  i < 66;  i++) { enc_bits[bit_idx++] = (state->dmr_stereo_payload[i] >> 1) & 1;
-                                      enc_bits[bit_idx++] =  state->dmr_stereo_payload[i]       & 1; }
-    for (int i = 90;  i < 108; i++) { enc_bits[bit_idx++] = (state->dmr_stereo_payload[i] >> 1) & 1;
-                                      enc_bits[bit_idx++] =  state->dmr_stereo_payload[i]       & 1; }
-    for (int i = 108; i < 144; i++) { enc_bits[bit_idx++] = (state->dmr_stereo_payload[i] >> 1) & 1;
-                                      enc_bits[bit_idx++] =  state->dmr_stereo_payload[i]       & 1; }
-
-    // 216 бит -> 27 байт (важно: та же полярность, что ожидает дешифратор; обычно MSB-first)
-    uint8_t enc_bytes[27] = {0};
-    // pack_bit_array_into_byte_array_ta(enc_bits, enc_bytes, 27);
-    pack_bit_array_into_byte_array(enc_bits, enc_bytes, 27);
-
-    // 3) AES-OFB: KS = AES_ENC(IV); P = C ^ KS; IV := KS
-    extern void aes_ecb_bytewise_payload_crypt(uint8_t *in, uint8_t *key,
-                                               uint8_t *out, int type, int enc);
-    uint8_t ofb[16];
-    // если IV хранится per-slot — возьми нужный: state->aes_iv[slot]
-    memcpy(ofb, state->aes_iv, 16);
-
-    uint8_t dec_bytes[27];
-    size_t produced = 0;
-    while (produced < sizeof(dec_bytes)) {
-      uint8_t ks_block[16];
-      // ваша сигнатура: (in, key, out, type, de/enc) — нам НУЖЕН ENC, т.е. enc=1
-      aes_ecb_bytewise_payload_crypt(ofb, aes_key, ks_block, 2, 1);
-      size_t take = (sizeof(dec_bytes) - produced > 16) ? 16 : (sizeof(dec_bytes) - produced);
-      for (size_t j = 0; j < take; j++)
-        dec_bytes[produced + j] = enc_bytes[produced + j] ^ ks_block[j];
-      memcpy(ofb, ks_block, 16); // OFB цепочка
-      produced += take;
-    }
-
-    // 4) Отладочный дамп (временно)
-    fprintf(stderr, "\n[OFB] DEC (27B): ");
-    for (int j = 0; j < 27; j++) fprintf(stderr, "%02X", dec_bytes[j]);
-    fprintf(stderr, "\n");
-
-    // Ничего больше тут не трогаем — основной пайплайн пусть работает как есть.
-}
-
-  //DMH
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
   {
@@ -338,13 +256,6 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   memcpy (m2, ambe_fr2, sizeof(m2));
   memcpy (m3, ambe_fr3, sizeof(m3));
 
-    // Явно вызываем дешифратор для каждого голосового фрейма,
-  // если мы в режиме AES и ключ был загружен нашей системой.
-  if ((state->payload_algid == 0x24  || state->payload_algid == 0x23 || state->payload_algid == 0x25) && state->aes_key_loaded[state->currentslot & 1] == 1)
-  {
-    // kv_decrypt_ambe_frames(state, ambe_fr, ambe_fr2, ambe_fr3);
-  }
-
   if (state->tyt_bp == 1)
   {
     tyt16_ambe2_codeword_keystream(state, ambe_fr, 0);
@@ -359,26 +270,6 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
-int veda_voice_done = 0;
-if (opts->isVEDA) {
-    veda_set_debug(opts->veda_debug);
-
-    if (opts->veda_key_set) {
-        veda_set_cps_key16(opts->veda_master_key);
-    }
-
-    veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
-
-    veda_voice_done = veda_ms_on_voice_triplet(
-        opts,
-        state,
-        0,
-        ambe_fr,
-        ambe_fr2,
-        ambe_fr3
-    );
-}
-
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
   ambe2_codeword_print_i(opts, ambe_fr2);
@@ -389,154 +280,14 @@ if (opts->isVEDA) {
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[0], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[0], state->s_lu, sizeof(state->s_lu));
-    state->kc_frames_total[0]++;
-    if (state->payload_algid > 0x00) {
-      if (state->errs2 >= 0 && state->errs2 <= 3) {
-        state->kc_frames_ok[0]++;
-      } else {
-        state->kc_uncorrectable[0]++;
-      }
-    }
-
   processMbeFrame (opts, state, NULL, ambe_fr2, NULL);
     memcpy(state->f_l4[1], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[1], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[1], state->s_lu, sizeof(state->s_lu));
-    state->kc_frames_total[0]++;
-    if (state->payload_algid > 0x00) {
-      if (state->errs2 >= 0 && state->errs2 <= 3) {
-        state->kc_frames_ok[0]++;
-      } else {
-        state->kc_uncorrectable[0]++;
-      }
-    }
   processMbeFrame (opts, state, NULL, ambe_fr3, NULL);
     memcpy(state->f_l4[2], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[2], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[2], state->s_lu, sizeof(state->s_lu));
-    state->kc_frames_total[0]++;
-    if (state->payload_algid > 0x00) { // только когда шифруется
-        if (state->errs2 >= 0 && state->errs2 <= 3) { 
-          state->kc_frames_ok[0]++;
-        } else {
-          state->kc_uncorrectable[0]++;
-        }
-    }    
-  
-  if (opts->kv_csv_path[0] != '\0')    // Покадровый тикер перебора: реагирует на KEY_SET_NEXT/KEY_FAILED/KEY_VALIDATED
-    kv_enum_on_frame(opts, state);    
-
-  //if ((state->payload_algid == 0x24   || state->payload_algid == 0x23 || state->payload_algid == 0x25) &&  
-  // if (  (state->currentslot == 0 && state->payload_algid == 0x24 && state->aes_key_loaded[0] == 1 ) || //DMR AES128
-  //           (state->currentslot == 0 && state->payload_algid == 0x25 && state->aes_key_loaded[0] == 1 ) || //DMR AES256
-            // ... остальная часть условия ...
-  //        )
-  if (state->payload_algid > 0x00) {
-    int kid = state->payload_keyid;
-    const int slot = (state->currentslot & 1);
-    if (state->dmr_key_validation_status[slot][kid] == KEY_VALIDATED)
-    {
-      time_ms_t now_ms    = dsd_now_ms();
-      time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-      time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
-      if (t_key_ms   < 0) t_key_ms = 0;
-      if (t_total_ms < 0) t_total_ms = 0;
-
-      fprintf(stderr, "\nKEY_VALIDATED (MS) alg=0x%02X keyid=%02X (t_key=%" PRId64 " ms, t_total=%" PRId64 " ms)\n",
-          (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms);
-
-      // kv_result.txt с учётом -jp
-      char kvpath[600];
-      kv_build_result_path(opts, "kv_result.txt", kvpath, sizeof(kvpath));
-      FILE *f = fopen(kvpath, "a");
-      if (f) {
-        fprintf(f, "KEY_VALIDATED (MS) alg=0x%02X keyid=%d t_key_ms=%" PRId64 " t_total_ms=%" PRId64 " prob=%u\n",
-            (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms, (unsigned) state->kv_key_probability[slot][kid]);
-      fclose(f);
-      } 
-      // keyOK_<id>.txt (ручной -H: ord=0, либо свой индекс)
-      int ord = 0;
-      kv_write_key_ok_file(opts, state, kid, ord);
-
-      state->dmr_key_validation_status[slot][kid] = KEY_SUCCESS;
-
-      if (opts->kv_exit_on_first_ok) {
-        exitflag = 1; // аккуратный выход
-      }
-    }        
-    else if (state->dmr_key_validation_status[slot][kid] == KEY_FAILED) {
-        // ключ явно признан неверным → выход
-        const int slot = state->currentslot & 1;
-        time_ms_t now_ms    = dsd_now_ms();
-        time_ms_t t_key_ms  = (state->kv_key_t0_ms[slot][kid] > 0) ? now_ms - state->kv_key_t0_ms[slot][kid] : 0;
-        time_ms_t t_total_ms= (state->kv_prog_t0_ms > 0)           ? now_ms - state->kv_prog_t0_ms : 0;
-        if (t_key_ms   < 0) t_key_ms = 0;
-        if (t_total_ms < 0) t_total_ms = 0;
-
-        // kv_result.txt с учётом -jp
-        char kvpath[600];
-        kv_build_result_path(opts, "kv_result.txt", kvpath, sizeof(kvpath));
-        FILE *f = fopen(kvpath, "a");
-        if (f) {
-        fprintf(f, "KEY_FAILED alg=0x%02X keyid=%02X t_key_ms=%" PRId64 ", t_total_ms=%" PRId64 " prob=%u\n",
-            (unsigned)state->payload_algid, kid, t_key_ms, t_total_ms, (unsigned) state->kv_key_probability[slot][kid]);
-        fclose(f);
-        } 
- 
-        exitflag = 1; // аккуратный выход при фейле
-    }
-  }  
-  if(state->exit_after_batch) {
-    exitflag = 1;
-  } 
-  /*  
-  if (state->payload_algid > 0x00 && state->dmr_key_validation_status[state->payload_keyid] == KEY_UNKNOWN)
-  {
-    const int slot = state->currentslot & 1;
-    const int kid  = (int)state->payload_keyid;
-
-    if (state->kv_key_t0_ms[slot][kid] == 0) {
-      state->kv_key_t0_ms[slot][kid] = dsd_now_ms();   // старт этой проверки
-    }    
-    if (state->kc_frames_ok[0] > 0) {
-      float energy = 0.0f;
-      int i;
-
-      // Анализируем энергию в аудио-буфере (160 сэмплов типа float)
-      //for (i = 0; i < 160; i++) 
-      //    energy += state->audio_out_temp_buf[i] * state->audio_out_temp_buf[i];
-      }
-      // Считаем энергию для ВСЕХ 3-х аудио-фрагментов
-      for (i = 0; i < 160; i++) energy += state->f_l4[0][i] * state->f_l4[0][i];
-      for (i = 0; i < 160; i++) energy += state->f_l4[1][i] * state->f_l4[1][i];
-      for (i = 0; i < 160; i++) energy += state->f_l4[2][i] * state->f_l4[2][i];      
-
-      // Пороговое значение. Тишина будет иметь энергию ~0. Голос - значительно больше.
-      // Это значение, возможно, придется немного подстроить, но 100.0f - это безопасное начало.
-      float energy_threshold = 1000000.0f;
-
-      if (energy > energy_threshold)
-      {
-          fprintf(stderr, "\n[+] AES KEY VALIDATION: SUCCESS for KID %d (Audio energy: %.2f, OK frames: %u/%u)\n",
-                  state->payload_keyid, energy, state->kc_frames_ok[0], state->kc_frames_total[0]);
-          state->dmr_key_validation_status[state->payload_keyid] = KEY_VALIDATED;
-      }
-      else
-      {
-          fprintf(stderr, "\n[-] AES KEY VALIDATION: FAILED for KID %d (Silence detected, energy: %.2f)\n",
-                  state->payload_keyid, energy);
-          state->dmr_key_validation_status[state->payload_keyid] = KEY_FAILED;
-      }
-    }    
-    else
-    {
-        // Если все фреймы были "плохими", ключ yt проверяем.
-        fprintf(stderr, "\n[-] AES KEY VALIDATION: FAILED for KID %d (OK Frames: %d/%d)\n", 
-                state->payload_keyid, state->kc_frames_ok[0], state->kc_frames_total[0]);
-        state->dmr_key_validation_status[state->payload_keyid] = KEY_UNKNOWN;
-    }
-  }
-  */
 
   //TODO: Consider copying f_l to f_r for left and right channel saturation on MS mode
   if (opts->floating_point == 0)
@@ -553,106 +304,27 @@ if (opts->isVEDA) {
       playSynthesizedVoiceFS3(opts, state);
   }
 
-if (opts->isVEDA) {
-    uint8_t raw_36[36]; 
-    memset(raw_36, 0, 36);
-    for (int i = 0; i < 144; i++) {
-        uint8_t dibit = state->dmr_stereo_payload[i];
-        int bit_idx = i * 2;
-        if (dibit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
-        if (dibit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
-    }
-    if (opts->veda_debug) {
-      log_ms_voic_288(vc, raw_36);
-      veda_burst288_stream_write(0xEB, raw_36);      
-    }
-    // Накапливаем первые 64 байта в начале сессии
-    int slot = state->currentslot & 1;
-    if (state->veda_kx_pos[slot] < 64) {
-        int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
-        memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
-        state->veda_kx_pos[slot] += copy_len;
-        
-        if (state->veda_kx_pos[slot] == 64) {
-            handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-        }
-    }
-}
   if (vc == 6)
   {
     //this needs to run prior to embedded link control
     if (state->payload_algid == 0x02)
         hytera_enhanced_alg_refresh(state);
-        
+    
     dmr_data_burst_handler(opts, state, (uint8_t *)dummy_bits, 0xEB);
     //check the single burst/reverse channel opportunity
     dmr_sbrc (opts, state, power);
 
     fprintf (stderr, "\n");
     dmr_alg_refresh (opts, state);
-    // Проверяем, только если это AES-шифрование и статус ключа еще не известен
-    /*
-    if (state->payload_algid > 0 && state->dmr_key_validation_status[state->payload_keyid] == KEY_UNKNOWN) // == 0x24 || state->payload_algid == 0x25
-    {
-        // Если хотя бы один фрейм в суперфрейме был "хорошим"
-        if (state->kc_frames_ok[0] > 0)
-        {
-          float energy = 0.0f;
-          int i;
-          // Анализируем энергию в аудио-буфере (160 сэмплов типа float)
-          for (i = 0; i < 160; i++) {
-            energy += state->audio_out_temp_buf[i] * state->audio_out_temp_buf[i];
-          }
-
-          // Пороговое значение. Тишина будет иметь энергию ~0. Голос - значительно больше.
-          // Это значение, возможно, придется немного подстроить, но 100.0f - это безопасное начало.
-          float energy_threshold = 1000000.0f;
-
-          if (energy > energy_threshold)
-          {
-            fprintf(stderr, "\n[+] AES KEY VALIDATION: SUCCESS for KID %d (Audio energy detected: %.2f)\n",
-                  state->payload_keyid, energy);
-            state->dmr_key_validation_status[state->payload_keyid] = KEY_VALIDATED;
-          }
-          else
-          {
-              fprintf(stderr, "\n[-] AES KEY VALIDATION: FAILED for KID %d (Silence detected, energy: %.2f)\n",
-                    state->payload_keyid, energy);
-                state->dmr_key_validation_status[state->payload_keyid] = KEY_FAILED;
-          }          
-        }
-        else
-        {
-            // Если все фреймы были "плохими", ключ yt проверяем.
-            fprintf(stderr, "\n[-] AES KEY VALIDATION: FAILED for KID %d (OK Frames: %d/%d)\n", 
-                    state->payload_keyid, state->kc_frames_ok[0], state->kc_frames_total[0]);
-            state->dmr_key_validation_status[state->payload_keyid] = KEY_UNKNOWN;
-        }
-    }
-   */     
   }
-  
 
   //collect the mi fragment
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, vc, m1, m2, m3);
 
-
-if (opts->isVEDA && !veda_voice_done)
-{
-    veda_debug_voice_wait(opts, state, 0,
-                          state->indx_SF,
-                          state->total_sf[0]);
-}
   //errors in ms/mono since we skip the other slot
   // cach_err = dmr_cach (opts, state, cachdata);
-  /* Реальный CACH decode вместо debug-only gate */
-  if (opts->isVEDA) 
-  {
-    // uint8_t ms_cach_bits[25];
-    // dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
-    // (void)dmr_cach(opts, state, ms_cach_bits);
-  }
+
   //update voice sync time for trunking purposes (particularly Con+)
   state->last_vc_sync_time = time(NULL);
 
@@ -664,7 +336,7 @@ if (opts->isVEDA && !veda_voice_done)
   lcss = 9;
 
   //this is necessary because we need to skip and collect dibits, not just skip them
-  if (vc > 6)  goto END;
+  if (vc > 6) goto END;
 
   skipDibit (opts, state, 144); //skip to next tdma channel
 
@@ -674,19 +346,12 @@ if (opts->isVEDA && !veda_voice_done)
     ncursesPrinter(opts, state);
   }
 
-    ipp_last_sample_num();//IPP
   //slot 1
   watchdog_event_history(opts, state, 0);
   watchdog_event_current(opts, state, 0);
 
  } // end loop
 
-      if(opts->run_scout) {
-        //if (!state->is_simulation_active) {
-         // avr_scout_on_superframe(opts, state);
-        //}      
-      }
-  
  END:
  //get first half payload dibits and store them in the payload for the next repitition
  skipDibit (opts, state, 144); //should we have two of these?
@@ -712,8 +377,7 @@ if (opts->isVEDA && !veda_voice_done)
   free (timestr);
   timestr = NULL;
  }
- ipp_last_sample_num();//IPP
- 
+
  //reset static ks counter
  state->static_ks_counter[0] = 0;
 
@@ -722,13 +386,6 @@ if (opts->isVEDA && !veda_voice_done)
 //collect buffered 1st half and get 2nd half voice payload and then jump to full MS Voice decoding.
 void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
 {
-  // сброс аудио-счётчиков MS
-  state->kc_frames_total[0] = 0;
-  state->kc_frames_ok[0]    = 0;
-  state->kc_uncorrectable[0]= 0;
-
-  // сброс признаков ключа на стороне KV
-  // dmr_kv_reset_all(state);
 
   char * timestr = getTimeC();
 
@@ -758,24 +415,6 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
   char cachdata[25];
   UNUSED(cachdata);
 
-  ipp_last_sample_num();//IPP
-
-  //DMH_KV
-  if (opts->kv_csv_path[0] && !getG_enum_active())
-  {
-     avr_kv_batch_begin(opts, state);         // старт батча кандидатов по ALGID/KID
-     // старт таймера для этого ключа (если ещё не стартовал)
-     const int slot = state->currentslot & 1;
-     const int kid  = (int)state->payload_keyid & 0xFF;
-     // if (state->kv_key_t0_ms[slot][kid] == 0)
-     state->kv_key_t0_ms[slot][kid] = dsd_now_ms();
-  }
-  // Вызываем дешифратор, если нужно
-  if ((state->payload_algid == 0x24  || state->payload_algid == 0x23 || state->payload_algid == 0x25) && state->aes_key_loaded[state->currentslot & 1] == 1)
-  {
-    // kv_decrypt_ambe_frames(state, ambe_fr, ambe_fr2, ambe_fr3);
-  }
-
   state->dmrburstL = 16;
   state->currentslot = 0; //force to slot 0
 
@@ -797,6 +436,7 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
     }
     cachdata[i] = dibit;
   }
+
   //Setup for first AMBE Frame
 
   //Interleave Schedule
@@ -896,47 +536,6 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
 
   }
 
-  //=============== суперкад
-/*  
-if (opts->run_scout)  
-{
-  uint8_t enc27[27];
-  if (scout_pack_27bytes_from_frames(ambe_fr, ambe_fr2, ambe_fr3, enc27) == 0) {
-    // IV берем из текущего стейта (он уже выставлен для этого VC*)
-    avr_scout_on_vc(state, enc27, state->aes_iv);
-  }
-}
-*/
-if (opts->isVEDA) {
-      uint8_t raw_36[36]; 
-      memset(raw_36, 0, 36);
-      for (int i = 0; i < 144; i++) {
-          uint8_t d_bit = state->dmr_stereo_payload[i];
-          int bit_idx = i * 2;
-          if (d_bit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
-          if (d_bit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
-      }
-      if (opts->veda_debug) {
-        log_ms_voic_288(1, raw_36);
-        veda_burst288_stream_write(0xEB, raw_36);        
-      }
-        
-      int slot = state->currentslot & 1;
-      if (state->veda_kx_pos[slot] < 64) {
-          int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
-          memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
-          state->veda_kx_pos[slot] += copy_len;
-          
-          if (opts->veda_debug) {
-              fprintf(stderr, "[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added %d bytes. Pos: %d/64\n", copy_len, state->veda_kx_pos[slot]);
-          }
-
-          if (state->veda_kx_pos[slot] == 64) {
-              handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-          }
-      }
-  }
-
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
   {
@@ -952,29 +551,16 @@ if (opts->isVEDA) {
   }
 
   fprintf (stderr, "%s ", timestr);
-  //IPP
-  ippl_new("sync-ms"); 
-  ippl_add("b_type", "ms");
-  
   if (opts->inverted_dmr == 0)
   {
     fprintf (stderr,"Sync: +DMR MS/DM MODE/MONO ");
-    ippl_add("DMR","+DMR");
   }
   else fprintf (stderr,"Sync: -DMR MS/DM MODE/MONO ");
-  if (state->dmr_color_code != 16){
+  if (state->dmr_color_code != 16)
     fprintf (stderr, "| Color Code=%02d ", state->dmr_color_code);
-    ippl_addi("tcc", state->dmr_color_code);//IPP
-  } else {
-     fprintf (stderr, "| Color Code=XX ");
-     ippl_add("tcc", "XX"); //IPP
-  }   
+  else fprintf (stderr, "| Color Code=XX ");
   fprintf (stderr, "| VC* ");
   fprintf (stderr, "\n");
-  //IPP
-  ippl_add("vc", "1");
-  ippl_add("vp", "VLC");//DMH
-  ippl_add("slot", "1");
 
   //alg reset
   //dmr_alg_reset (opts, state);
@@ -995,33 +581,12 @@ if (opts->isVEDA) {
     tyt16_ambe2_codeword_keystream(state, ambe_fr3, 0);
   }
 
-
   if (state->csi_ee == 1)
   {
     csi72_ambe2_codeword_keystream(state, ambe_fr);
     csi72_ambe2_codeword_keystream(state, ambe_fr2);
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
-
-int veda_voice_done = 0;
-if (opts->isVEDA) {
-    veda_set_debug(opts->veda_debug);
-
-    if (opts->veda_key_set) {
-        veda_set_cps_key16(opts->veda_master_key);
-    }
-
-    veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
-
-    veda_voice_done = veda_ms_on_voice_triplet(
-        opts,
-        state,
-        0,
-        ambe_fr,
-        ambe_fr2,
-        ambe_fr3
-    );
-}
 
   #ifdef PRINT_AMBE72
   ambe2_codeword_print_i(opts, ambe_fr);
@@ -1033,67 +598,15 @@ if (opts->isVEDA) {
     memcpy(state->f_l4[0], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[0], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[0], state->s_lu, sizeof(state->s_lu));
-    if (state->payload_algid > 0x00) { // только когда шифруется
-        if (state->errs2 >= 0 && state->errs2 <= 3) { 
-          state->kc_frames_ok[0]++;
-        } else {
-          state->kc_uncorrectable[0]++;
-        }
-    }    
-
   processMbeFrame (opts, state, NULL, ambe_fr2, NULL);
     memcpy(state->f_l4[1], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[1], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[1], state->s_lu, sizeof(state->s_lu));
-    if (state->payload_algid > 0x00) { // только когда шифруется
-        if (state->errs2 >= 0 && state->errs2 <= 3) { 
-          state->kc_frames_ok[0]++;
-        } else {
-          state->kc_uncorrectable[0]++;
-        }
-    }    
-
   processMbeFrame (opts, state, NULL, ambe_fr3, NULL);
     memcpy(state->f_l4[2], state->audio_out_temp_buf, sizeof(state->audio_out_temp_buf));
     memcpy(state->s_l4[2], state->s_l, sizeof(state->s_l));
     memcpy(state->s_l4u[2], state->s_lu, sizeof(state->s_lu));
-    if (state->payload_algid > 0x00) { // только когда шифруется
-        if (state->errs2 >= 0 && state->errs2 <= 3) { 
-          state->kc_frames_ok[0]++;
-        } else {
-          state->kc_uncorrectable[0]++;
-        }
-    }        
-  /*  
-  //if ((state->payload_algid == 0x24 || state->payload_algid == 0x25) &&
-  if (state->payload_algid > 0 && state->dmr_key_validation_status[state->payload_keyid] == KEY_UNKNOWN)
-  {
-      float energy = 0.0f;
-      int i;
-      // Анализируем энергию в аудио-буфере (160 сэмплов типа float)
-      for (i = 0; i < 160; i++) {
-          energy += state->audio_out_temp_buf[i] * state->audio_out_temp_buf[i];
-      }
 
-      // Пороговое значение. Тишина будет иметь энергию ~0. Голос - значительно больше.
-      // Это значение, возможно, придется немного подстроить, но 100.0f - это безопасное начало.
-      float energy_threshold = 1000000.0f;
-
-      if (energy > energy_threshold)
-      {
-          fprintf(stderr, "\n[+] AES KEY VALIDATION: SUCCESS for KID %d (Audio energy detected: %.2f)\n",
-                  state->payload_keyid, energy);
-          state->dmr_key_validation_status[state->payload_keyid] = KEY_VALIDATED;
-      }
-      else
-      {
-          fprintf(stderr, "\n[-] AES KEY VALIDATION: FAILED for KID %d (Silence detected, energy: %.2f)\n",
-                  state->payload_keyid, energy);
-          state->dmr_key_validation_status[state->payload_keyid] = KEY_FAILED;
-      }
-  }
-  */
- 
   //TODO: Consider copying f_l to f_r for left and right channel saturation on MS mode
   if (opts->floating_point == 0)
   {
@@ -1113,24 +626,8 @@ if (opts->isVEDA) {
   if (opts->dmr_le != 2) //if not Hytera Enhanced
     dmr_late_entry_mi_fragment (opts, state, 1, m1, m2, m3);
 
-if (opts->isVEDA && !veda_voice_done)
-{
-    veda_debug_voice_wait(opts, state, 0,
-                          state->indx_SF,
-                          state->total_sf[0]);
-}
-
-
-
   //errors due to skipping other slot
   // cach_err = dmr_cach (opts, state, cachdata);
-  /* Реально декодируем CACH и запускаем обычный Short LC path в MS/simplex */
-  if (opts->isVEDA)  
-  {
-    // uint8_t ms_cach_bits[25];
-    // dmr_ms_unpack_cach_bits_from_dibits(cachdata, ms_cach_bits);
-    // (void)dmr_cach(opts, state, ms_cach_bits);
-  }  
   if (timestr != NULL)
   {
     free (timestr);
@@ -1138,11 +635,8 @@ if (opts->isVEDA && !veda_voice_done)
   }
 
   skipDibit (opts, state, 144); //skip to next TDMA slot
-  ipp_last_sample_num();//IPP
   dmrMS (opts, state); //bootstrap into full TDMA frame
-  
-  if(!opts->kv_batch_enable)  
-    avr_scout_flush(opts, state, true);
+
 }
 
 //simplied to a simple data collector, and then passed on to dmr_data_sync for the usual processing
@@ -1173,28 +667,15 @@ void dmrMSData (dsd_opts * opts, dsd_state * state)
   }
 
   fprintf (stderr, "%s ", timestr);
-  //IPP
-  ippl_new("sync-ms-data"); 
-  ippl_add("b_type", "ms");
-
   if (opts->inverted_dmr == 0)
   {
     fprintf (stderr,"Sync: +DMR MS/DM MODE/MONO ");
-    ippl_add("DMR","+DMR");
   }
   else fprintf (stderr,"Sync: -DMR MS/DM MODE/MONO ");
   if (state->dmr_color_code != 16)
     fprintf (stderr, "| Color Code=%02d ", state->dmr_color_code);
   else fprintf (stderr, "| Color Code=XX ");
 
-  if (state->dmr_color_code != 16){
-    fprintf (stderr, "| Color Code=%02d ", state->dmr_color_code);\
-    ippl_addi("tcc", state->dmr_color_code);
-  } else {
-     fprintf (stderr, "| Color Code=XX ");
-     ippl_add("tcc", "XX");
-  }
-  ippl_add("slot", "1"); //DMH
   sprintf(state->slot1light, "%s", "");
   sprintf(state->slot2light, "%s", "");
 
@@ -1227,8 +708,5 @@ void dmrMSData (dsd_opts * opts, dsd_state * state)
     free (timestr);
     timestr = NULL;
   }
-
-  if(!opts->kv_batch_enable)
-    avr_scout_flush(opts, state, true);
 
 }

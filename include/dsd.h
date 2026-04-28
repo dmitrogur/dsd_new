@@ -59,8 +59,9 @@
 #include "p25p1_heuristics.h"
 
 //OSS support
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__CYGWIN__)
 #include <sys/soundcard.h>
-
+#endif
 #include <pulse/pulseaudio.h> //PULSE AUDIO
 #include <pulse/simple.h>     //PULSE AUDIO
 #include <pulse/error.h>      //PULSE AUDIO
@@ -68,7 +69,6 @@
 
 #define SAMPLE_RATE_IN 48000 //48000
 #define SAMPLE_RATE_OUT 8000 //8000
-
 
 #ifdef USE_RTLSDR
 #include <rtl-sdr.h>
@@ -86,53 +86,9 @@
 #ifdef USE_CODEC2
 #include <codec2/codec2.h>
 #endif
+
 extern volatile uint8_t exitflag; //fix for issue #136
 
-#include <sys/time.h>
-
-typedef struct veda_context_t veda_context_t;
-// быстрый helper в мс
-typedef int64_t time_ms_t;
-static inline time_ms_t dsd_now_ms(void) {
-  struct timeval tv; gettimeofday(&tv, NULL);
-  return (long)(tv.tv_sec * 1000LL + tv.tv_usec / 1000);
-}
-
-//#define DSD_KV_HOOK 1
-// Добавляем перечисление для статуса ключа
-typedef enum {
-  KEY_UNKNOWN   = 0,
-  KEY_FAILED    = 1,  
-  KEY_SET_NEXT  = 2,   // ранний отсев текущего кандидата, взять следующий
-  KEY_VALIDATED = 3,
-  KEY_SUCCESS   = 4,
-} dmr_key_status_t;
-
-typedef struct {
-  uint32_t last_mi;         // последний внутренний MI (из дешифр. блока)
-  int64_t  last_sf_no;      // последний номер суперфрейма (если ведёте счётчик)
-  int      score;
-  int      consec_hits;
-  uint8_t  accepted;        // 1, если ключ признан корректным
-  uint8_t  prev_algid;      // чтобы отлавливать смену ALG/KEY
-  uint8_t  prev_keyid;
-
-  uint8_t  rejected;        // 1, если решили "плохой ключ"
-  int      obs;             // сколько наблюдений учтено
-  uint8_t  logged_accept;   // чтобы "OK" напечатать один раз
-  uint8_t  logged_reject;   // чтобы "BAD" напечатать один раз
-} key_verifier_t;
-#ifdef DSD_KV_HOOK
-void dmr_kv_on_voice_decrypted(
-  int slot,           // 0 или 1
-  int algid,          // 0x24 AES-128, 0x25 AES-256
-  int keyid,          // из PI/LE
-  const uint8_t *iv,  // 16 байт AES IV (state->aes_iv/ aes_ivR)
-  const uint8_t *ct,  // 33 байта шифротекста голоса (как “DSP out”)
-  size_t ct_len,      // = 33
-  uint32_t mi_hdr     // внешний MI из PI/LE (state->payload_mi/R, 32 бита)
-);
-#endif
 //event history (each item)
 typedef struct {
   uint8_t write;      //if this event needs to be written to a log file
@@ -168,9 +124,6 @@ typedef struct {
   char text_message[2000]; //if this event is a decoded text message, then it goes here
   char event_string[2000]; //user legible and printable string for the event that happened
   char internal_str[2000]; //string that relates to a DSD-FME generated event (ENC LO, error notices, etc)
-  uint8_t kid;
-  uint8_t kv_smooth;
-  uint8_t kv_batch;
 } Event_History;
 
 //event history for number of each items above
@@ -295,59 +248,6 @@ typedef struct
 //dPMR
 /* Could only be 2 or 4 */
 #define NB_OF_DPMR_VOICE_FRAME_TO_DECODE 2
-typedef enum {
-  KV_FRAME_UNKNOWN = 0,
-  KV_FRAME_VLC,   // "VLC"
-  KV_FRAME_VC,    // "VC*"
-  KV_FRAME_PI,    // "PI"
-  KV_FRAME_LE,    // "LE SB"
-  KV_FRAME_OTHER
-} kv_frame_tag_t;
-
-// ===== freq CSV keys (до 32 строк) =====
-#ifndef KV_FREQ_MAX
-#define KV_FREQ_MAX 32
-#endif
-
-typedef struct {
-  uint8_t  alg_id;      // 0x24, 0x23, 0x25, ...
-  uint8_t  key_id;      // 0..255
-  uint8_t  enkey[32];   // байты ключа
-  uint8_t  key_len;     // фактическая длина в байтах (16/24/32 и т.п.)
-  uint32_t freq;        // Гц (154125000) или 0
-  int      cc;          // Color Code или -1
-  int      tg;          // TalkGroup  или -1
-} freq_key_t;
-
-typedef struct {
-  freq_key_t v[KV_FREQ_MAX];
-  int        n;
-} bf_store_t;
-
-// Глобальное хранилище (по желанию — можете убрать extern и держать локально)
-extern bf_store_t g_freqKeys;
-
-// Утилита: евристика для маппинга alg_id -> kv_alg_filter_t
-typedef enum {
-  KV_ALG_AUTO   = 0,
-  KV_ALG_BP     = 1,
-  KV_ALG_ARC4   = 2,
-  KV_ALG_DES    = 3,
-  KV_ALG_AES    = 4,
-  KV_ALG_TYT_BP = 5,
-  KV_ALG_TYT_EP = 6,
-  KV_ALG_TYT_AP = 7,
-  KV_ALG_AES128 = 8,
-  KV_ALG_AES192 = 9,
-  KV_ALG_AES256 = 10,
-  KV_ALG_VEDA   = 11,
-  KV_ALG_RETEVIS = 12,
-  KV_ALG_NULL = 13,  
-  KV_ALG_XOR = 14,  
-  KV_ALG_XOR_2 = 15  
-} kv_alg_filter_t;
-
-kv_alg_filter_t kv_algid_to_filter(uint8_t alg_id, uint8_t key_len);
 
 typedef struct
 {
@@ -372,220 +272,7 @@ typedef struct
   unsigned char SlowData[NB_OF_DPMR_VOICE_FRAME_TO_DECODE];
   unsigned int  ColorCode[NB_OF_DPMR_VOICE_FRAME_TO_DECODE / 2];
 } dPMRVoiceFS2Frame_t;
-
-//============================= 
-// VEDA
-#define VEDA_RAW_MAX_EVTS   256
-#define VEDA_RAW_MAX_BYTES   64
-#define VEDA_RAW_SF_WINDOW    3   /* ~ первые 0.7–1.1 с по текущим логам */
-
-typedef enum
-{
-  VEDA_RAW_NONE = 0,
-  VEDA_RAW_MBC_BLK0,
-  VEDA_RAW_MBC_SF,
-  VEDA_RAW_DB,
-  VEDA_RAW_VLC,
-  VEDA_RAW_TLC,
-  VEDA_RAW_EMB,
-  VEDA_RAW_CACH,
-  VEDA_RAW_MI
-} veda_raw_kind_t;
-
-typedef struct
-{
-  uint8_t  kind;
-  uint8_t  databurst;
-  uint8_t  slot;
-  uint8_t  crc_ok;
-  uint8_t  irr_err;
-
-  uint16_t sf;
-  uint16_t session_no;
-  uint16_t seq;
-
-  uint8_t  len;
-
-  /* универсальные aux-поля */
-  uint8_t  aux0;
-  uint8_t  aux1;
-  uint8_t  aux2;
-  uint8_t  aux3;
-
-  /* для CACH */
-  uint32_t tact_raw;
-
-  uint8_t  raw[VEDA_RAW_MAX_BYTES];
-} veda_raw_evt_t;
-
-
-typedef struct
-{
-  uint8_t  b0;
-  uint8_t  b1;
-  uint16_t w2;
-  uint16_t w4;
-  uint16_t w6;
-} veda_air_header_t;
-
-typedef enum
-{
-  VEDA_CAND_NONE   = 0,
-  VEDA_CAND_MBC05  = 1,
-  VEDA_CAND_VLC01  = 2,
-  VEDA_CAND_VC_EMB = 3,
-  VEDA_CAND_TLC02  = 4,
-  VEDA_CAND_TLC_F9 = 5
-} veda_candidate_source_t;
-
-typedef struct
-{
-  uint8_t  valid;
-  uint8_t  source_type;
-  uint8_t  raw_payload[64];
-  uint8_t  payload_len;
-  uint16_t seq_in_session;
-  uint16_t timestamp_sf;
-} veda_session_candidate_t;
-
-typedef enum
-{
-  VEDA_PATH_IDLE     = 0,
-  VEDA_PATH_PREVOICE = 1,
-  VEDA_PATH_INVOICE  = 2,
-  VEDA_PATH_TAIL     = 3
-} veda_path_stage_t;
-
-typedef struct
-{
-  uint8_t  active;
-  uint8_t  stage;
-  uint8_t  saw_mbc;
-  uint8_t  saw_vlc;
-  uint8_t  saw_voice;
-  uint8_t  tail_kind;     /* 0=none, 1=F9, 2=TLC */
-  uint16_t session_no;
-  uint16_t start_sf;
-  uint16_t last_sf;
-  uint16_t mbc_seq;
-  uint16_t vlc_seq;
-  uint16_t voice_seq;
-  uint16_t tail_seq;
-} veda_path_state_t;
-
-typedef enum
-{
-  VEDA_HDRSRC_NONE    = 0,
-  VEDA_HDRSRC_CSBK    = 1,
-  VEDA_HDRSRC_VLC     = 2,
-  VEDA_HDRSRC_TLC     = 3,
-  VEDA_HDRSRC_DHEADER = 4,
-  VEDA_HDRSRC_UDT     = 5
-} veda_hdrsrc_t;
-
-typedef struct {
-  uint8_t valid;
-  uint8_t slot;
-  uint8_t b0;
-  uint8_t b1;
-  uint16_t w2;
-  uint16_t w4;
-  uint16_t w6;
-  uint8_t raw8[8];
-  uint8_t crc_ok;
-  uint8_t fec_ok;
-  veda_hdrsrc_t src_kind;
-} veda_hdr_obs_t;
-
-typedef enum {
-  VEDA_IDS_NONE = 0,
-  VEDA_IDS_CSBK,
-  VEDA_IDS_FLCO,
-  VEDA_IDS_TLC,
-  VEDA_IDS_DHEADER,
-  VEDA_IDS_UDT,
-  VEDA_IDS_LASTSRC_TG,
-  VEDA_IDS_LRRP
-} veda_ids_source_t;
-
-typedef struct {
-  uint8_t valid;
-  uint32_t src;
-  uint32_t tgt;
-  veda_ids_source_t src_kind;
-} veda_ids_obs_t;
-
-typedef struct {
-  uint8_t valid;
-  uint32_t dmr_src;
-  uint32_t dmr_tgt;
-  uint32_t veda_id24_a;
-  uint32_t veda_id24_b;
-  uint8_t swapped;   // 0: a=tgt,b=src; 1: a=src,b=tgt
-  uint8_t source_kind;
-} veda_id_map_t;
-
-//=====================================================
-// На будущее!!!
-typedef struct {
-  uint8_t kind;          // MBC, DB, VLC, TLC, EMB, CACH, LC, unknown
-  uint8_t databurst;     // 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0xEB ...
-  uint8_t slot;
-  uint8_t sf;
-  uint8_t crc_ok;
-  uint8_t irr_err;
-  uint8_t len;           // байт в raw[]
-  uint8_t raw[64];       // запас с перекрытием
-  uint32_t tact_raw;
-  uint8_t lcss;
-  uint8_t at;
-  uint8_t tdma_slot;
-} veda_raw_block_t;
-
-typedef struct {
-  uint32_t session_no;
-  uint8_t active;
-  uint8_t slot;
-
-  uint8_t primary_key[32];
-  uint8_t primary_key_len;
-
-  uint8_t saw_first_voice;
-  uint8_t saw_tail_f9;
-  uint8_t setup_finalized;
-
-  uint32_t start_sf;
-  uint32_t first_voice_sf;
-
-  uint8_t vendor_mi_valid;
-  uint32_t vendor_mi32;
-  uint64_t eff_mi64;
-
-  uint16_t raw_count;
-  veda_raw_block_t raw_blocks[256];
-
-  uint16_t early_mbc_count;
-  uint16_t early_db_count;
-  uint16_t early_lc_count;
-  uint16_t early_cach_count;
-} veda_air_session_t;
-
-typedef struct {
-  uint8_t valid;
-
-  uint8_t peer_material[128];
-  uint8_t peer_material_len;
-
-  uint8_t challenge[128];
-  uint8_t challenge_len;
-
-  uint8_t entropy_tmp[32];
-  uint8_t session_key[32];
-
-  uint32_t score;
-  uint32_t reason_flags;
-} veda_kx_candidate_t;
-//=====================================================
+//
 typedef struct
 {
   int onesymbol;
@@ -672,10 +359,6 @@ typedef struct
   int ssize;
   int msize;
   int playfiles;
-  int m17encoder;
-  int m17encoderbrt;
-  int m17encoderpkt;
-  int m17decoderip;
   int delay;
   int use_cosine_filter;
   int unmute_encrypted_p25;
@@ -730,7 +413,6 @@ typedef struct
   short int aggressive_framesync;
 
   int frame_m17;
-  int inverted_m17;
 
   FILE *symbolfile;
   int call_alert;
@@ -746,12 +428,6 @@ typedef struct
   int udp_sockfdA; //analog 48k1
   int udp_portno;
   char udp_hostname[1024];
-
-  //M17 UDP for IP frame output
-  int m17_use_ip;     //if enabled, open UDP and broadcast IP frame
-  int m17_portno;    //default is 17000
-  int m17_udp_sock; //actual UDP socket for M17 to send to
-  char m17_hostname[1024];
 
   //tcp socket for SDR++, etc
   int tcp_sockfd;
@@ -827,56 +503,11 @@ typedef struct
 
   //Use floating point audio output
   int floating_point;
-  // Определяет, какой DMR-фильтр использовать: 61, 91 или 121
-  int dmr_filter_taps;  
-  // --- НОВЫЕ ПОЛЯ ДЛЯ ШУМОДАВА ---
-  int use_squelch;      // Флаг: 1 - использовать шумодав, 0 - нет.
-  float squelch_level;  // Порог шумодава в дБ (например, -40.0).
-  int analog_mute;      // Флаг: 1 - принудительно отключить аналоговый мониторинг (включается опцией -aM).
-  
-  int symbol_l_edge;
-  int symbol_r_edge;  
 
-  int kv_smooth; // 0=off, 1=on (enabled by -js) перебор ключей из CSV/INI ===
-  int run_scout; 
-  
-  // -jc <file.csv>
-  char  kv_csv_path[1024];         // пустая строка = не задан
-  // -jb <file.ini>
-  char  fb_csv_path[1024];         // пустая строка = не задан
-  // -jf <file.ini>
-  char  kv_ini_path[1024];         // пустая строка = не задан
-  // -ji <KID>
-  int   curr_ord;                  // -1 = фильтр KID отключён
-  // -jk <KID>
-  int   kv_filter_kid;             // -1 = фильтр KID отключён
-  // -ja <alg>
-  int   kv_filter_alg;              // 0=auto (по длине/полю CSV), 1=ARC4, 2=AES128, 3=AES192, 4=AES256
-  int kv_exit_on_first_ok;   // -j1: 1=немедленный выход при первом KEY_VALIDATED, 0=продолжать до конца
-  char kv_results_dir[512];
-  float kv_stat_thr;
-  char kv_batch_scout_dir[512];
-  int kv_batch_enable;
-  uint64_t curr_index; 
-
-  /* VEDA mode */
-  uint8_t isVEDA;   // 1 = включить VEDA-ветку
-  uint8_t veda_debug;    // 1 = подробные VEDA-логи
-
-  uint8_t veda_master_key[32]; // VEDA master-key (CPS)
-  uint8_t veda_key_set;        // Флаг, что ключ введен
-
-  uint8_t veda_manual_session_key[32];
-  uint8_t veda_manual_set; // Флаг, что юзер ввел сессию вручную
-
-  uint8_t veda_hypothesis; /* 0=collect, 1=main-tree, 2=runtime-bridge, 3=case8-proof, 4=auto */
-
-  
 } dsd_opts;
 
 typedef struct
 {
-
   int *dibit_buf;
   int *dibit_buf_p;
   int *dmr_payload_buf;
@@ -1004,7 +635,7 @@ typedef struct
   unsigned long long int K2;
   unsigned long long int K3;
   unsigned long long int K4;
-  uint8_t forced_alg_id; 
+  uint8_t forced_alg_id;
   int menuopen;
 
   //AES Key Segments
@@ -1259,7 +890,7 @@ typedef struct
   uint8_t nxdn_sacch_frame_segcrc[4];
   uint8_t nxdn_alias_block_number;
   char nxdn_alias_block_segment[4][4][8];
-  uint16_t nxdn_pn95_seed;  
+  uint16_t nxdn_pn95_seed;
 
   //site/srv/cch info
   char nxdn_location_category[14];
@@ -1314,15 +945,11 @@ typedef struct
   //M17 Storage
   uint8_t m17_lsf[360];
   uint8_t m17_pkt[850];
-  uint8_t m17_pbc_ct; //pbc packet counter
   uint8_t m17_str_dt; //stream contents
 
   unsigned long long int m17_dst;
   unsigned long long int m17_src;
   uint8_t m17_can; //can value that was decoded from signal
-  int m17_can_en; //can value supplied to the encoding side
-  int m17_rate;  //sampling rate for audio input
-  int m17_vox;  //vox enabled via RMS value
 
   char m17_dst_csd[20];
   char m17_src_csd[20];
@@ -1333,21 +960,19 @@ typedef struct
   uint8_t m17_meta[16];    //packed meta
   uint8_t m17_aes_iv[16]; //aes iv
   uint8_t m17_enc;        //enc type
-  uint8_t m17_enc_st;    //scrambler or data subtye     
-  
+  uint8_t m17_enc_st;    //scrambler or data subtye
+
   char m17_text_string[1024];
   char m17_gnss_string[1024];
   char m17_data_string[1024];
   char m17_meta_string[1024];
 
-  float m17_viterbi_err;  
+  float m17_viterbi_err;
 
   //misc str storage
   char str50a[50];
   char str50b[50];
   char str50c[50];
-  char m17dat[50];  //user supplied m17 data input string
-  char m17sms[800]; //user supplied sms text string
 
   //Codec2
   #ifdef USE_CODEC2
@@ -1359,10 +984,9 @@ typedef struct
   int tyt_ap;
   int tyt_bp;
   int tyt_ep;
-
   // retrevis rc2
   int retevis_ap;
-  void *rc2_context;         
+  void *rc2_context;
 
   //kenwood scrambler on DMR with forced application
   int ken_sc;
@@ -1370,7 +994,7 @@ typedef struct
   //anytone bp
   int any_bp;
 
-    //baofeng ap
+  //baofeng ap
   int baofeng_ap;
 
   //connect systems ee
@@ -1379,147 +1003,10 @@ typedef struct
   //generic ks
   int straight_ks;
   int straight_mod;
-  
-  //DMH
+
   uint8_t static_ks_bits[2][882];
   int static_ks_counter[2];
 
-  // Добавляем массив для хранения статуса для каждого KID (0-255)
-  dmr_key_status_t dmr_key_validation_status[2][256];
-  uint8_t kv_key_probability[2][256];
-
-  // статистика проверки ключа за текущий голосовой суперфрейм
-  // --- Key Check (DMR) instrumentation  -------------------- // KC++
-  uint32_t kc_frames_total[2];     // сколько embedded/LC кадров обработано в текущем суперфрейме
-  uint32_t kc_frames_ok[2];        // из них успешно декодированы (FEC/CRC ок) после расшифровки
-  uint32_t kc_uncorrectable[2];
-  key_verifier_t kv[2]; // [0]=slot1, [1]=slot2
-
-  time_ms_t kv_prog_t0_ms;                 // старт программы (мс)
-  time_ms_t kv_key_t0_ms[2][256];          // старт проверки по (slot,kid) (мс)  
-
-  bool exit_after_batch;
-  int indx_SF;
-  int is_simulation_active;
-  bool ms_mode;
-  int ngroups;
-  uint8_t flco_fec_err[2];  // 0/1: на текущем SF слота был FLCO FEC ERR
-  int kv_enum_count;
-  int total_sf[2];
-  int total_good[2];
-  bool analyzer;    
-  //===================================
-  // VEDA ================
-  veda_hdr_obs_t veda_hdr_obs[2];
-  
-  veda_ids_obs_t veda_ids_csbk[2];
-  veda_ids_obs_t veda_ids_flco[2];
-  veda_ids_obs_t veda_ids_tlc[2];
-  veda_ids_obs_t veda_ids_dhdr[2];
-  veda_ids_obs_t veda_ids_udt[2];
-
-  veda_id_map_t veda_map[2];
-  uint8_t veda_have_candidate_hdr[2];
-  uint8_t veda_subst_mask[2][6];
-  
-  uint32_t veda_sbrc_i[2];
-  uint16_t veda_sbrc_d[2];
-  uint8_t  veda_sbrc_valid[2];
-
-  bool veda_debug;
-  /* VEDA runtime */
-  uint32_t veda_raw_tgt[2];
-  uint32_t veda_raw_src[2];
-  uint8_t  veda_raw_src_kind[2];
-
-  uint8_t  veda_last_hdr_valid[2];
-  uint8_t  veda_last_hdr_src[2];
-  uint8_t  veda_last_b0[2];
-  uint8_t  veda_last_b1[2];
-  uint16_t veda_last_w2[2];
-  uint16_t veda_last_w4[2];
-  uint16_t veda_last_w6[2];
-
-  uint32_t veda_id24_a[2];
-  uint32_t veda_id24_b[2];
-  uint8_t  veda_id24_valid[2];
-
-  uint8_t  veda_sm[2];
-  uint16_t veda_len_lo[2];
-  uint16_t veda_len_hi[2];
-
-  uint8_t  veda_tx_buf[2][6];
-  uint8_t  veda_last_sel[2];
-  uint8_t  veda_subst_active[2];  
-
-  uint8_t veda_cmd0[2];
-  uint8_t veda_cmd1[2];
-
-
-  uint16_t Priority1;            
-  uint16_t Priority2;            
-  uint16_t Priority3; 
-  uint16_t irr_err;
-
-  uint8_t veda_session_key[2][32];     // 32-байтный session material
-  uint32_t veda_crypto_state[2][12];   // 384-битное состояние
-  int veda_state_valid[2];             // session_key_valid: ключ сессии уже есть
-  int veda_stream_valid[2];            // stream_ctx_prepared: ctx уже инициализирован и MI/tweak применён
-  int veda_pos[2];                     // Позиция в гамме
-
-  uint8_t veda_kx_buffer[2][48]; // Буфер для сборки KX пакета (по слотам)
-  int     veda_kx_pos[2];        // Текущий индекс сборки
-
-  uint64_t veda_last_applied_mi[2];
-  uint8_t  veda_mi_applied[2];
-
-  uint32_t veda_vendor_mi32[2];
-  uint8_t  veda_vendor_mi_valid[2];
-
-  uint8_t veda_f9_lc_bytes[2][4][9];
-  uint8_t veda_f9_lc_type[2][4];
-  uint8_t veda_f9_lc_count[2];   
-
-  veda_session_candidate_t veda_candidate[2];
-  uint16_t veda_candidate_seq[2];
-
-  veda_session_candidate_t veda_ref_mbc[2];
-  veda_session_candidate_t veda_ref_vlc[2];
-
-  veda_path_state_t veda_path[2];
-  uint16_t veda_path_counter[2];  
-
-  uint8_t  veda_seen_db06[2];
-  uint8_t  veda_seen_db07[2];
-  uint8_t  veda_seen_mbc48[2];
-  uint16_t veda_kx_try_count[2];
-
-  uint16_t veda_reject_probe_count[2];
-  uint16_t veda_reject_svc_hits[2];  
-
-  uint8_t  veda_bridge_notice_done[2];
-  uint16_t veda_bridge_probe_count[2]; 
-
-  uint16_t veda_svc_hdr_hits[2];
-
-  uint16_t veda_seen_db03[2];
-  uint16_t veda_seen_db04[2];
-  uint16_t veda_seen_svc_db03[2];
-  uint16_t veda_seen_svc_db04[2];
-  uint16_t veda_case5_like_hits[2];
-  uint16_t veda_case6_like_hits[2];
-
-  /* VEDA raw early logging */
-  uint8_t  veda_raw_active[2];
-  uint16_t veda_raw_session_no[2];
-  uint16_t veda_raw_start_sf[2];
-  uint16_t veda_raw_first_voice_sf[2];
-  uint16_t veda_raw_capture_until_sf[2];
-  uint16_t veda_raw_count[2];
-  uint16_t veda_raw_seq[2];
-  veda_raw_evt_t veda_raw_evt[2][VEDA_RAW_MAX_EVTS];
-
-  veda_context_t *veda;
 } dsd_state;
 
 /*
@@ -1529,13 +1016,6 @@ typedef struct
 //M17 Sync Patterns
 #define M17_LSF     "11113313"
 #define M17_STR     "33331131"
-//alternating with last symbol opposite of first symbol of LSF
-#define M17_PRE     "31313131"
-#define M17_PIV     "13131313"
-#define M17_PRE_LSF "3131313133331131" //Preamble + LSF
-#define M17_PIV_LSF "1313131311113313" //Preamble + LSF
-#define M17_BRT     "31331111"
-#define M17_PKT     "13113333"
 
 #define FUSION_SYNC     "31111311313113131131"
 #define INV_FUSION_SYNC "13333133131331313313"
@@ -1746,6 +1226,7 @@ int p25_12(uint8_t * input, uint8_t treturn[12]);
 //new p25 lsd fec function
 int p25p1_lsd_fec(uint8_t * input);
 
+void processP25lcw (dsd_opts * opts, dsd_state * state, char *lcformat, char *mfid, char *lcinfo);
 void processHDU (dsd_opts * opts, dsd_state * state);
 void processLDU1 (dsd_opts * opts, dsd_state * state);
 void processLDU2 (dsd_opts * opts, dsd_state * state);
@@ -1758,13 +1239,6 @@ void processDSTAR_HD (dsd_opts * opts, dsd_state * state); //DSTAR Header
 void processDSTAR_SD (dsd_opts * opts, dsd_state * state, uint8_t * sd); //DSTAR Slow Data
 void processYSF(dsd_opts * opts, dsd_state * state); //YSF
 void processM17STR(dsd_opts * opts, dsd_state * state); //M17 (STR)
-void processM17PKT(dsd_opts * opts, dsd_state * state); //M17 (PKT)
-void processM17LSF(dsd_opts * opts, dsd_state * state); //M17 (LSF)
-void processM17IPF(dsd_opts * opts, dsd_state * state); //M17 (IPF)
-void encodeM17STR(dsd_opts * opts, dsd_state * state); //M17 (STR) encoder
-void encodeM17BRT(dsd_opts * opts, dsd_state * state); //M17 (BRT) encoder
-void encodeM17PKT(dsd_opts * opts, dsd_state * state); //M17 (PKT) encoder
-void decodeM17PKT(dsd_opts * opts, dsd_state * state, uint8_t * input, int len); //M17 (PKT) decoder
 void processP2(dsd_opts * opts, dsd_state * state); //P2
 void processTSBK(dsd_opts * opts, dsd_state * state); //P25 Trunking Single Block
 void processMPDU(dsd_opts * opts, dsd_state * state); //P25 Multi Block PDU (SAP 0x61 FMT 0x15 or 0x17 for Trunking Blocks)
@@ -1790,25 +1264,25 @@ void ncursesMenu (dsd_opts * opts, dsd_state * state);
 uint8_t ncurses_input_handler(dsd_opts * opts, dsd_state * state, int c);
 void ncursesClose ();
 
-//new NXDN Functions start here!
+//NXDN Functions Start Here
 void nxdn_frame (dsd_opts * opts, dsd_state * state);
-void nxdn_descramble (uint8_t dibits[], int len);
-//nxdn deinterleaving/depuncturing functions
-void nxdn_deperm_facch (dsd_opts * opts, dsd_state * state, uint8_t bits[144]);
-void nxdn_deperm_sacch (dsd_opts * opts, dsd_state * state, uint8_t bits[60]);
-void nxdn_deperm_cac (dsd_opts * opts, dsd_state * state, uint8_t bits[300]);
-void nxdn_deperm_facch2_udch (dsd_opts * opts, dsd_state * state, uint8_t bits[348], uint8_t type);
-//type-d 'idas' deinterleaving/depuncturing functions
-void nxdn_deperm_scch(dsd_opts * opts, dsd_state * state, uint8_t bits[60], uint8_t direction);
-void nxdn_deperm_facch3_udch2(dsd_opts * opts, dsd_state * state, uint8_t bits[288], uint8_t type);
-//DCR Mode
-void nxdn_deperm_sacch2(dsd_opts * opts, dsd_state * state, uint8_t bits[60]);
-void nxdn_deperm_pich_tch(dsd_opts * opts, dsd_state * state, uint8_t bits[144]);
-//MT and Voice 
+void nxdn_pn95_dibit_scrambler(dsd_state * state, uint8_t * dibits, int len);
 void nxdn_message_type (dsd_opts * opts, dsd_state * state, uint8_t MessageType);
-void nxdn_voice (dsd_opts * opts, dsd_state * state, int voice, uint8_t dbuf[182]);
-//Osmocom OP25 12 Rate Trellis Decoder (for NXDN, M17, YSF, etc)
-void trellis_decode(uint8_t result[], const uint8_t source[], int result_len);
+void nxdn_voice (dsd_opts * opts, dsd_state * state, int voice, uint8_t * dbuf);
+
+//All-in-One NXDN Soft Decision Viterbi Function based on libM17
+uint32_t nxdn_soft_decision_viterbi(uint8_t * bits, const uint16_t * interleave, uint8_t * puncture, int d_len, int p_len, int num_bytes, int offset, uint8_t * viterbi_bits, uint8_t * viterbi_bytes);
+//NXDN Conventional and Type-C
+void nxdn_facch1(dsd_opts * opts, dsd_state * state, uint8_t * bits, uint8_t frame);
+void nxdn_sacch(dsd_opts * opts, dsd_state * state, uint8_t * bits);
+void nxdn_cac(dsd_opts * opts, dsd_state * state, uint8_t * bits);
+void nxdn_facch2_udch(dsd_opts * opts, dsd_state * state, uint8_t * bits, uint8_t type);
+//type-d 'idas'
+void idas_scch(dsd_opts * opts, dsd_state * state, uint8_t * bits, uint8_t direction);
+void idas_facch3_udch2(dsd_opts * opts, dsd_state * state, uint8_t * bits, uint8_t type);
+//Japanese DCR
+void dcr_sacch(dsd_opts * opts, dsd_state * state, uint8_t * bits);
+void dcr_pich_tch(dsd_opts * opts, dsd_state * state, uint8_t * bits, uint8_t lich);
 
 //OP25 NXDN CRC functions
 int load_i(const uint8_t val[], int len);
@@ -1818,26 +1292,25 @@ uint16_t crc15(const uint8_t buf[], int len);
 uint16_t crc16cac(const uint8_t buf[], int len);
 uint8_t crc7_scch(uint8_t bits[], int len); //converted from op25 crc6
 
+//YSF Soft Decision Viterbi
+uint32_t ysf_soft_decision_viterbi(uint8_t * dbuf, int d_len, int num_bytes, int offset, uint8_t * viterbi_bits, uint8_t * viterbi_bytes);
+
+//libM17 viterbi decoder
+
 //libm17 magic soft decision based viterbi
 #define SYM_PER_PLD 184
 void slice_symbols(uint16_t out[2*SYM_PER_PLD], const float inp[SYM_PER_PLD]);
 void randomize_soft_bits(uint16_t inp[SYM_PER_PLD*2]);
 void reorder_soft_bits(uint16_t outp[SYM_PER_PLD*2], const uint16_t inp[SYM_PER_PLD*2]);
-
-/* NXDN Convolution functions */
-void CNXDNConvolution_start(void);
-void CNXDNConvolution_decode(uint8_t s0, uint8_t s1);
-void CNXDNConvolution_chainback(unsigned char* out, unsigned int nBits);
-void CNXDNConvolution_encode(const unsigned char* in, unsigned char* out, unsigned int nBits);
-void CNXDNConvolution_init();
-
-//libM17 viterbi decoder
 uint32_t viterbi_decode(uint8_t* out, const uint16_t* in, const uint16_t len);
 uint32_t viterbi_decode_punctured(uint8_t* out, const uint16_t* in, const uint8_t* punct, const uint16_t in_len, const uint16_t p_len);
 void viterbi_decode_bit(uint16_t s0, uint16_t s1, const size_t pos);
 uint32_t viterbi_chainback(uint8_t* out, size_t pos, uint16_t len);
 void viterbi_reset(void);
 uint16_t q_abs_diff(const uint16_t v1, const uint16_t v2);
+
+//libm17 based soft decision viterbi for variable len and new punctures
+void slice_symbols_to_len(uint16_t * out, const float * inp, int len);
 
 //keeping these
 void NXDN_SACCH_Full_decode(dsd_opts * opts, dsd_state * state);
@@ -1849,14 +1322,24 @@ char * NXDN_Call_Type_To_Str(uint8_t CallType);
 void NXDN_Voice_Call_Option_To_Str(uint8_t VoiceCallOption, uint8_t * Duplex, uint8_t * TransmissionMode);
 char * NXDN_Cipher_Type_To_Str(uint8_t CipherType);
 //added these
+void NXDN_decode_Prop(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_Alias(dsd_opts * opts, dsd_state * state, uint8_t * Message);
+void NXDN_decode_Alias16(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_VCALL_ASSGN(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_cch_info(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_srv_info(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_site_info(dsd_opts * opts, dsd_state * state, uint8_t * Message);
+void nxdn_decode_dst_info(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 void NXDN_decode_adj_site(dsd_opts * opts, dsd_state * state, uint8_t * Message);
 //Type-D SCCH Message Decoder
 void NXDN_decode_scch(dsd_opts * opts, dsd_state * state, uint8_t * Message, uint8_t direction);
+void NXDN_decode_VCALL_ARIB(dsd_opts * opts, dsd_state * state, uint8_t * Message);
+void NXDN_decode_ALIAS_ARIB(dsd_opts * opts, dsd_state * state, uint8_t * Message);
+uint32_t sjis_char_to_unicode(uint16_t sjis);
+uint32_t big5_char_to_unicode(uint16_t big5);
+int utf8_encode(int c, char *buf);
+
+void dPMRVoiceFrameProcess(dsd_opts * opts, dsd_state * state);
 
 //dPMR functions
 void ScrambledPMRBit(uint32_t * LfsrValue, uint8_t * BufferIn, uint8_t * BufferOut, uint32_t NbOfBitToScramble);
@@ -1894,7 +1377,7 @@ void dmr_flco (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[], uint32_t C
 void dmr_cspdu (dsd_opts * opts, dsd_state * state, uint8_t cs_pdu_bits[], uint8_t cs_pdu[], uint32_t CRCCorrect, uint32_t IrrecoverableErrors);
 void dmr_slco (dsd_opts * opts, dsd_state * state, uint8_t slco_bits[]);
 uint8_t dmr_cach (dsd_opts * opts, dsd_state * state, uint8_t cach_bits[25]);
-uint32_t dmr_34(uint8_t * input, uint8_t treturn[18]); //simplier trellis decoder
+uint32_t viterbi_r34 (uint8_t * input, uint8_t * output);
 void beeper (dsd_opts * opts, dsd_state * state, int lr, int id, int ad, int len);
 void dmr_gateway_identifier (uint32_t source, uint32_t target); //translate special addresses
 
@@ -1916,8 +1399,7 @@ void dmr_embedded_gps (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[]);
 void apx_embedded_gps (dsd_opts * opts, dsd_state * state, uint8_t lc_bits[]);
 void lip_protocol_decoder (dsd_opts * opts, dsd_state * state, uint8_t * input);
 void nmea_iec_61162_1 (dsd_opts * opts, dsd_state * state, uint8_t * input, uint32_t src, int type);
-void nmea_harris (dsd_opts * opts, dsd_state * state, uint8_t * input, uint32_t src, int slot);
-void harris_gps(dsd_opts * opts, dsd_state * state, int slot, uint8_t * input);
+void harris_lptt (dsd_opts * opts, dsd_state * state, uint8_t * input, uint32_t src, int slot, int phase);
 void utf16_to_text (dsd_state * state, uint8_t wr, uint16_t len, uint8_t * input);
 void utf8_to_text (dsd_state * state, uint8_t wr, uint16_t len, uint8_t * input);
 
@@ -2041,10 +1523,6 @@ void QR_16_7_6_init();
 void QR_16_7_6_encode(unsigned char *origBits, unsigned char *encodedBits);
 bool QR_16_7_6_decode(unsigned char *rxBits);
 
-// Репорт-версии для DMR
-// bool Hamming_7_4_decode_report(unsigned char *rxBits, int *corrected, bool *uncorrectable);
-// bool QR_16_7_6_decode_report(unsigned char *rxBits, int *corrected, bool *uncorrectable);
-
 void InitAllFecFunction(void);
 void resetState (dsd_state * state);
 void reset_dibit_buffer(dsd_state * state);
@@ -2131,9 +1609,6 @@ int udp_socket_connect(dsd_opts * opts, dsd_state * state);
 int udp_socket_connectA(dsd_opts * opts, dsd_state * state);
 void udp_socket_blaster(dsd_opts * opts, dsd_state * state, size_t nsam, void * data);
 void udp_socket_blasterA(dsd_opts * opts, dsd_state * state, size_t nsam, void * data);
-int m17_socket_receiver(dsd_opts * opts, void * data);
-int udp_socket_connectM17(dsd_opts * opts, dsd_state * state);
-int m17_socket_blaster(dsd_opts * opts, dsd_state * state, size_t nsam, void * data);
 
 //RC4 function prototypes
 void rc4_voice_decrypt (int drop, uint8_t keylength, uint8_t messagelength, uint8_t key[], uint8_t cipher[], uint8_t plain[]);
@@ -2155,33 +1630,29 @@ void aes_ctr_bitwise_payload_crypt (uint8_t * iv, uint8_t * key, uint8_t * paylo
 void tyt16_ambe2_codeword_keystream(dsd_state * state, char ambe_fr[4][24], int fnum);
 void tyt_ep_aes_keystream_creation(dsd_state * state, char * input);
 void tyt_ap_pc4_keystream_creation(dsd_state * state, char * input);
-void retevis_rc2_keystream_creation(dsd_state *state, char *input);     
-
+void retevis_rc2_keystream_creation(dsd_state *state, char *input);
+void ken_dmr_scrambler_keystream_creation(dsd_state * state, char * input);
+void anytone_bp_keystream_creation(dsd_state * state, char * input);
 void baofeng_ap_pc5_keystream_creation(dsd_state *state, char *input);
 void csi72_ambe2_codeword_keystream(dsd_state * state, char ambe_fr[4][24]);
+void straight_mod_xor_keystream_creation(dsd_state * state, char * input);
 
 //Kirisun
 uint32_t kirisun_lfsr(unsigned long long int mi);
 void kirisun_adv_keystream_creation(dsd_state *state);
 void kirisun_uni_keystream_creation(dsd_state *state);
-        
-//Misc Other Encryption Modes
-void ken_dmr_scrambler_keystream_creation(dsd_state * state, char * input);
-void anytone_bp_keystream_creation(dsd_state * state, char * input);
-void straight_mod_xor_keystream_creation(dsd_state * state, char * input);  
 
 //Hytera Enhanced
 void hytera_enhanced_rc4_setup(dsd_opts * opts, dsd_state * state, unsigned long long int key_value, unsigned long long int mi_value);
 unsigned long long int hytera_lfsr(uint8_t * mi, uint8_t * taps, uint8_t len);
-void hytera_enhanced_alg_refresh(dsd_state * state);  
+void hytera_enhanced_alg_refresh(dsd_state * state);
 
 //LFSR to expand either a DMR 32-bit or P25/NXDN 64-bit MI into a 128-bit IV for AES
+void lfsr_64_to_128(uint8_t * iv);
 void LFSR128(dsd_state * state);
 void LFSR128n(dsd_state * state);
 void LFSR128d(dsd_state * state);
 
-//IPP
-extern unsigned int dmr_filter_sample_num;
 
 #ifdef __cplusplus
 extern "C" {
@@ -2197,38 +1668,18 @@ long int rtl_return_rms();
 void rtl_clean_queue();
 #endif
 
+
 //Phase 2 RS/FEC Functions
 int ez_rs28_ess (int payload[96], int parity[168]); //ezpwd bridge for FME
 int ez_rs28_facch (int payload[156], int parity[114]); //ezpwd bridge for FME
 int ez_rs28_sacch (int payload[180], int parity[132]); //ezpwd bridge for FME
 int isch_lookup (uint64_t isch); //isch map lookup
-//=========================================================================
-// VEDA mode
 
-void veda_note_raw_src_tgt_ex(dsd_state *state, int slot,
-                              uint32_t source, uint32_t target,
-                              uint8_t src_kind);
-
-int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
-                           const veda_air_header_t *hdr,
-                           uint8_t src_kind);
-
-void veda_reset_slot(dsd_state *state, int slot);
-void veda_reset_profile(dsd_state *state, int slot);
-void veda_dump_state(dsd_state *state, int slot);
-void veda_log_subst(dsd_state *state, int slot, int chng);
-void veda_note_raw_src_tgt(dsd_state *state, int slot, uint32_t source, uint32_t target);
-int  veda_try_build_tx_subst_frame(dsd_state *state, int slot);
-void veda_set_profile_ids(dsd_state *state, int slot, uint32_t id24_a, uint32_t id24_b);
-
-int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, const veda_air_header_t *hdr);
+//Phase 1 NID Check
+int check_NID(char* bch_code, int* new_nac, char* new_duid, unsigned char parity);
 
 #ifdef __cplusplus
 }
 #endif
-
-//IPP
-#include "avr-log.h"
-
 
 #endif // DSD_H

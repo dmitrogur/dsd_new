@@ -12,7 +12,6 @@
 
 void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRCCorrect, uint32_t IrrecoverableErrors)
 {
-  UNUSED2(opts, CRCCorrect);
 
   uint8_t MFID = PI_BYTE[1];
 
@@ -25,18 +24,65 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
       state->last_vc_sync_time = time(NULL);
       state->last_cc_sync_time = time(NULL);
     }
-    fprintf (stderr, "\n MFID %d", MFID);
+
+    if (MFID == 0x0A && CRCCorrect == 1) //Kirisun
+    {
+      uint8_t so  = PI_BYTE[2]; //in VLC and PI, this byte is 0x40, so thinking this could be SVC_OPT
+      uint8_t alg = PI_BYTE[0]; //observed 0x36 and 0x37 for Kirisun Advanced and Universal Privacy
+      // uint8_t kid = PI_BYTE[2]; //user info conveyed there is only 16 allotments for Key, and keys are channel specific, so no key id value
+      uint32_t target = ((unsigned long long int)PI_BYTE[7] << 16) | ((unsigned long long int)PI_BYTE[8] << 8)  | ((unsigned long long int)PI_BYTE[9] << 0);
+
+      //TODO: Use ALG and TGT value here to produce a key id via hashing it
+      uint8_t hash = alg * target % 256; //more complex hash later (honestly, probably not)
+
+      //MI only appears to be 32-bit
+      uint32_t mi = ((uint32_t)PI_BYTE[3] << 24) | ((uint32_t)PI_BYTE[4] << 16) | 
+                    ((uint32_t)PI_BYTE[5] << 8)  | ((uint32_t)PI_BYTE[6] << 0);
+
+      if (state->currentslot == 0)
+      {
+        state->dmr_so = so;
+        state->payload_algid = alg; 
+        state->payload_keyid = hash;
+        state->payload_mi = mi;
+      }
+      else
+      {
+        state->dmr_soR = so;
+        state->payload_algidR = alg;
+        state->payload_keyidR = hash;
+        state->payload_miR = mi;
+      }
+
+      fprintf (stderr, "%s ", KYEL);
+      fprintf (stderr, "\n Slot %d", state->currentslot+1);
+      fprintf (stderr, " DMR PI H- ALG ID: %02X; KEY ID: %02X; MI(32): %08X;", alg, hash, mi);
+
+      fprintf (stderr, " Kirisun ");
+      if (alg == 0x36)
+        fprintf (stderr, "Advanced;");
+      else if (alg == 0x37)
+        fprintf (stderr, "Universal;");
+      else fprintf (stderr, "Encryption;");
+      fprintf (stderr, "%s", KNRM);
+
+      //disable late entry for DMRA, Flag 3 for future check of VC-F 48-bit region with Golay 24,12 Encoding
+      //SEE: https://patents.google.com/patent/CN102307075A/en?q=(kirisun)&q=(dmr)&oq=kirisun
+      //tested patent above with information provided, VC-F had a SB, but the 48-bit
+      //full value yielded bad Golay results, and user submitted info contradicts this patent for samples provided
+      //Late Entry MI does appear to work, however, and reports a good CRC for that as well,
+      //reverse engineered LFSR for Kirisun lines up with the late entry for 32-bit MI values.
+      opts->dmr_le = 3;
+
+    }
+
     if (MFID == 0x68) //Hytera Enhanced
     {
-      sprintf (state->dmr_branding, "%s", "Hytera"); 
       if (state->currentslot == 0)
       {
         state->dmr_so |= 0x40; //OR the enc bit onto the SO
         state->payload_algid = PI_BYTE[0];
         state->payload_keyid = PI_BYTE[2];
-        scout_db_on_pi_or_lc(state->currentslot, state->payload_algid,  state->payload_keyid, 0, 0);
-        // crc_ok_pi == 1, если PI прошёл CRC (или твой эквивалент)
-
         state->payload_mi = ((unsigned long long int)PI_BYTE[3] << 32ULL) | ((unsigned long long int)PI_BYTE[4] << 24) | 
         ((unsigned long long int)PI_BYTE[5] << 16) | ((unsigned long long int)PI_BYTE[6] << 8) | ((unsigned long long int)PI_BYTE[7] << 0);
       }
@@ -45,7 +91,6 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
         state->dmr_soR |= 0x40; //OR the enc bit onto the SO
         state->payload_algidR = PI_BYTE[0];
         state->payload_keyidR = PI_BYTE[2];
-        scout_db_on_pi_or_lc(state->currentslot, state->payload_algidR, state->payload_keyidR, 0, 0);
         state->payload_miR = ((unsigned long long int)PI_BYTE[3] << 32ULL) | ((unsigned long long int)PI_BYTE[4] << 24) | 
         ((unsigned long long int)PI_BYTE[5] << 16) | ((unsigned long long int)PI_BYTE[6] << 8) | ((unsigned long long int)PI_BYTE[7] << 0);
       }
@@ -53,13 +98,7 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
       fprintf (stderr, "%s ", KYEL);
       fprintf (stderr, "\n Slot %d", state->currentslot+1);
       fprintf (stderr, " DMR PI H- ALG ID: %02X; KEY ID: %02X; MI(40): %02X%02X%02X%02X%02X;", 
-      PI_BYTE[0], PI_BYTE[2], PI_BYTE[3], PI_BYTE[4], PI_BYTE[5], PI_BYTE[6], PI_BYTE[7]);      
-      
-      //IPP
-      ippl_add("kPI", "H"); 
-      ippl_addu("kALG_ID", state->payload_algidR); 
-      ippl_addu("kKEY_ID", state->payload_keyidR); 
-      ippl_addu("kPI_MI", state->payload_miR);
+      PI_BYTE[0], PI_BYTE[2], PI_BYTE[3], PI_BYTE[4], PI_BYTE[5], PI_BYTE[6], PI_BYTE[7]);
 
       //PI_BYTE[9] is a checksum of the other bytes combined
       uint8_t checksum = 0;
@@ -107,11 +146,7 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
         state->payload_algid = PI_BYTE[0];
         state->payload_keyid = PI_BYTE[2];
         state->payload_mi    = ((unsigned long long int)PI_BYTE[3] << 24ULL) | ((unsigned long long int)PI_BYTE[4] << 16ULL) | ((unsigned long long int)PI_BYTE[5] << 8ULL) | ((unsigned long long int)PI_BYTE[6] << 0ULL);
-        
-        if(state->payload_algid < 0x21 || state->payload_algid > 0x25)
-          state->analyzer = 1;
-
-        if (state->payload_algid <= 0x26)
+        if (state->payload_algid < 0x26)
         {
           fprintf (stderr, "%s ", KYEL);
           fprintf (stderr, "\n Slot 1");
@@ -140,23 +175,12 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
             fprintf (stderr, " AES-128;");
             state->payload_algid = 0x24;
           }
-          else if ((state->payload_algid & 0x07) == 0x03) //DMH ????
-          {
-            fprintf (stderr, " AES-192;");
-            state->payload_algid = 0x23;
-          }
+
           else if ((state->payload_algid & 0x07) == 0x05)
           {
             fprintf (stderr, " AES-256;");
             state->payload_algid = 0x25;
           }
-          //IPP
-          ippl_add("kPI", "H"); 
-          ippl_addu("kALG_ID", state->payload_algid); 
-          ippl_addu("kKEY_ID", state->payload_keyid); 
-          ippl_addu("kPI_MI", state->payload_mi);
-
-          scout_db_on_pi_or_lc(state->currentslot, state->payload_algid, state->payload_keyid, 0, 0);
 
           fprintf (stderr, "%s ", KNRM);
 
@@ -168,14 +192,14 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
           }
 
           //expand the 32-bit MI to a 128-bit AES IV
-          if (state->payload_algid == 0x24 || state->payload_algid == 0x23 || state->payload_algid == 0x25)
+          if (state->payload_algid == 0x24 || state->payload_algid == 0x25)
           {
             fprintf (stderr, "\n");
             LFSR128d (state);
           }
         }
 
-        if (state->payload_algid > 0x26)
+        if (state->payload_algid >= 0x26)
         {
           state->payload_algid = 0;
           state->payload_keyid = 0;
@@ -189,11 +213,7 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
         state->payload_algidR = PI_BYTE[0];
         state->payload_keyidR = PI_BYTE[2];
         state->payload_miR    = ((unsigned long long int)PI_BYTE[3] << 24ULL) | ((unsigned long long int)PI_BYTE[4] << 16ULL) | ((unsigned long long int)PI_BYTE[5] << 8ULL) | ((unsigned long long int)PI_BYTE[6] << 0ULL);
-
-        if(state->payload_algidR < 0x21 || state->payload_algidR > 0x25)
-          state->analyzer=1;
-
-        if (state->payload_algidR <= 0x26)
+        if (state->payload_algidR < 0x26)
         {
           fprintf (stderr, "%s ", KYEL);
           fprintf (stderr, "\n Slot 2");
@@ -223,24 +243,14 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
             state->payload_algidR = 0x24;
           }
 
-          else if ((state->payload_algidR & 0x07) == 0x03)
-          {
-            fprintf (stderr, " AES-192;");
-            state->payload_algidR = 0x23;
-          }
           else if ((state->payload_algidR & 0x07) == 0x05)
           {
             fprintf (stderr, " AES-256;");
             state->payload_algidR = 0x25;
           }
-          //IPP
-          ippl_add("kPI", "C"); 
-          ippl_addu("kALG_ID", state->payload_algidR); 
-          ippl_addu("kKEY_ID", state->payload_keyidR); 
-          ippl_addu("kPI_MI", state->payload_miR);
+
 
           fprintf (stderr, "%s ", KNRM);
-          scout_db_on_pi_or_lc(state->currentslot, state->payload_algid, state->payload_keyid, 0, 0);
 
           //expand the 32-bit MI to a 64-bit DES IV
           if (state->payload_algidR == 0x22)
@@ -250,14 +260,14 @@ void dmr_pi (dsd_opts * opts, dsd_state * state, uint8_t PI_BYTE[], uint32_t CRC
           }
 
           //expand the 32-bit MI to a 128-bit AES IV
-          if (state->payload_algidR == 0x24 || state->payload_algidR == 0x23 || state->payload_algidR == 0x25)
+          if (state->payload_algidR == 0x24 || state->payload_algidR == 0x25)
           {
             fprintf (stderr, "\n");
             LFSR128d (state);
           }
         }
 
-        if (state->payload_algidR > 0x26)
+        if (state->payload_algidR >= 0x26)
         {
           state->payload_algidR = 0;
           state->payload_keyidR = 0;
@@ -298,12 +308,6 @@ void LFSR(dsd_state * state)
     fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algid, state->payload_keyid);
     fprintf (stderr, " MI(32): %08llX;", lfsr);
     fprintf (stderr, " RC4;");
-    //IPP
-    ippl_add("kPI", "C"); 
-    ippl_addu("kALG_ID", state->payload_algid); 
-    ippl_addu("kKEY_ID", state->payload_keyid); 
-    ippl_addu("kPI_MI", lfsr);
-
     fprintf (stderr, "%s", KNRM);
     state->payload_mi = lfsr;
   }
@@ -316,12 +320,6 @@ void LFSR(dsd_state * state)
     fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algidR, state->payload_keyidR);
     fprintf(stderr, " MI(32): %08llX;", lfsr);
     fprintf (stderr, " RC4;");
-    //IPP
-    ippl_add("kPI", "C"); 
-    ippl_addu("kALG_ID", state->payload_algidR); 
-    ippl_addu("kKEY_ID", state->payload_keyidR); 
-    ippl_addu("kPI_MI", lfsr);
-
     fprintf (stderr, "%s", KNRM);
     state->payload_miR = lfsr;
   }
@@ -354,12 +352,6 @@ void LFSR64(dsd_state * state)
       fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algid, state->payload_keyid);
       fprintf (stderr, " MI(64): %016llX;", lfsr);
       fprintf (stderr, " DES;");
-      //IPP
-      ippl_add("kPI", "C"); 
-      ippl_addu("kALG_ID", state->payload_algid); 
-      ippl_addu("kKEY_ID", state->payload_keyid); 
-      ippl_addu("kPI_MI", lfsr);
-
       fprintf (stderr, "%s", KNRM);
       state->payload_mi = lfsr & 0xFFFFFFFF; //truncate for next repitition and le verification
       state->payload_miP = lfsr;
@@ -373,12 +365,6 @@ void LFSR64(dsd_state * state)
       fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algidR, state->payload_keyidR);
       fprintf (stderr, " MI(64): %016llX;", lfsr);
       fprintf (stderr, " DES;");
-      //IPP
-      ippl_add("kPI", "C"); 
-      ippl_addu("kALG_ID", state->payload_algidR); 
-      ippl_addu("kKEY_ID", state->payload_keyidR); 
-      ippl_addu("kPI_MI",  state->payload_miP);
-
       fprintf (stderr, "%s", KNRM);
       state->payload_miR = lfsr & 0xFFFFFFFF; //truncate for next repitition and le verification
       state->payload_miN = lfsr;
@@ -452,22 +438,9 @@ void LFSR128d(dsd_state * state)
 
     if (state->payload_algid == 0x24)
       fprintf (stderr, " AES-128;");
-    else
-      if (state->payload_algid == 0x23)
-        fprintf (stderr, " AES-192;");
-      else  
-        if (state->payload_algid == 0x25)
-          fprintf (stderr, " AES-256;");
-        else
-          fprintf (stderr, " NA;");
+    else fprintf (stderr, " AES-256;");
 
     state->payload_mi = next_mi;
-    //IPP
-    ippl_add("kPI", "C"); 
-    ippl_addu("kALG_ID", state->payload_algid); 
-    ippl_addu("kKEY_ID", state->payload_keyid); 
-    ippl_addu("kPI_MI", state->payload_mi); // state->aes_iv[x]
-
     state->DMRvcL = 0;
 
   }
@@ -484,20 +457,9 @@ void LFSR128d(dsd_state * state)
     
     if (state->payload_algidR == 0x24)
       fprintf (stderr, " AES-128;");
-    else
-      if (state->payload_algidR == 0x23)
-        fprintf (stderr, " AES-192;");
-      else  
-        if (state->payload_algidR == 0x25)
-          fprintf (stderr, " AES-256;");
-        else
-          fprintf (stderr, " NA;");    state->payload_miR = next_mi;
-    //IPP
-    ippl_add("kPI", "C"); 
-    ippl_addu("kALG_ID", state->payload_algidR); 
-    ippl_addu("kKEY_ID", state->payload_keyidR); 
-    ippl_addu("kPI_MI", state->payload_miR); // state->aes_iv[x]
+    else fprintf (stderr, " AES-256;");
 
+    state->payload_miR = next_mi;
     state->DMRvcR = 0;
 
   }
@@ -511,13 +473,13 @@ unsigned long long int hytera_lfsr(uint8_t * mi, uint8_t * taps, uint8_t len)
   {
     uint8_t bit = (mi[i] >> 7) & 1;
     mi[i] <<= 1;
-    if (bit) mi[i] ^= taps[i%5];
+    if (bit) mi[i] ^= taps[i%len];
     mi[i] |= bit;
     
   }
 
   unsigned long long int mi_value = 0;
-  for (uint8_t i = 0; i < 5; i++)
+  for (uint8_t i = 0; i < len; i++)
   {
     mi_value <<= 8;
     mi_value |= mi[i];
@@ -554,14 +516,42 @@ void hytera_enhanced_alg_refresh(dsd_state * state)
   taps[3] = 0x22;
   taps[4] = 0x14;  
   mi_value = hytera_lfsr(mi, taps, 5);
-  
-  //IPP
-  ippl_add("kPI", "C"); 
-  ippl_addu("kALG_ID", state->payload_algidR); 
-  ippl_addu("kKEY_ID", state->payload_keyidR); 
-  ippl_addu("kPI_MI", state->payload_miR); // state->aes_iv[x]
 
   if (state->currentslot == 0)
     state->payload_mi = mi_value;
   else state->payload_miR = mi_value;
+}
+
+uint32_t kirisun_lfsr(unsigned long long int mi)
+{
+
+  uint32_t taps = 0xD459C4F1;
+  uint32_t lfsr = (uint32_t)mi;
+  uint32_t new_mi = 0;
+
+  for (int i = 0; i < 4; i++) 
+  {
+
+    uint8_t byte = 0;
+
+    for (int j = 0; j < 8; j++) 
+    {
+      uint32_t temp = (lfsr << 1);
+      uint8_t  msb  = (lfsr >> 31) & 1;
+
+      if (msb) 
+      {
+        byte |= (1 << j);
+        lfsr = temp ^ taps;
+      }
+      else lfsr = temp; //was previously temp ^ 1, but that isn't a primitive
+    }
+
+    new_mi <<=8;
+    new_mi |= byte;
+
+  }
+
+  return new_mi;
+
 }

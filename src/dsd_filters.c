@@ -1,9 +1,5 @@
 #include "dsd.h"
 
-// IPP
-short avr_dmr_input_filter(short sample);
-unsigned int dmr_filter_sample_num = 0;
-
 //M17 Filter -- RRC Alpha = 0.5 S/s 48000 with 81 taps
 #define M17ZEROS 80
 float m17gain = 3.16227766f; //sqrt of 10.0f
@@ -191,7 +187,7 @@ dmr_filter(short sample)
 short
 nxdn_filter(short sample)
 {
-    return dsd_input_filter(sample, 4);
+    return dsd_input_filter(sample, 2);
 }
 
 short

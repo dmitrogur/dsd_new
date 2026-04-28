@@ -137,9 +137,11 @@ void openPulseInput(dsd_opts * opts)
   lt.maxlength = -1;
   lt.prebuf = -1;
   lt.tlength = -1;
-  if (opts->m17encoder == 1)
-    opts->pulse_digi_dev_in  = pa_simple_new(NULL, "DSD-FME4", PA_STREAM_RECORD, dev, "M17 Voice Input", &cc, NULL, &lt, &err);
-  else opts->pulse_digi_dev_in  = pa_simple_new(NULL, "DSD-FME", PA_STREAM_RECORD, dev, opts->output_name, &cc, NULL, &lt, &err);
+  // if (opts->m17encoder == 1)
+  //   opts->pulse_digi_dev_in  = pa_simple_new(NULL, "DSD-FME4", PA_STREAM_RECORD, dev, "M17 Voice Input", &cc, NULL, &lt, &err);
+  // else opts->pulse_digi_dev_in  = pa_simple_new(NULL, "DSD-FME", PA_STREAM_RECORD, dev, opts->output_name, &cc, NULL, &lt, &err);
+
+  opts->pulse_digi_dev_in  = pa_simple_new(NULL, "DSD-FME", PA_STREAM_RECORD, dev, opts->output_name, &cc, NULL, &lt, &err);
 
   if (err != 0)
   {
@@ -187,6 +189,14 @@ void parse_pulse_output_string (dsd_opts * opts, char * input)
   }
 }
 
+#ifdef __APPLE__
+// macOS does not support OSS (/dev/dsp).
+// Provide a stub so callers can link while using Pulse/CoreAudio backends.
+void openOSSOutput(dsd_opts *opts)
+{
+  (void)opts;
+}
+#else
 void openOSSOutput (dsd_opts * opts)
 {
   int fmt;
@@ -205,6 +215,7 @@ void openOSSOutput (dsd_opts * opts)
         exit(1);
       }
 
+      
       fmt = 0;
       if (ioctl (opts->audio_out_fd, SNDCTL_DSP_RESET) < 0)
       {
@@ -301,6 +312,7 @@ void openOSSOutput (dsd_opts * opts)
     }
   }
 }
+#endif
 
 void
 processAudio (dsd_opts * opts, dsd_state * state)
@@ -684,7 +696,7 @@ void writeSynthesizedVoiceMS (dsd_opts * opts, dsd_state * state)
 
   sf_write_short(opts->wav_out_f, ss, 320);
 
-} 
+}
 
 void writeRawSample (dsd_opts * opts, dsd_state * state, short sample)
 {

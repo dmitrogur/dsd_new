@@ -11,47 +11,6 @@
 
 #include "dsd.h"
 
-//IPP
-#define IPP_DMR_SAMPLE_NUM 1
-
-#if defined(IPP_DMR_SAMPLE_NUM)
-//get HHmmss timestamp no colon (file operations)
-
-static void IPP_dmr_sample(char *buf)
-{
-    double sample_time;
-    sample_time = (double)dmr_filter_sample_num / 48000.0;
-//    sprintf(buf, "%*u/%.3f", 8, dmr_filter_sample_num, sample_time);
-    sprintf(buf, "%u%9.3f | ", dmr_filter_sample_num, sample_time);
-}
-
-char * getTime()
-{
-  char buf[32];
-  IPP_dmr_sample(buf);
-  
-  char * curr = calloc(47, sizeof(char));
-//  time_t t = time(NULL);
-//  struct tm * ptm = localtime(& t);
-//  sprintf(curr,"%s %02d%02d%02d", buf, ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
-  sprintf(curr,"%s", buf);
-  return curr;
-}
-
-//get HH:mm:ss timestamp with colon (Sync/Console Display)
-char * getTimeC()
-{
-  char buf[32];
-  IPP_dmr_sample(buf);
-  
-  char * curr = calloc(49, sizeof(char));
-//  time_t t = time(NULL);
-//  struct tm * ptm = localtime(& t);
-//  sprintf(curr, "%s %02d:%02d:%02d", buf, ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
-  sprintf(curr, "%s", buf);
-  return curr;
-}
-#else
 //get HHmmss timestamp no colon (file operations)
 char * getTime()
 {
@@ -71,7 +30,6 @@ char * getTimeC()
   sprintf(curr, "%02d:%02d:%02d", ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
   return curr;
 }
-#endif
 
 //get HH:mm:ss timestamp with colon (Ncurses Call History)
 char * getTimeN(time_t t)

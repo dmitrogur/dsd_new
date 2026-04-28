@@ -1,4 +1,4 @@
-  /*-------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------
  * dsd_alias.c
  * Talker Alias Handling for Various Protocols and Vendors
  *
@@ -581,11 +581,15 @@ void tait_iso7_embedded_alias_decode (dsd_opts * opts, dsd_state * state, uint8_
   for (uint8_t i = 0; i < len; i++)
   {
     alias[i] = (uint8_t)ConvertBitIntoBytes(&input[16+(i*7)], 7);
+    
+    // fprintf (stderr, "%X,", alias[i]); //debug
+
     if (alias[i] == 0x2C) //change a comma to a dot
       alias[i] = 0x2E;
     else if (alias[i] < 0x20) //change any garble / control chars to a space
       alias[i] = 0x20;
-    fprintf (stderr, "%c", alias[i]);  
+
+    fprintf (stderr, "%c", alias[i]);
   }
 
   //flag to indicate this already exists in import or group struct
@@ -794,22 +798,18 @@ void dmr_talker_alias_lc_decode (dsd_opts * opts, dsd_state * state, uint8_t slo
   }
   else if (char_size == 16)
   {
+    int ptr = 0;
     setlocale(LC_ALL, ""); //needed when encoded alias contains Chinese (or probably any non-roman charset that isn't default on users terminal)
     for (i = 0; i < end; i++)
     {
       uint16_t character = (uint16_t)ConvertBitIntoBytes(&state->dmr_pdu_sf[slot][(i*16)], 16);
-      char ch[2]; ch[0] = character & 0xFF; ch[1] = 0;
       
       if (character >= 0x20 && character != 0x7F)
         fprintf (stderr, "%lc", character);
       else fprintf (stderr, " ");
 
-      if (character == 0)
-        strcat (alias_string, " ");
-      else if (character >= 0x20 && character <= 0xFE)
-        strcat (alias_string, ch);
-      else
-        strcat (alias_string, "*");
+      //Encode to UTF-8
+      ptr += utf8_encode(character, alias_string+ptr);
 
       //debug
       // fprintf (stderr, " [%04X], ", character);

@@ -1165,13 +1165,13 @@ void prepare_str(dsd_opts * opts, dsd_state * state, float * sbuf)
 
   //libm17 magic
   //slice symbols to soft dibits
-  // slice_symbols(soft_bit, sbuf);
+  slice_symbols(soft_bit, sbuf);
 
   //derandomize
-  // randomize_soft_bits(soft_bit);
+  randomize_soft_bits(soft_bit);
 
   //deinterleave
-  // reorder_soft_bits(d_soft_bit, soft_bit);
+  reorder_soft_bits(d_soft_bit, soft_bit);
 
   //viterbi
   error = viterbi_decode_punctured(viterbi_bytes, d_soft_bit+96, p2, 272, 12);

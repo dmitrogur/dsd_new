@@ -18,6 +18,7 @@
 #include "dsd.h"
 #include "p25p1_const.h" //for imbe fr (7200)
 #include "dmr_const.h" //for ambe+2 fr
+#include "bp.h" //for bp key table
 
 void saveImbe4400Data (dsd_opts * opts, dsd_state * state, char *imbe_d)
 {
@@ -538,14 +539,11 @@ SNDFILE * close_and_rename_wav_file(SNDFILE * wav_file, char * wav_out_filename,
   memset (new_filename, 0, sizeof(new_filename));
 
   //check for String based TGT and SRC values (M17, YSF, DSTAR)
-  if ( event_struct->Event_History_Items[0].kv_smooth) {
-      sprintf (new_filename, "%s/%05d.wav", dir, event_struct->Event_History_Items[0].kid);
-  } else {
-    if (is_string == 1)
-      sprintf (new_filename, "%s/%s_%s_%05d_%s_%s_TGT_%s_SRC_%s.wav", dir, datestr, timestr, random_number, sys_str, gi_str, tgt_str, src_str);
-    else //is a numerical value
-      sprintf (new_filename, "%s/%s_%s_%05d_%s_%s_TGT_%d_SRC_%d.wav", dir, datestr, timestr, random_number, sys_str, gi_str, target_id, source_id);
-  }  
+  if (is_string == 1)
+    sprintf (new_filename, "%s/%s_%s_%05d_%s_%s_TGT_%s_SRC_%s.wav", dir, datestr, timestr, random_number, sys_str, gi_str, tgt_str, src_str);
+  else //is a numerical value
+    sprintf (new_filename, "%s/%s_%s_%05d_%s_%s_TGT_%d_SRC_%d.wav", dir, datestr, timestr, random_number, sys_str, gi_str, target_id, source_id);
+
   if (timestr != NULL)
   {
     free (timestr);
@@ -931,9 +929,12 @@ uint16_t parse_raw_user_string (char * input, uint8_t * output)
   return len;
 }
 
+//DMRA late entry items
+static int ambe2_counter;
+static int dmra_le;
+
 uint16_t ambe2_str_to_decode(dsd_opts * opts, dsd_state * state, char * ambe_str, uint8_t * ks, uint16_t ks_idx, uint8_t dmra, uint8_t is_enc, uint8_t ks_available)
 {
-  UNUSED(opts);
 
   char ambe_fr[4][24]; memset (ambe_fr, 0, sizeof(ambe_fr));
   uint8_t dibit_pair = 0;
@@ -977,6 +978,39 @@ uint16_t ambe2_str_to_decode(dsd_opts * opts, dsd_state * state, char * ambe_str
 
     //working now!
 
+  }
+
+  //if using DMRA Late Entry IV mechanics, evaluate for IV
+  if (dmra_le)
+  {
+
+    //make a copy of ambe_fr codeword 3 (MI fragment)
+    uint8_t c3[24]; memset (c3, 0, sizeof(c3));
+    for (int i = 0; i < 24; i++)
+      c3[i] = ambe_fr[3][i];
+
+    //force slot to 0
+    state->currentslot = 0;
+
+    uint8_t c3_hex = (uint64_t)ConvertBitIntoBytes(c3, 4);
+
+    //debug
+    // fprintf (stderr, "\n AMBE#: %02d / %d / %d; F: %X;", ambe2_counter, ambe2_counter/3, ambe2_counter%3, c3_hex);
+
+    //use div and mod 3 to set current storage fragment
+    state->late_entry_mi_fragment[0][(ambe2_counter/3)+1][ambe2_counter%3] = c3_hex;
+
+    //run LFSR evaluate stored codewords for matching IV or replace if not match or not set
+    if (ambe2_counter == 17)
+    {
+      if (state->payload_mi != 0)
+      {
+        fprintf (stderr, "\n");
+        LFSR(state);
+      }
+      fprintf (stderr, "\n");
+      dmr_late_entry_mi (opts, state);
+    }
   }
 
   char ambe_d[49]; memset(ambe_d, 0, sizeof(ambe_d));
@@ -1055,7 +1089,6 @@ uint16_t ambe2_str_to_decode(dsd_opts * opts, dsd_state * state, char * ambe_str
 
 uint16_t imbe_str_to_decode(dsd_opts * opts, dsd_state * state, char * imbe_str, uint8_t * ks, uint16_t ks_idx, uint8_t is_enc, uint8_t ks_available)
 {
-  UNUSED(opts);
 
   char imbe_fr[8][23]; memset (imbe_fr, 0, sizeof(imbe_fr));
   uint8_t dibit_pair = 0;
@@ -1202,6 +1235,16 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
   state->synctype = -1;
   state->lastsynctype = -1;
 
+  //reset encryption variables
+  state->payload_mi = 0;
+  state->payload_algid = 0;
+  state->payload_keyid = 0;
+  if (state->keyloader == 1)
+  {
+    state->R = 0;
+    state->aes_key_loaded[0] = 0;
+  }
+
   //watchdog for event history
   watchdog_event_history(opts, state, 0);
   watchdog_event_current(opts, state, 0);
@@ -1213,6 +1256,12 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
   uint8_t ks_i[3000]; memset (ks_i, 0, sizeof(ks_i));
   uint16_t ks_idx_i = 808; //keystream index value IMBE (start at 808 for out of order ESS)
   int imbe_counter = 0; //count IMBE frames for when to skip 2 bytes of ks and juggle keystreams
+  
+  //Used in conjunction with DMR's DMRA Late Entry IV
+  ambe2_counter = 0; //count AMBE+2 frames for DMRA late entry IV mechanics (static)
+  dmra_le = 0;       //whether or not to attempt looking for the DMRA Late Entry
+  if (state->forced_alg_id != 0)
+    state->payload_mi = 0;
 
   source_size = fread (source_str, 1, 0x100000, opts->mbe_in_f);
 
@@ -1347,6 +1396,77 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
 
     }
 
+    //if forcing a DMRA EP mode, turn on dmra_le and set alg here
+    if (state->forced_alg_id >= 0x21 &&  state->forced_alg_id <= 0x25)
+    {
+      is_dmra = 1;
+      dmra_le = 1;
+      is_enc = 1;
+      alg_id = state->forced_alg_id;
+      state->payload_algid = alg_id;
+      rc4_db = 256;
+      rc4_mod = 9;
+
+      //since we can't keyring on a forced alg, we can perhaps look it up
+      //via the TO field for the TG value, as long as it isn't greated than 0x1FFFF (upper bound of the array)
+      if (state->keyloader == 1 && state->lasttg != 0 && state->lasttg < 0x1FFFF && state->rkey_array[state->lasttg] != 0)
+        state->R = state->rkey_array[state->lasttg];
+
+      if (alg_id == 0x21 && state->R != 0 && state->payload_mi != 0)
+      {
+
+        //test when we don't have an encryption_mi in the .mbe file for DMR
+        //TODO: Handle multi keystream creation with a new function
+        uint8_t ks_bytes[375]; memset(ks_bytes, 0, sizeof(ks_bytes));
+        uint8_t kiv[32]; memset(kiv, 0, sizeof(kiv));
+
+        //load key into key portion of kiv
+        kiv[0] = ((state->R & 0xFF00000000) >> 32);
+        kiv[1] = ((state->R & 0xFF000000) >> 24);
+        kiv[2] = ((state->R & 0xFF0000) >> 16);
+        kiv[3] = ((state->R & 0xFF00) >> 8);
+        kiv[4] = ((state->R & 0xFF) >> 0);
+
+        //load IV from late entry state->payload_mi
+        kiv[5] = ((state->payload_mi & 0xFF000000) >> 24);
+        kiv[6] = ((state->payload_mi & 0xFF0000) >> 16);
+        kiv[7] = ((state->payload_mi & 0xFF00) >> 8);
+        kiv[8] = ((state->payload_mi & 0xFF) >> 0);
+
+        rc4_block_output (rc4_db, rc4_mod, 200, kiv, ks_bytes);
+        unpack_byte_array_into_bit_array(ks_bytes, ks, 200);
+
+        ks_available = 1;
+
+      }
+
+    }
+    //TODO: This
+    else if (state->forced_alg_id == 1) //Basic Privacy
+    {
+      //This is where the key loaded comes into play for moto vs hytera vs scrambler
+      if (state->K != 0)
+      {
+        uint64_t k = 0;
+        k = BPK[state->K];
+        k = ( ((k & 0xFF0F) << 32 ) + (k << 16) + k );
+        k <<= 1;
+        k += (k >> 48) & 1;
+
+        //load that into ks
+        for (int i = 0; i < 18*49; i++)
+          ks[i] = (k >> (i%49)) & 1;
+      }
+      else if (state->H != 0)
+      {
+        //Hytera BP
+      }
+      else if (state->R != 0)
+      {
+        //NXDN Scrambler
+      }
+    }
+
     if (strncmp ("to", str_buffer, 2) == 0)
     {
       str_buffer = strtok(NULL, " : \""); //next value after any : "" string
@@ -1448,9 +1568,9 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
 
       //TODO: Handle multi keystream creation with a new function
       uint8_t ks_bytes[375]; memset(ks_bytes, 0, sizeof(ks_bytes));
-      uint8_t kiv[15]; memset(kiv, 0, sizeof(kiv));
+      uint8_t kiv[32]; memset(kiv, 0, sizeof(kiv));
 
-      //Test: Setup a simple RC4 for now (working)
+      //RC4 (v1 tested and working on P25, v2 should be okay now)
       if ( (alg_id == 0xAA || alg_id == 0x21) && state->R != 0 )
       {
 
@@ -1483,19 +1603,113 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
 
         ks_available = 1;
 
+      }
 
-      } //end test
+      //P25 DES (v1 tested and working on P1, v2 should be okay now)
+      else if (alg_id == 0x81 && state->R != 0)
+      {
 
-      //NOTE: Regarding SDRTrunk .mbe format, the ESS Encryption Sync
-      //is in the correct location on P25p2, but for P25p1, the ESS
-      //information preceeds LDU2, but should be AFTER the LDU2 IMBE frames,
-      //so, for now, we utilize a reverse lfsr function (Crypthings coming in handy)
-      //and recover the previous LFSR and make two keystreams in order
-      //to properly decrypt the initial frame, and then juggle the 
-      //keystreams in code to provide a smooth decryption session of P25p1.
+        des_multi_keystream_output(iv_hex, state->R, ks_bytes, 1, 32); //32*8=256
 
-      //Update: There is a pull request available now, and using a version value,
-      //we will be able to do either format (ESS out of order vs ESS in correct order)
+        if (protocol == 1) //Phase 1 IMBE start on 19 for DES-OFB (8 discard + 9 LCW + 2 reserved)
+          unpack_byte_array_into_bit_array(ks_bytes+19, ks, 256-19); //unpack starting after discard
+        else if (protocol == 2) //Phase 2 AMBE+2 start on 8 after discard round for DES-OFB
+          unpack_byte_array_into_bit_array(ks_bytes+8, ks, 256-8); //unpack starting after discard
+
+        //reverse lfsr on IV and create keystream with that as well
+        //due to out of order execution on P25p1 ESS sync.
+        if (protocol == 1 && version == 1)
+        {
+
+          //load the str_buffer into the IV portion of kiv (just borrowing for DES)
+          parse_raw_user_string(str_buffer, kiv+5);
+
+          reverse_lfsr_64_to_len (opts, kiv+5, 64);
+
+          //convert bytes back into value
+          iv_hex = 0;
+          for (int i = 0; i < 8; i++)
+          {
+            iv_hex <<= 8;
+            iv_hex |= kiv[i+5];
+          }
+
+          memset(ks_bytes, 0, sizeof(ks_bytes));
+
+          des_multi_keystream_output(iv_hex, state->R, ks_bytes, 1, 32); //32*8=256
+
+          unpack_byte_array_into_bit_array(ks_bytes+19, ks_i, 256-19); //unpack starting after discard
+        }
+
+        ks_available = 1;
+
+      }
+
+      //P25 AES (v1 and v2 tested working on P1)
+      else if ( (alg_id == 0x84 || alg_id == 0x89) && state->aes_key_loaded[0] == 1 )
+      {
+
+        uint8_t aes_key[32];
+        memset(aes_key, 0, sizeof(aes_key));
+
+        //Load key from A1 - A4
+        for (int i = 0; i < 8; i++)
+        {
+          aes_key[i+0]  = (state->A1[0] >> (56-(i*8))) & 0xFF;
+          aes_key[i+8]  = (state->A2[0] >> (56-(i*8))) & 0xFF;
+          aes_key[i+16] = (state->A3[0] >> (56-(i*8))) & 0xFF;
+          aes_key[i+24] = (state->A4[0] >> (56-(i*8))) & 0xFF;
+        }
+
+        uint8_t aes_iv[16];
+        memset(aes_iv, 0, sizeof(aes_iv));
+
+        //load the str_buffer into the IV portion of aes_iv
+        parse_raw_user_string(str_buffer, aes_iv);
+
+        //backup copy of current IV to reverse and expand, if needed
+        uint8_t aes_last_iv[16];
+        memset(aes_last_iv, 0, sizeof(aes_last_iv));
+        for (int i = 0; i < 8; i++)
+          aes_last_iv[i] = aes_iv[i];
+
+        //Resolve the longer IV from the shorter one
+        lfsr_64_to_128(aes_iv);
+
+        if (alg_id == 0x89) //128, or 256
+          aes_ofb_keystream_output(aes_iv, aes_key, ks_bytes, 0, 16); //16*16=256
+        else aes_ofb_keystream_output(aes_iv, aes_key, ks_bytes, 2, 16); //16*16=256
+
+        if (protocol == 1) //Phase 1 IMBE start on 27 for AES-OFB (16 discard + 9 LCW + 2 reserved)
+          unpack_byte_array_into_bit_array(ks_bytes+27, ks, 256-27); //unpack starting after discard
+        else if (protocol == 2) //Phase 2 AMBE+2 start on 16 after discard round for AES-OFB
+          unpack_byte_array_into_bit_array(ks_bytes+16, ks, 256-16); //unpack starting after discard
+
+        //reverse lfsr on IV and create keystream with that as well
+        //due to out of order execution on P25p1 ESS sync.
+        if (protocol == 1 && version == 1)
+        {
+
+          reverse_lfsr_64_to_len (opts, aes_last_iv, 64);
+
+          //Resolve the longer IV from the shorter one
+          lfsr_64_to_128(aes_last_iv);
+
+          memset(ks_bytes, 0, sizeof(ks_bytes));
+
+          if (alg_id == 0x89) //128, or 256
+            aes_ofb_keystream_output(aes_last_iv, aes_key, ks_bytes, 0, 16); //16*16=256
+          else aes_ofb_keystream_output(aes_last_iv, aes_key, ks_bytes, 2, 16); //16*16=256
+
+          unpack_byte_array_into_bit_array(ks_bytes+27, ks_i, 256-27); //unpack starting after discard
+        }
+
+        ks_available = 1;
+
+      }
+
+      //Pull request: https://github.com/DSheirer/sdrtrunk/pull/2273
+      //Merged into SDRTrunk nightly so should be able to handle this better now
 
       //reset ks_idx to 0
       ks_idx = 0;
@@ -1519,6 +1733,9 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
 
         imbe_counter++;
 
+        //debug
+        // fprintf (stderr, "\n IMBE# %02d; KS_IDX: %d; KS_IDX_I: %d; ", imbe_counter, ks_idx, ks_idx_i);
+
         //36 hex characters on 'hex' which is the IMBE interleaved C codewords
         if (version == 1)
           ks_idx_i = imbe_str_to_decode(opts, state, str_buffer, ks_i, ks_idx_i, is_enc, ks_available);
@@ -1526,7 +1743,10 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
 
         //skip LSD bits in-between these two IMBE voice frames
         if (imbe_counter == 8 || imbe_counter == 17)
+        {
           ks_idx_i += 16;
+          ks_idx   += 16;
+        }
 
         //juggle keystreams and reset the I counter (if version 1)
         if (imbe_counter == 9 && version == 1)
@@ -1547,7 +1767,7 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
         }
           
         //debug
-        // fprintf (stderr, " # %02d; KS_IDX_I: %04d;", imbe_counter, ks_idx_i);
+        // fprintf (stderr, "\n IMBE# %02d; KS_IDX: %d; KS_IDX_I: %d; ", imbe_counter, ks_idx, ks_idx_i);
 
         //debug
         // if (is_enc == 1 && ks_available == 0)
@@ -1569,6 +1789,16 @@ void read_sdrtrunk_json_format (dsd_opts * opts, dsd_state * state)
         //   fprintf (stderr, " Enc Mute;");
         // else if (is_enc == 1 && ks_available == 1)
         //   fprintf (stderr, " Enc Play;");
+
+        //increment AMBE+2 counter
+        ambe2_counter++;
+
+        //reset if over for DMR 18 AMBE+2 frames
+        if (dmra_le && ambe2_counter == 18)
+        {
+          ambe2_counter = 0;
+          ks_idx = 0;
+        } 
 
       }
     }

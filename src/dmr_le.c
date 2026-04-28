@@ -2,35 +2,18 @@
  * dmr_le.c
  * DMR Late Entry MI Fragment Assembly, Procesing, and related Alg functions
  *
- * DMH/IPP
+ * LWVMOBILE
+ * 2022-12 DSD-FME Florida Man Edition
  *-----------------------------------------------------------------------------*/
 
 #include "dsd.h"
-#include "dsd_veda.h"
+
 //gather ambe_fr mi fragments for processing
 void dmr_late_entry_mi_fragment (dsd_opts * opts, dsd_state * state, uint8_t vc, uint8_t ambe_fr[4][24], uint8_t ambe_fr2[4][24], uint8_t ambe_fr3[4][24])
 {
 
   uint8_t slot = state->currentslot;
 
-  //enforce RC4 due to missing PI header, but with valid SVC Opts
-  //ideally, this would be handled by VC-F single burst, but its not fully reliable compared to this
-  //due to multiple signalling occurring inside of it, depending on system type
-  /*
-  if (state->forced_alg_id == 0x21)
-  {
-    if (slot == 0 && state->dmr_so & 0x40)
-    {
-      state->payload_algid = 0x21;
-      state->payload_keyid = 0xFF;
-    }
-    if (slot == 1 && state->dmr_soR & 0x40)
-    {
-      state->payload_algidR = 0x21;
-      state->payload_keyidR = 0xFF;
-    }
-  }
-  */
   //collect our fragments and place them into storage
   state->late_entry_mi_fragment[slot][vc][0] = (uint64_t)ConvertBitIntoBytes(&ambe_fr[3][0], 4);
   state->late_entry_mi_fragment[slot][vc][1] = (uint64_t)ConvertBitIntoBytes(&ambe_fr2[3][0], 4);
@@ -111,15 +94,11 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
         fprintf (stderr, " Slot 1 PI/LFSR and Late Entry MI Mismatch - %08llX : %08llX ", state->payload_mi, mi_final);
         if (mi_crc_ok == 1) state->payload_mi = mi_final;
         if (mi_crc_ok == 1) fprintf (stderr, "(CRC OK)");
-        else {
-          fprintf (stderr, "(CRC ERR)"); 
-          ippl_add("err", "1"); 
-          ippl_add("errv", "CRC ERR");          
-        }
+        else fprintf (stderr, "(CRC ERR)");
         fprintf (stderr, "\n");
         fprintf (stderr, "%s", KNRM);
       }
-      
+
       //run expansions afterwards, or le verification won't match up properly
 
       //DES1
@@ -130,7 +109,7 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
       }
 
       //AES-128 or AES-256
-      if (state->payload_algid == 0x24 || state->payload_algid == 0x23 || state->payload_algid == 0x25)
+      if (state->payload_algid == 0x24 || state->payload_algid == 0x25)
       {
         LFSR128d (state);
         fprintf (stderr, "\n");
@@ -145,11 +124,7 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
         fprintf (stderr, " Slot 2 PI/LFSR and Late Entry MI Mismatch - %08llX : %08llX ", state->payload_miR, mi_final);
         if (mi_crc_ok == 1) state->payload_miR = mi_final;
         if (mi_crc_ok == 1) fprintf (stderr, "(CRC OK)");
-        else {
-          ippl_add("err", "1"); 
-          ippl_add("errv", "CRC ERR");          
-          fprintf (stderr, "(CRC ERR)");
-        }  
+        else fprintf (stderr, "(CRC ERR)");
         fprintf (stderr, "\n");
         fprintf (stderr, "%s", KNRM);
       }
@@ -164,7 +139,7 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
       }
 
       //AES-128 or AES-256
-      if (state->payload_algidR == 0x24 || state->payload_algidR == 0x23 || state->payload_algidR == 0x25)
+      if (state->payload_algidR == 0x24 || state->payload_algidR == 0x25)
       {
         LFSR128d (state);
         fprintf (stderr, "\n");
@@ -185,7 +160,7 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
     }
 
     //AES-128 or AES-256
-    if (state->payload_algid == 0x24 || state->payload_algid == 0x23 || state->payload_algid == 0x25)
+    if (state->payload_algid == 0x24 || state->payload_algid == 0x25)
     {
       LFSR128d (state);
       fprintf (stderr, "\n");
@@ -201,7 +176,7 @@ void dmr_late_entry_mi (dsd_opts * opts, dsd_state * state)
     }
 
     //AES-128 or AES-256
-    if (state->payload_algidR == 0x24 || state->payload_algid == 0x23 || state->payload_algidR == 0x25)
+    if (state->payload_algidR == 0x24 || state->payload_algidR == 0x25)
     {
       LFSR128d (state);
       fprintf (stderr, "\n");
@@ -244,6 +219,23 @@ void dmr_alg_refresh (dsd_opts * opts, dsd_state * state)
       fprintf (stderr, "%s\n", KNRM);
     }
 
+    if (state->payload_algid == 0x35 || state->payload_algid == 0x36 || state->payload_algid == 0x37)
+    {
+      state->DMRvcL = 0;
+      state->payload_mi = kirisun_lfsr(state->payload_mi);
+      fprintf (stderr, "%s", KYEL);
+      fprintf (stderr, " Slot 1");
+      fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algid, state->payload_keyid);
+      fprintf (stderr, " MI(32): %08llX;", state->payload_mi);
+      fprintf (stderr, " Kirisun");
+      if (state->payload_algid == 0x36)
+        fprintf (stderr, " Advanced;");
+      else if (state->payload_algid == 0x37)
+        fprintf (stderr, " Universal;");
+      else fprintf (stderr, " Encryption;");
+      fprintf (stderr, "%s\n", KNRM);
+    }
+
   }
   if (state->currentslot == 1)
   {
@@ -274,20 +266,25 @@ void dmr_alg_refresh (dsd_opts * opts, dsd_state * state)
       fprintf (stderr, "%s\n", KNRM);
     } 
 
-  }
-  {
-    uint64_t hi = state->payload_miP; // старшие 64 бита MI
-    uint64_t lo = state->payload_miN; // младшие 64 бита MI
-    uint8_t iv[16];
-    for (int i = 0; i < 8; i++) iv[i]     = (hi >> (56 - 8*i)) & 0xFF;
-    for (int i = 0; i < 8; i++) iv[8 + i] = (lo >> (56 - 8*i)) & 0xFF;
+    if (state->payload_algidR == 0x35 || state->payload_algidR == 0x36 || state->payload_algidR == 0x37)
+    {
+      state->DMRvcR = 0;
+      state->payload_miR = kirisun_lfsr(state->payload_miR);
+      fprintf (stderr, "%s", KYEL);
+      fprintf (stderr, " Slot 2");
+      fprintf (stderr, " DMR PI C- ALG ID: %02X; KEY ID: %02X;", state->payload_algidR, state->payload_keyidR);
+      fprintf (stderr, " MI(32): %08llX;", state->payload_miR);
+      fprintf (stderr, " Kirisun");
+      if (state->payload_algidR == 0x36)
+        fprintf (stderr, " Advanced;");
+      else if (state->payload_algidR == 0x37)
+        fprintf (stderr, " Universal;");
+      else fprintf (stderr, " Encryption;");
+      fprintf (stderr, "%s\n", KNRM);
+    }
 
-    memcpy(state->aes_iv,  iv, 16);
-    memcpy(state->aes_ivR, iv, 16);
-    fprintf(stderr, "KV|IV set from MI: %02X%02X%02X%02X ... %02X%02X%02X%02X\n",
-          state->aes_iv[0], state->aes_iv[1], state->aes_iv[2], state->aes_iv[3],
-          state->aes_iv[12], state->aes_iv[13], state->aes_iv[14], state->aes_iv[15]);    
-  }  
+  }
+
 }
 
 void dmr_alg_reset (dsd_opts * opts, dsd_state * state)
@@ -410,6 +407,41 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
   //NOTE: on above, I belive that we need to check by opcode as well, as a CRC3 can have multiple collisions
   //so we need to exclude op/alg 0 and 3 from the check (does algID 0x03/0x23 even exist?)
 
+  //Kirisun Placeholder
+  if (opts->dmr_le == 3)
+  {
+    if (irr_err != 0)
+    {
+      uint32_t sbrcpl = 0;
+      for(i = 0; i < 32; i++)
+      {
+        sbrcpl = sbrcpl << 1;
+        sbrcpl |= sbrc_interleaved[i] & 1;
+      }
+      if (opts->payload == 0) fprintf (stderr, "\n");
+      fprintf (stderr, "%s SLOT %d SB/RC (FEC ERR) E:%d; I:%08X D:%03X; %s ", KRED, slot+1, irr_err, sbrcpl, sbrc_hex, KNRM);
+      if (opts->payload == 1) fprintf (stderr, "\n");
+    }
+    else if (irr_err == 0 && sbrc_hex != 0) //first batch had sbrc_hex 0x5F1, second batch had 0x5E1 instead, what changed?
+    {
+      fprintf (stderr, "\n");
+      fprintf (stderr, "%s", KCYN);
+      fprintf (stderr, " Slot %d", state->currentslot+1);
+      fprintf (stderr, " DMR LE SB Kirisun Encryption Identifier;");
+      fprintf (stderr, "%s ", KNRM);
+      if (state->currentslot == 0)
+      {
+        if (state->payload_algid == 0 && state->dmr_so & 0x40)
+          state->payload_algid = 0x35; //placeholder value
+      }
+      else
+      {
+        if (state->payload_algidR == 0  && state->dmr_soR & 0x40)
+          state->payload_algidR = 0x35; //placeholder value
+      }
+    }
+  }
+
   if (opts->dmr_le == 1)
   {
     if (irr_err != 0)
@@ -422,47 +454,6 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
       }
       if (opts->payload == 0) fprintf (stderr, "\n");
       fprintf (stderr, "%s SLOT %d SB/RC (FEC ERR) E:%d; I:%08X D:%03X; %s ", KRED, slot+1, irr_err, sbrcpl, sbrc_hex, KNRM);
-      fprintf(stderr, "FEC ERR %d. Power %d\n", irr_err, power);
-
-      
-      if(opts->veda_debug && !state->veda_vendor_mi_valid){ 
-        fprintf(stderr,"\nVEDA SBRC slot=%d I=%08X D=%03X I_hi16=%u I_lo16=%u "
-          "I_b0=%02X I_b1=%02X I_b2=%02X I_b3=%02X "
-          "I_24_a=%u I_24_b=%u",
-          slot + 1,
-          sbrcpl, sbrcpl,
-          (sbrcpl >> 16) & 0xFFFF, sbrcpl & 0xFFFF,
-          (sbrcpl >> 24) & 0xFF, (sbrcpl >> 16) & 0xFF,
-          (sbrcpl >> 8) & 0xFF, sbrcpl & 0xFF,
-          sbrcpl & 0xFFFFFF,
-          (sbrcpl >> 8) & 0xFFFFFF);      
-      }  
-      if (opts->isVEDA && sbrcpl != 0)
-      {
-        int vslot = state->currentslot & 1;
-        state->veda_vendor_mi32[vslot] = sbrcpl;
-        state->veda_vendor_mi_valid[vslot] = 1;
-
-        veda_raw_log_mi(opts, state, slot,
-                state->veda_vendor_mi32[slot],
-                state->indx_SF);
-                
-        if (opts->veda_debug)
-        {
-          fprintf(stderr,
-                "\n[VEDA] SBRC-MI slot=%d I=%08X\n",
-                vslot + 1,
-                sbrcpl);
-        }
-      }      
-      
-      if(irr_err>7) {
-         if (opts->fb_csv_path[0] == '\0') {
-           fprintf (stderr, " irr_err %d;", irr_err);
-         }  
-         state->irr_err++;
-      }   
-
       if (opts->payload == 1) fprintf (stderr, "\n");
     }
     if (irr_err == 0)
@@ -533,13 +524,8 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
               fprintf (stderr, "%s", KCYN);
               fprintf (stderr, " Slot 1");
               fprintf (stderr, " DMR LE SB ALG ID: %02X; KEY ID: %02X;", alg + 0x20, key);
-              //IPP
-              ippl_addu("kALG_ID", alg + 0x20); 
-              ippl_addu("kKEY_ID", key);             
-
               if (alg == 1) fprintf (stderr, " RC4;");
               if (alg == 2) fprintf (stderr, " DES;");
-              if (alg == 3) fprintf (stderr, " AES192;");
               if (alg == 4) fprintf (stderr, " AES128;");
               if (alg == 5) fprintf (stderr, " AES256;");
               fprintf (stderr, "%s ", KNRM);
@@ -548,9 +534,6 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
                 state->payload_keyid = key;
               if (state->payload_algid != alg)
                 state->payload_algid = alg + 0x20; //assuming DMRA approved alg values (moto patent)
-              // --- ВСТАВИТЬ ВОТ ЗДЕСЬ ---
-              avr_scout_stat_le_observe(slot, 1);
-              scout_db_on_pi_or_lc(slot, state->payload_algid, state->payload_keyid, 1, state->tg);                
             }
 
           }
@@ -567,19 +550,12 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
               fprintf (stderr, "%s", KCYN);
               fprintf (stderr, " Slot 2");
               fprintf (stderr, " DMR LE SB ALG ID: %02X; KEY ID: %02X;", alg + 0x20, key);
-              //IPP
-              ippl_addu("kALG_ID", alg + 0x20); 
-              ippl_addu("kKEY_ID", key);
-                            
               fprintf (stderr, "%s ", KNRM);
               if (opts->payload == 1) fprintf (stderr, "\n");
               if (state->payload_keyidR != key)
                 state->payload_keyidR = key;
               if (state->payload_algidR != alg)
                 state->payload_algidR = alg + 0x20; //assuming DMRA approved alg values (moto patent)
-              // --- ВСТАВИТЬ ВОТ ЗДЕСЬ ---
-              avr_scout_stat_le_observe(slot, 1);
-              scout_db_on_pi_or_lc(slot, state->payload_algidR, state->payload_keyidR, 1, state->tg);                
             }
 
           }

@@ -320,7 +320,7 @@ void csi72_ambe2_codeword_keystream(dsd_state * state, char ambe_fr[4][24])
   w = rW; x = rX; y = rY; z = rZ;
 
   for (int8_t i = 0; i < 36; i++)
-  { 
+  {
     interleaved[(i*2)+0] = ambe_fr[*w][*x];
     interleaved[(i*2)+1] = ambe_fr[*y][*z];
 

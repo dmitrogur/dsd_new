@@ -28,20 +28,17 @@ printFrameSync (dsd_opts * opts, dsd_state * state, char *frametype, int offset,
   {
     fprintf (stderr,"%s ", timestr);
     fprintf (stderr,"Sync: %s ", frametype);
-    //IPP
-    ippl_new("sync-frame"); 
-    ippl_add("frame", frametype);           
   }
 
   //oops, that made a nested if-if-if-if statement,
   //causing a memory leak
 
-  if (opts->verbose > 2)
-    fprintf (stderr,"o: %4i ", offset);
-  if (opts->verbose > 1)
-    fprintf (stderr,"mod: %s ", modulation);
-  if (opts->verbose > 2)
-    fprintf (stderr,"g: %f ", state->aout_gain);
+  // if (opts->verbose > 2)
+    //fprintf (stderr,"o: %4i ", offset);
+  // if (opts->verbose > 1)
+    //fprintf (stderr,"mod: %s ", modulation);
+  // if (opts->verbose > 2)
+    //fprintf (stderr,"g: %f ", state->aout_gain);
 
   if (timestr != NULL)
   {
@@ -165,7 +162,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
   char synctest20[21]; //YSF
   char synctest48[49]; //EDACS
   char synctest8[9];   //M17
-  char synctest16[17]; //M17 Preamble
   char modulation[8];
   char *synctest_p;
   char synctest_buf[10240]; //what actually is assigned to this, can't find its use anywhere?
@@ -211,9 +207,8 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
   t = 0;
   synctest10[10] = 0;
   synctest[24] = 0;
-  synctest8[8] = 0;   //M17, wasn't initialized or terminated (source of much pain and frustration in Cygwin)
+  synctest8[8] = 0;
   synctest12[12] = 0;
-  synctest16[16] = 0; //M17, wasn't initialized or terminated (source of much pain and frustration in Cygwin)
   synctest48[48] = 0;
   synctest32[32] = 0;
   synctest20[20] = 0;
@@ -384,6 +379,7 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               lbuf2[i] = lbuf[i];
             }
           qsort (lbuf2, t_max, sizeof (int), comp);
+
           //on shorter sync patterns, we need to look at the edges since we don't have many to pull from
           if (t_max < 13)
           {
@@ -395,7 +391,7 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
           {
             lmin = (lbuf2[2] + lbuf2[3] + lbuf2[4]) / 3;
             lmax = (lbuf2[t_max - 5] + lbuf2[t_max - 4] + lbuf2[t_max - 3]) / 3;
-          }  
+          }
 
           if (state->rf_mod == 1)
             {
@@ -579,139 +575,24 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
           }
           //end YSF sync
 
-          //M17 Sync -- Just STR and LSF for now
-          strncpy(synctest16, (synctest_p - 15), 16);
+          //M17 Sync -- Just STR
           strncpy(synctest8, (synctest_p - 7), 8);
           if(opts->frame_m17 == 1)
           {
-            //preambles will skip dibits in an attempt to prime the
-            //demodulator but not attempt any decoding
-            if (strcmp(synctest8, M17_PRE) == 0)
+            if (strcmp(synctest8, M17_STR) == 0)
             {
-              if (opts->inverted_m17 == 0)
+              printFrameSync (opts, state, "+M17 STR", synctest_pos + 1, modulation);
+              state->carrier = 1;
+              state->offset = synctest_pos;
+              state->max = ((state->max) + lmax) / 2;
+              state->min = ((state->min) + lmin) / 2;
+              if (state->lastsynctype == 16)
               {
-                printFrameSync (opts, state, "+M17 PREAMBLE", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                state->lastsynctype = 98;
-                fprintf (stderr, "\n");
-                return (98);
-              }
-            }
-            else if (strcmp(synctest8, M17_PIV) == 0)
-            {
-              if (opts->inverted_m17 == 1)
-              {
-                printFrameSync (opts, state, "-M17 PREAMBLE", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                state->lastsynctype = 99;
-                fprintf (stderr, "\n");
-                return (99);
-              }
-            }
-            else if (strcmp(synctest8, M17_PKT) == 0)
-            {
-              if (opts->inverted_m17 == 0)
-              {
-                printFrameSync (opts, state, "+M17 PKT", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                if (state->lastsynctype == 86 || state->lastsynctype == 8)
-                {
-                  state->lastsynctype = 86;
-                  return (86);
-                }
-                state->lastsynctype = 86;
-                fprintf (stderr, "\n");
-              }
-              // else //unknown, -BRT?
-              // {
-              //   printFrameSync (opts, state, "-M17 BRT", synctest_pos + 1, modulation);
-              //   state->carrier = 1;
-              //   state->offset = synctest_pos;
-              //   state->max = ((state->max) + lmax) / 2;
-              //   state->min = ((state->min) + lmin) / 2;
-              //   if (state->lastsynctype == 77)
-              //   {
-              //     state->lastsynctype = 77;
-              //     return (77);
-              //   }
-              //   state->lastsynctype = 77;
-              //   fprintf (stderr, "\n");
-              // }
-            }
-            else if (strcmp(synctest8, M17_STR) == 0)
-            {
-              if (opts->inverted_m17 == 0)
-              {
-                printFrameSync (opts, state, "+M17 STR", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                if (state->lastsynctype == 16 || state->lastsynctype == 8)
-                {
-                  state->lastsynctype = 16;
-                  return (16);
-                }
                 state->lastsynctype = 16;
-                fprintf (stderr, "\n");
+                return (16);
               }
-              else
-              {
-                printFrameSync (opts, state, "-M17 LSF", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                if (state->lastsynctype == 99)
-                {
-                  state->lastsynctype = 9;
-                  return (9);
-                }
-                state->lastsynctype = 9;
-                fprintf (stderr, "\n");
-              }
-            }
-            else if (strcmp(synctest8, M17_LSF) == 0)
-            {
-              if (opts->inverted_m17 == 1)
-              {
-                printFrameSync (opts, state, "-M17 STR", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                if (state->lastsynctype == 17 || state->lastsynctype == 9)
-                {
-                  state->lastsynctype = 17;
-                  return (17);
-                }
-                state->lastsynctype = 17;
-                fprintf (stderr, "\n");
-              }
-              else
-              {
-                printFrameSync (opts, state, "+M17 LSF", synctest_pos + 1, modulation);
-                state->carrier = 1;
-                state->offset = synctest_pos;
-                state->max = ((state->max) + lmax) / 2;
-                state->min = ((state->min) + lmin) / 2;
-                if (state->lastsynctype == 98)
-                {
-                  state->lastsynctype = 8;
-                  return (8);
-                }
-                state->lastsynctype = 8;
-                fprintf (stderr, "\n");
-              }
+              state->lastsynctype = 16;
+              fprintf (stderr, "\n");
             }
           }
           //end M17
@@ -869,8 +750,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // data frame
                 sprintf(state->ftype, "DMR MS");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1)
                 {
                   //printFrameSync (opts, state, "+DMR MS Data", synctest_pos + 1, modulation);
@@ -885,8 +764,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               else //inverted MS voice frame
               {
                 sprintf(state->ftype, "DMR MS");
-                ippl_add("DMR","+DMR"); //IPP
-
                 state->lastsynctype = 32;
                 return (32);
               }
@@ -904,8 +781,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // voice frame
                 sprintf(state->ftype, "DMR MS");
-                ippl_add("DMR","+DMR");//IPP
-
                 if (opts->errorbars == 1)
                 {
                   //printFrameSync (opts, state, "+DMR MS Voice", synctest_pos + 1, modulation);
@@ -920,7 +795,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               else //inverted MS data frame
               {
                 sprintf(state->ftype, "DMR MS");
-                ippl_add("DMR","+DMR"); //IPP
                 state->lastsynctype = 33;
                 return (33);
               }
@@ -939,7 +813,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //iIPP
                 if (opts->errorbars == 1)
                 {
                   printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -952,8 +825,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -979,8 +850,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1)
                 {
                   //printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -993,8 +862,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1)
                 {
                   //printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -1020,8 +887,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1)
                 {
                   //printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -1034,8 +899,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -1061,8 +924,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -1080,7 +941,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
                 if (opts->errorbars == 1) //&& opts->dmr_stereo == 0
                 {
                   printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -1102,8 +962,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -1120,8 +978,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -1142,8 +998,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // voice frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "+DMR ", synctest_pos + 1, modulation);
@@ -1160,8 +1014,6 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
               {
                 // inverted data frame
                 sprintf(state->ftype, "DMR ");
-                ippl_add("DMR","+DMR"); //IPP
-
                 if (opts->errorbars == 1 && opts->dmr_stereo == 0)
                 {
                   //printFrameSync (opts, state, "-DMR ", synctest_pos + 1, modulation);
@@ -1299,8 +1151,7 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
                  }
 
             }
-
-                  #ifdef NXDN_OLD_SYNC
+          #ifdef NXDN_OLD_SYNC
           //NXDN (previous sync, now a cmake option -DNOS=ON ..)
           else if ((opts->frame_nxdn96 == 1) || (opts->frame_nxdn48 == 1))
           {
@@ -1409,7 +1260,7 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
             }
 
           }
-          #endif 
+          #endif
 
           //Provoice Conventional -- Some False Positives due to shortened frame sync pattern, so use squelch if possible
           #ifdef PVCONVENTIONAL
@@ -1524,14 +1375,14 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
 
       if (state->lastsynctype != 1)
         {
-          // if (synctest_pos >= 3456) //200 мс при скорости 4800 символов/сек  или 1800   
+
           if (synctest_pos >= 1800)
             {
               if ((opts->errorbars == 1) && (opts->verbose > 1) && (state->carrier == 1))
                 {
                   fprintf (stderr,"Sync: no sync\n");
                   // fprintf (stderr,"Press CTRL + C to close.\n");
-                  ippl_add("no_sync", "1"); 
+
                 }
               noCarrier (opts, state);
 
@@ -1544,3 +1395,4 @@ getFrameSync (dsd_opts * opts, dsd_state * state)
   return (-1);
 
 }
+

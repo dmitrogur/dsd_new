@@ -5,14 +5,14 @@
  * Portions of BPTC/FEC/CRC code from LouisErigHerve
  * Source: https://github.com/LouisErigHerve/dsd/blob/master/src/dmr_sync.c
  *
- * DMH/IPP
+ * LWVMOBILE
+ * 2023-12 DSD-FME Florida Man Edition
  *-----------------------------------------------------------------------------*/
 
 //TODO: Test USBD LIP Decoder with Real World Samples (if/when available)
 //TODO: Test UDT NMEA and LIP Decoders with Real World Samples (if/when available)
 
 #include "dsd.h"
-#include "dsd_veda.h"
 
 void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196], uint8_t databurst)
 {
@@ -23,66 +23,6 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   uint32_t CRCCorrect       = 0;
   uint32_t IrrecoverableErrors = 0;
   uint8_t slot = state->currentslot;
-
-if (opts->isVEDA)
-{
-    uint8_t raw_bytes[25];
-    memset(raw_bytes, 0, sizeof(raw_bytes));
-
-    if (databurst == 0xEB)
-    {
-        /*
-         * Для db=0xEB обычный info[196] в MS path пустой (dummy_bits).
-         * Поэтому берём реальный EMB источник:
-         * state->dmr_embedded_signalling[slot][1..4][8..39]
-         *
-         * Это 128 бит = 16 байт.
-         * Но чтобы формат info= остался одинаковым с db=0x01/0x02,
-         * печатаем всё равно 25 байт (50 hex):
-         *   первые 16 байт = реальный EMB128
-         *   оставшиеся 9 байт = 00
-         */
-        int bitpos = 0;
-
-        for (int burst = 1; burst <= 4; burst++)
-        {
-            for (int k = 0; k < 32; k++, bitpos++)
-            {
-                uint8_t bit = state->dmr_embedded_signalling[slot][burst][k + 8] & 1;
-                if (bit)
-                    raw_bytes[bitpos >> 3] |= (uint8_t)(1u << (7 - (bitpos & 7)));
-            }
-        }
-    }
-    else
-    {
-        /*
-         * Обычные databurst'ы: старое поведение.
-         * Печатаем входные 196 бит как 25 байт.
-         */
-        for (int i = 0; i < 196; i++)
-        {
-            if (info[i] & 1)
-                raw_bytes[i >> 3] |= (uint8_t)(1u << (7 - (i & 7)));
-        }
-    }
-
-    fprintf(stderr, "\n[VEDA RAW BURST] db=0x%02X info=", databurst);
-    for (int i = 0; i < 25; i++)
-        fprintf(stderr, "%02X", raw_bytes[i]);
-    fprintf(stderr, "\n");
-}
-
-if (opts->isVEDA && opts->veda_debug)
-{
-    fprintf(stderr,
-            "\n[VEDA DB] slot=%d databurst=0x%02X ms=%u stereo=%u payload_algid=0x%02X",
-            slot + 1,
-            databurst,
-            state->dmr_ms_mode,
-            state->dmr_stereo,
-            state->payload_algid);
-}
 
   //confirmed data
   uint8_t dbsn = 0; //data block serial number for confirmed data blocks
@@ -268,18 +208,11 @@ if (opts->isVEDA && opts->veda_debug)
   {
     if (state->dmr_ms_mode == 0)
     {
-      if (state->dmr_color_code != 16) {
+      if (state->dmr_color_code != 16)
         fprintf(stderr, "| Color Code=%02d ", state->dmr_color_code);
-        ippl_addi("tcc", state->dmr_color_code);//IPP
-      } else { 
-        fprintf(stderr, "| Color Code=XX ");
-        ippl_addi("tcc", state->dmr_color_code);//IPP
-      }
+      else fprintf(stderr, "| Color Code=XX ");
     }
     fprintf(stderr, "|%s", state->fsubtype);
-    //IPP
-    ippl_add("vp", state->fsubtype);
-    fprintf(stderr, "vp = %s ", state->fsubtype);
 
     //'DSP' output to file
     if (opts->use_dsp_output == 1)
@@ -436,7 +369,6 @@ if (opts->isVEDA && opts->veda_debug)
 
   }
 
-  
   //Embedded Signalling will use BPTC 128x77
   if (is_emb)
   {
@@ -506,7 +438,7 @@ if (opts->isVEDA && opts->veda_debug)
 
     uint8_t TrellisReturn[18];
     memset (TrellisReturn, 0, sizeof(TrellisReturn));
-    IrrecoverableErrors = dmr_34(tdibits, TrellisReturn);
+    IrrecoverableErrors = viterbi_r34(tdibits, TrellisReturn);
 
     //NOTE: IrrecoverableErrors in this context are a tally of errors from trellis
     //they may have been successfully corrected, the CRC will reveal as much
@@ -623,83 +555,6 @@ if (opts->isVEDA && opts->veda_debug)
 
 
   //time for some pi
-  /*
-    VEDA: trace rejected pre-voice control/service candidates.
-    Здесь PDU уже собран, CRC/FEC уже известны, но high-level handler ещё не вызван.
-    Это лучшая точка, чтобы увидеть, не теряем ли case6-подобный путь ещё до обработки.
-  */
-  if (opts->isVEDA)
-  {
-    veda_trace_rejected_air_header(opts,
-                                   state,
-                                   slot,
-                                   databurst,
-                                   DMR_PDU,
-                                   pdu_len,
-                                   CRCCorrect,
-                                   IrrecoverableErrors,
-                                   state->indx_SF);
-    if (databurst == 0x03 || databurst == 0x04 || databurst == 0x05 ||
-      databurst == 0x06 || databurst == 0x07 || databurst == 0x0B)
-    {
-      veda_raw_log_db(opts, state, slot,
-                    databurst,
-                    DMR_PDU, pdu_len,
-                    (uint8_t)CRCCorrect,
-                    (uint8_t)IrrecoverableErrors,
-                    state->indx_SF);
-    }                                   
-  }
-
-  if (opts->isVEDA && CRCCorrect && IrrecoverableErrors == 0 && pdu_len >= 8)
-  {
-    uint8_t b0 = DMR_PDU[0];
-    uint8_t b1 = DMR_PDU[1];
-    uint16_t w2 = (uint16_t)DMR_PDU[2] | ((uint16_t)DMR_PDU[3] << 8);
-    uint16_t w4 = (uint16_t)DMR_PDU[4] | ((uint16_t)DMR_PDU[5] << 8);
-    uint16_t w6 = (uint16_t)DMR_PDU[6] | ((uint16_t)DMR_PDU[7] << 8);
-    uint8_t svc = (((b0 & 0x60) == 0x20) ? 1 : 0);
-
-    if (databurst == 0x03)
-    {
-      state->veda_seen_db03[slot]++;
-      if (svc) state->veda_seen_svc_db03[slot]++;
-    }
-    else if (databurst == 0x04)
-    {
-      state->veda_seen_db04[slot]++;
-      if (svc) state->veda_seen_svc_db04[slot]++;
-    }
-
-    if (opts->veda_debug && svc && (databurst == 0x03 || databurst == 0x04))
-    {
-      fprintf(stderr,
-              "\n[VEDA SVCPROBE] slot=%d sf=%d db=0x%02X b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X raw=",
-              slot + 1,
-              state->indx_SF,
-              databurst,
-              b0, b1, w2, w4, w6);
-
-      for (int x = 0; x < pdu_len && x < 12; x++)
-        fprintf(stderr, "%02X", DMR_PDU[x]);
-
-      fprintf(stderr, "\n");
-    }
-  }
-
-  /* ========================================================================= */
-  /* VEDA HARDCORE RAW DUMP - ЛОГИРУЕМ ВООБЩЕ ВСЁ ДО ФИЛЬТРОВ И ПРОВЕРОК CRC   */
-  /* ========================================================================= */
-  if (opts->isVEDA) // Можно добавить && opts->veda_debug, но для тестов лучше выводить всегда
-  {
-      fprintf(stderr, "\n[VEDA HARDCORE] db=0x%02X len=%d crc=%d fec_err=%d raw=", 
-              databurst, pdu_len, CRCCorrect, IrrecoverableErrors);
-      for (int x = 0; x < pdu_len; x++) {
-          fprintf(stderr, "%02X", DMR_PDU[x]);
-      }
-      fprintf(stderr, "\n");
-  }
-  /* ========================================================================= */  
   if (databurst == 0x00) dmr_pi (opts, state, DMR_PDU, CRCCorrect, IrrecoverableErrors);
 
   //full link control
@@ -716,7 +571,7 @@ if (opts->isVEDA && opts->veda_debug)
 
   //control signalling types (CSBK, MBC)
   if (databurst == 0x03) dmr_cspdu (opts, state, DMR_PDU_bits, DMR_PDU, CRCCorrect, IrrecoverableErrors);
-  /*
+
   //both MBC header and MBC continuation will go to the block_assembler - type 2, and then to dmr_cspdu
   if (databurst == 0x04)
   {
@@ -725,32 +580,7 @@ if (opts->isVEDA && opts->veda_debug)
     dmr_block_assembler (opts, state, DMR_PDU, pdu_len, databurst, 2);
   }
   if (databurst == 0x05) dmr_block_assembler (opts, state, DMR_PDU, pdu_len, databurst, 2);
-  */
- if (databurst == 0x04)
-{
-  if (opts->isVEDA && opts->veda_debug)
-  {
-    fprintf(stderr, "\n[VEDA MBC] H slot=%d pdu=", slot + 1);
-    for (int x = 0; x < pdu_len; x++) fprintf(stderr, "%02X", DMR_PDU[x]);
-    fprintf(stderr, "\n");
-  }
 
-  state->data_block_counter[slot] = 0;
-  state->data_header_valid[slot] = 1;
-  dmr_block_assembler(opts, state, DMR_PDU, pdu_len, databurst, 2);
-}
-
-if (databurst == 0x05)
-{
-  if (opts->isVEDA && opts->veda_debug)
-  {
-    fprintf(stderr, "\n[VEDA MBC] C slot=%d pdu=", slot + 1);
-    for (int x = 0; x < pdu_len; x++) fprintf(stderr, "%02X", DMR_PDU[x]);
-    fprintf(stderr, "\n");
-  }
-
-  dmr_block_assembler(opts, state, DMR_PDU, pdu_len, databurst, 2);
-}
   //Unified Single Data Block (USBD) -- Not to be confused with Unified Data Transport (UDT)
   if (databurst == 0x0B)
   {
@@ -761,34 +591,6 @@ if (databurst == 0x05)
     if (usbd_st == 0) lip_protocol_decoder (opts, state, DMR_PDU_bits);
     else if (usbd_st > 8) fprintf (stderr, "Manufacturer Specific Service %d ", usbd_st);
     else fprintf (stderr, "Reserved %d ", usbd_st);
-  }
-
-
-{
-    // ВМЕСТО НЕГО: Сбрасываем только если пришел TLC (конец сессии)
-    if (databurst == 0x02) { // TLC
-        if (opts->veda_debug && state->veda_kx_pos[slot] > 0)
-            fprintf(stderr, "[VEDA KX] Resetting buffer due to TLC (End of Call)\n");
-        state->veda_kx_pos[slot] = 0;
-    }
-    // Накапливаем ВСЁ, что похоже на блоки управления или данных в начале
-    if (databurst == 0x04 || databurst == 0x05 || databurst == 0x06 || databurst == 0x07)
-    {
-        if (state->veda_kx_pos[slot] <= 36 && CRCCorrect)
-        {
-            memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], DMR_PDU, 12);
-            state->veda_kx_pos[slot] += 12;
-
-            fprintf(stderr, "[VEDA KX] Captured %d/48 bytes (Burst 0x%02X)\n", 
-                    state->veda_kx_pos[slot], databurst);
-
-            if (state->veda_kx_pos[slot] == 48)
-            {
-                handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-                // Не сбрасываем сразу, даем шанс отработать
-            }
-        }
-    }
   }
 
   //set the original CRCCorrect back to its original value if the RAS flag was tripped
@@ -807,12 +609,8 @@ if (databurst == 0x05)
 
   if (IrrecoverableErrors != 0 && databurst != 0x08 && databurst != 0x09) //&& databurst != 0x05
   {
-    //IPP
-    // ippl_add("err", "1"); 
-    // ippl_add("errv", "FEC ERR");
-
     fprintf (stderr, "%s", KRED);
-    fprintf(stderr, " (FEC ERR) %d. \n", IrrecoverableErrors);
+    fprintf(stderr, " (FEC ERR)");
     fprintf (stderr, "%s", KNRM);
   }
 
@@ -828,10 +626,6 @@ if (databurst == 0x05)
 
   if (IrrecoverableErrors == 0 && CRCCorrect == 0 && is_ras == 0 && databurst != 0x09 && databurst != 0x05)
   {
-    //IPP
-    ippl_add("err", "1"); 
-    ippl_add("errv", "CRC ERR");
-    
     fprintf (stderr, "%s", KRED);
     fprintf (stderr, " (CRC ERR) ");
     fprintf (stderr, "%s", KNRM);
