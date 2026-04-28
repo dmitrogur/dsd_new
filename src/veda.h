@@ -227,6 +227,7 @@ extern "C"
      * current dsd.h uses anonymous typedef structs for dsd_opts/dsd_state.
      * For collect mode this must not modify AMBE frames.
      */
+    
     int veda_ms_on_voice_triplet(
         dsd_opts *opts,
         dsd_state *state,

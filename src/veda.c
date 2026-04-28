@@ -558,55 +558,6 @@ void veda_ms_collect_kx64(const uint8_t *payload64)
     }
 }
 
-int veda_rx_try_payload216(veda_context_t *v, dsd_state *state)
-{
-    uint8_t enc27[27];
-    uint8_t dec27[27];
-    int rc;
-
-    if (!v || !state)
-        return VEDA_RC_ERROR;
-
-    rc = veda_rx_pack_ms_payload216(state, enc27);
-    if (rc != VEDA_RC_OK)
-        return rc;
-
-    if (v->debug)
-    {
-        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-IN] raw=");
-        veda_hexdump_stderr(NULL, enc27, 27);
-        fprintf(stderr, "\n");
-    }
-
-    if (!v->stream.key32_valid || !v->stream.seed8_valid || !v->stream.tweak_valid)
-        return VEDA_RC_WAIT_KEY32;
-
-    memcpy(dec27, enc27, 27);
-    rc = veda_stream_cfb128_crypt_model(&v->stream, dec27, 27);
-
-    if (rc != VEDA_RC_OK)
-    {
-        if (v->debug)
-            fprintf(stderr, "[VEDA2 RX-PAYLOAD216-WAIT] cfb_rc=%d\n", rc);
-        return rc;
-    }
-
-    if (v->debug)
-    {
-        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-OUT] raw=");
-        veda_hexdump_stderr(NULL, dec27, 27);
-        fprintf(stderr, "\n");
-    }
-
-    rc = veda_rx_unpack_ms_payload216(state, dec27);
-    if (rc != VEDA_RC_OK)
-        return rc;
-
-    return VEDA_RC_OK;
-}
-
-
-
 static void veda_rx_pack_one_dibit(uint8_t out27[27], int *bitpos, int dibit)
 {
     int b1 = (dibit >> 1) & 1;
@@ -718,6 +669,45 @@ int veda_rx_rebuild_ms_ambe_from_payload(dsd_state *state, char ambe_fr[4][24], 
         ambe_fr3[*y][*z] = (1 & dibit);
         w++; x++; y++; z++;
     }
+
+    return VEDA_RC_OK;
+}
+
+int veda_rx_try_payload216(veda_context_t *v, dsd_state *state)
+{
+    uint8_t enc27[27];
+    uint8_t dec27[27];
+    int rc;
+
+    if (!v || !state) return VEDA_RC_ERROR;
+
+    rc = veda_rx_pack_ms_payload216(state, enc27);
+    if (rc != VEDA_RC_OK) return rc;
+
+    if (v->debug) {
+        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-IN] raw=");
+        veda_hexdump_stderr(NULL, enc27, 27);
+        fprintf(stderr, "\n");
+    }
+
+    if (!v->stream.key32_valid || !v->stream.seed8_valid || !v->stream.tweak_valid) return VEDA_RC_WAIT_KEY32;
+
+    memcpy(dec27, enc27, 27);
+    rc = veda_stream_cfb128_crypt_model(&v->stream, dec27, 27);
+
+    if (rc != VEDA_RC_OK) {
+        if (v->debug) fprintf(stderr, "[VEDA2 RX-PAYLOAD216-WAIT] cfb_rc=%d\n", rc);
+        return rc;
+    }
+
+    if (v->debug) {
+        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-OUT] raw=");
+        veda_hexdump_stderr(NULL, dec27, 27);
+        fprintf(stderr, "\n");
+    }
+
+    rc = veda_rx_unpack_ms_payload216(state, dec27);
+    if (rc != VEDA_RC_OK) return rc;
 
     return VEDA_RC_OK;
 }
