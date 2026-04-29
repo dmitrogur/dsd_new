@@ -19,6 +19,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#define VEDA_DEBUG_KEYSTREAM 1
+
 static veda_context_t g_veda_ctx;
 
 static int veda_str_eq(const char *a, const char *b)
@@ -107,6 +109,66 @@ void veda_reset_global_context(void)
     veda_init_context(&g_veda_ctx);
 }
 
+static void veda_store_le32(uint8_t *p, uint32_t x)
+{
+    p[0] = (uint8_t)(x >> 0);
+    p[1] = (uint8_t)(x >> 8);
+    p[2] = (uint8_t)(x >> 16);
+    p[3] = (uint8_t)(x >> 24);
+}
+
+static uint32_t veda_rotl32(uint32_t x, int r)
+{
+    return (x << r) | (x >> (32 - r));
+}
+
+static void veda_gimli384_permute_model(uint32_t s[12])
+{
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+    uint32_t t;
+    int round;
+    int col;
+
+    for (round = 24; round > 0; round--)
+    {
+        for (col = 0; col < 4; col++)
+        {
+            x = veda_rotl32(s[col], 24);
+            y = veda_rotl32(s[col + 4], 9);
+            z = s[col + 8];
+
+            s[col + 8] = x ^ (z << 1) ^ ((y & z) << 2);
+            s[col + 4] = y ^ x ^ ((x | z) << 1);
+            s[col] = z ^ y ^ ((x & y) << 3);
+        }
+
+        if ((round & 3) == 0)
+        {
+            t = s[0];
+            s[0] = s[1];
+            s[1] = t;
+
+            t = s[2];
+            s[2] = s[3];
+            s[3] = t;
+
+            s[0] ^= (0x9E377900u | (uint32_t)round);
+        }
+        else if ((round & 3) == 2)
+        {
+            t = s[0];
+            s[0] = s[2];
+            s[2] = t;
+
+            t = s[1];
+            s[1] = s[3];
+            s[3] = t;
+        }
+    }
+}
+
 const char *veda_hypothesis_name(veda_hypothesis_t h)
 {
     switch (h)
@@ -117,10 +179,50 @@ const char *veda_hypothesis_name(veda_hypothesis_t h)
         return "main-tree";
     case VEDA_HYP_RUNTIME_BRIDGE:
         return "runtime-bridge";
+    case VEDA_HYP_CASE7_SERVICE:
+        return "case7-service";
     case VEDA_HYP_CASE8_PROOF:
         return "case8-proof";
     case VEDA_HYP_AUTO:
         return "auto";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *veda_key32_source_name(veda_key32_source_t s)
+{
+    switch (s)
+    {
+    case VEDA_KEY32_SRC_NONE:
+        return "none";
+    case VEDA_KEY32_SRC_OUT0:
+        return "out0";
+    case VEDA_KEY32_SRC_OUT1:
+        return "out1";
+    case VEDA_KEY32_SRC_RUNTIME_BRIDGE:
+        return "runtime-bridge";
+    case VEDA_KEY32_SRC_CASE8_SIDE_PROOF:
+        return "case8-side-proof";
+    case VEDA_KEY32_SRC_TEMP_CPS_CAND:
+        return "temp-cps-cand";
+    case VEDA_KEY32_SRC_TEMP_KX64_FIRST32:
+        return "temp-kx64-first32";
+    case VEDA_KEY32_SRC_TEMP_CAND_REPEAT:
+        return "temp-cand-repeat";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *veda_st_profile_name(veda_seed_tweak_profile_t p)
+{
+    switch (p)
+    {
+    case VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8:
+        return "zero-seed-cand-tweak-first8";
+    case VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8:
+        return "cand-seed-first8-cand-tweak-last8";
     default:
         return "unknown";
     }
@@ -136,6 +238,8 @@ veda_hypothesis_t veda_hypothesis_from_string(const char *s)
         return VEDA_HYP_MAIN_TREE;
     if (veda_str_eq(s, "runtime-bridge"))
         return VEDA_HYP_RUNTIME_BRIDGE;
+    if (veda_str_eq(s, "case7-service") || veda_str_eq(s, "case7"))
+        return VEDA_HYP_CASE7_SERVICE;
     if (veda_str_eq(s, "case8-proof"))
         return VEDA_HYP_CASE8_PROOF;
     if (veda_str_eq(s, "auto"))
@@ -338,19 +442,377 @@ int veda_try_build_key32_main_tree(veda_context_t *v, veda_key_candidate_t *kc)
     return VEDA_RC_WAIT_IDA_PROOF;
 }
 
-static uint32_t veda_rotl32(uint32_t x, int r)
-{
-    return (x << r) | (x >> (32 - r));
-}
-
-int veda_try_build_temporary_key_candidate(
-    veda_context_t *v,
-    veda_key_candidate_t *kc)
+static int veda_fill_temp_key32_cps_cand(veda_context_t *v, veda_key_candidate_t *kc)
 {
     int i;
+
+    if (!v->cps_key_valid || !v->ms.cand_valid || v->ms.cand_len <= 0)
+        return VEDA_RC_WAIT_KEY32;
+
+    for (i = 0; i < VEDA_KEY32_BYTES; i++)
+    {
+        uint8_t a = v->cps_key16[i & 15];
+        uint8_t b = v->ms.cand_raw[i % v->ms.cand_len];
+        kc->key32[i] = (uint8_t)(a ^ b ^ (uint8_t)(0xA5u + i));
+    }
+
+    kc->source = VEDA_KEY32_SRC_TEMP_CPS_CAND;
+    return VEDA_RC_OK;
+}
+
+static int veda_fill_temp_key32_kx64_first32(veda_context_t *v, veda_key_candidate_t *kc)
+{
+    if (!v->ms.kx64_valid)
+        return VEDA_RC_WAIT_KEY32;
+
+    memcpy(kc->key32, v->ms.kx64_raw, VEDA_KEY32_BYTES);
+    kc->source = VEDA_KEY32_SRC_TEMP_KX64_FIRST32;
+    return VEDA_RC_OK;
+}
+
+static int veda_fill_temp_key32_cand_repeat(veda_context_t *v, veda_key_candidate_t *kc)
+{
+    int i;
+
+    if (!v->ms.cand_valid || v->ms.cand_len <= 0)
+        return VEDA_RC_WAIT_KEY32;
+
+    for (i = 0; i < VEDA_KEY32_BYTES; i++)
+    {
+        kc->key32[i] = v->ms.cand_raw[i % v->ms.cand_len];
+    }
+
+    kc->source = VEDA_KEY32_SRC_TEMP_CAND_REPEAT;
+    return VEDA_RC_OK;
+}
+
+static uint32_t veda_mix_u32(uint32_t a, uint32_t b, uint32_t c)
+{
+    a ^= b + 0x9E3779B9u + (a << 6) + (a >> 2);
+    a ^= c + 0x85EBCA6Bu + (a << 7) + (a >> 3);
+    return a;
+}
+
+static uint32_t veda_load_le32_part(const uint8_t *p, int n, int off)
+{
+    if (!p || n < off + 4)
+        return 0;
+
+    return veda_load_le32(p + off);
+}
+
+static void veda_air_absorb_bytes_model(uint32_t st[12], const uint8_t *p, int n,
+    uint32_t domain)
+{
+    int i;
+
+    if (!st || !p || n <= 0)
+        return;
+
+    st[10] ^= domain;
+    st[11] ^= (uint32_t)n;
+
+    for (i = 0; i < n; i++)
+    {
+        st[i & 11] ^= ((uint32_t)p[i] << ((i & 3) * 8));
+
+        if ((i & 15) == 15)
+            veda_gimli384_permute_model(st);
+    }
+
+    veda_gimli384_permute_model(st);
+}
+
+static void veda_air_squeeze_key32_model(uint32_t st[12], uint8_t out32[VEDA_KEY32_BYTES])
+{
+    int i;
+
+    veda_gimli384_permute_model(st);
+
+    for (i = 0; i < 8; i++)
+        veda_store_le32(out32 + (i * 4), st[i & 11]);
+}
+
+static int veda_air_build_session_key32(veda_context_t *v, veda_key_candidate_t *kc,
+    int hprofile)
+{
+    uint32_t st[12];
+    int i;
+
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+    if (!v->cps_key_valid)
+        return VEDA_RC_WAIT_KEY32;
+    if (!v->ms.vlc_valid && !v->ms.cand_valid)
+        return VEDA_RC_WAIT_KEY32;
+
+    memset(st, 0, sizeof(st));
+
+    for (i = 0; i < 4; i++)
+        st[i] = veda_load_le32(v->cps_key16 + (i * 4));
+
+    st[4] = 0x56454441u; /* VEDA */
+    st[5] = (uint32_t)hprofile;
+    st[6] = v->ms.superframe;
+    st[7] = v->ms.seq;
+
+    if (v->ms.vlc_valid)
+        veda_air_absorb_bytes_model(st, v->ms.vlc_raw, v->ms.vlc_len, 0x44423031u); /* DB01 */
+    else
+        veda_air_absorb_bytes_model(st, v->ms.cand_raw, v->ms.cand_len, 0x43414E44u); /* CAND */
+
+    if (v->ms.kx64_valid)
+        veda_air_absorb_bytes_model(st, v->ms.kx64_raw, 64, 0x4B583634u); /* KX64 */
+
+    if (hprofile == 3 && v->ms.emb_valid)
+        veda_air_absorb_bytes_model(st, v->ms.emb_raw, v->ms.emb_len, 0x45423033u); /* EB03 */
+
+    if (hprofile == 4 && v->ms.mi32_valid)
+    {
+        st[8] ^= v->ms.mi32;
+        st[9] ^= veda_mix_u32(v->ms.mi32, v->ms.superframe, v->ms.burst_index);
+        veda_gimli384_permute_model(st);
+    }
+
+    veda_air_squeeze_key32_model(st, kc->key32);
+
+    if (hprofile == 1)
+        kc->source = VEDA_KEY32_SRC_AIR_H1_DB01_BASE;
+    else if (hprofile == 2)
+        kc->source = VEDA_KEY32_SRC_AIR_H2_DB01_EB_REFRESH;
+    else if (hprofile == 3)
+        kc->source = VEDA_KEY32_SRC_AIR_H3_DB01_EB_KEY32;
+    else
+        kc->source = VEDA_KEY32_SRC_AIR_H4_SPLIT_LEVELS;
+
+    return VEDA_RC_OK;
+}
+
+static int veda_air_profile_from_hypothesis(veda_context_t *v)
+{
+    if (!v)
+        return 1;
+
+    if (v->hypothesis == VEDA_HYP_MAIN_TREE)
+        return 1;
+    if (v->hypothesis == VEDA_HYP_RUNTIME_BRIDGE)
+        return 2;
+    if (v->hypothesis == VEDA_HYP_CASE7_SERVICE)
+        return 3;
+    if (v->hypothesis == VEDA_HYP_CASE8_PROOF)
+        return 4;
+
+    return 1;
+}
+
+static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_tweak_profile_t *used_profile,
+    uint8_t seed8[VEDA_SEED8_BYTES], uint32_t *tweak0, uint32_t *tweak1)
+{
+    uint32_t mi;
+    uint32_t eb0;
+    uint32_t eb1;
+    uint32_t db01;
+    int hprofile;
+
+    if (!v || !used_profile || !seed8 || !tweak0 || !tweak1)
+        return VEDA_RC_ERROR;
+
+    if (!v->ms.cand_valid || v->ms.cand_len < 8)
+        return VEDA_RC_WAIT_KEY32;
+
+    hprofile = veda_air_profile_from_hypothesis(v);
+
+    memset(seed8, 0, VEDA_SEED8_BYTES);
+
+    mi = v->ms.mi32_valid ? v->ms.mi32 : 0;
+    eb0 = v->ms.emb_valid ? veda_load_le32_part(v->ms.emb_raw, v->ms.emb_len, 0) : 0;
+    eb1 = v->ms.emb_valid ? veda_load_le32_part(v->ms.emb_raw, v->ms.emb_len, v->ms.emb_len - 4) : 0;
+    db01 = v->ms.vlc_valid ? veda_load_le32_part(v->ms.vlc_raw, v->ms.vlc_len, 0) : 0;
+
+    if (hprofile == 1)
+    {
+        /* H1: db01=session key, EB/MI/phase=tweak */
+        seed8[0] = (uint8_t)(mi >> 0);
+        seed8[1] = (uint8_t)(mi >> 8);
+        seed8[2] = (uint8_t)(mi >> 16);
+        seed8[3] = (uint8_t)(mi >> 24);
+        seed8[4] = (uint8_t)v->ms.superframe;
+        seed8[5] = (uint8_t)v->ms.burst_index;
+        seed8[6] = (uint8_t)v->ms.seq;
+        seed8[7] = 0x01;
+
+        *tweak0 = veda_mix_u32(eb0, mi, v->ms.superframe);
+        *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->ms.voice_triplet_count);
+        *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
+    }
+    else if (hprofile == 2)
+    {
+        /* H2: db01=session base, EB refresh changes dynamic tweak */
+        seed8[0] = (uint8_t)(db01 >> 0);
+        seed8[1] = (uint8_t)(db01 >> 8);
+        seed8[2] = (uint8_t)(db01 >> 16);
+        seed8[3] = (uint8_t)(db01 >> 24);
+        seed8[4] = (uint8_t)(mi >> 0);
+        seed8[5] = (uint8_t)(mi >> 8);
+        seed8[6] = (uint8_t)v->ms.burst_index;
+        seed8[7] = 0x02;
+
+        *tweak0 = veda_mix_u32(eb0, db01, mi);
+        *tweak1 = veda_mix_u32(eb1, v->ms.seq, v->ms.superframe);
+        *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
+    }
+    else if (hprofile == 3)
+    {
+        /* H3: EB participates in key32; MI/phase drives stream side */
+        if (v->ms.emb_valid && v->ms.emb_len >= 8)
+            memcpy(seed8, v->ms.emb_raw, 8);
+        else
+            memcpy(seed8, v->ms.cand_raw, 8);
+
+        *tweak0 = veda_mix_u32(mi, v->ms.superframe, v->ms.seq);
+        *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->ms.voice_triplet_count);
+        *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
+    }
+    else
+    {
+        /* H4: db01 for base, EB/MI for voice-side stream material */
+        if (v->ms.vlc_valid && v->ms.vlc_len >= 8)
+            memcpy(seed8, v->ms.vlc_raw, 8);
+        else
+            memcpy(seed8, v->ms.cand_raw, 8);
+
+        *tweak0 = veda_mix_u32(eb0, mi, v->ms.burst_index);
+        *tweak1 = veda_mix_u32(eb1, db01, v->ms.seq);
+        *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
+    }
+
+    if (v->debug)
+    {
+        fprintf(stderr,
+            "[VEDA2 AIR-H%d] db01=%d eb=%d mi=%d seed=%02X%02X%02X%02X%02X%02X%02X%02X tweak=%08X:%08X\n",
+            hprofile, v->ms.vlc_valid, v->ms.emb_valid, v->ms.mi32_valid,
+            seed8[0], seed8[1], seed8[2], seed8[3], seed8[4], seed8[5], seed8[6], seed8[7],
+            *tweak0, *tweak1);
+    }
+
+    return VEDA_RC_OK;
+}
+
+static int veda_build_temporary_kx_split_from_air(veda_context_t *v)
+{
+    int i;
+    int n;
+    uint8_t a;
+    uint8_t b;
+    uint8_t c;
+
+    if (!v)
+        return VEDA_RC_ERROR;
+    if (!v->cps_key_valid)
+        return VEDA_RC_WAIT_KEY32;
+    if (!v->ms.cand_valid || v->ms.cand_len < 8)
+        return VEDA_RC_WAIT_KEY32;
+
+    memset(&v->kx, 0, sizeof(v->kx));
+
+    n = v->ms.cand_len;
+
+    for (i = 0; i < VEDA_KX_SEED32_BYTES; i++)
+    {
+        a = v->cps_key16[i & 15];
+        b = v->ms.cand_raw[i % n];
+        c = v->ms.kx64_valid ? v->ms.kx64_raw[i & 63] : 0;
+        v->kx.seed32[i] = (uint8_t)(a ^ b ^ c ^ (uint8_t)(0x3Du + i));
+    }
+
+    for (i = 0; i < VEDA_KEY32_BYTES; i++)
+    {
+        a = v->kx.seed32[i];
+        b = v->ms.kx64_valid ? v->ms.kx64_raw[(i + 32) & 63] : v->ms.cand_raw[(i + 3) % n];
+        c = v->cps_key16[(i + 7) & 15];
+        v->kx.out0[i] = (uint8_t)(a ^ b ^ c ^ (uint8_t)(0xA5u + i));
+    }
+
+    for (i = 0; i < VEDA_KEY32_BYTES; i++)
+    {
+        a = v->kx.seed32[31 - i];
+        b = v->ms.cand_raw[(i + 5) % n];
+        c = v->ms.kx64_valid ? v->ms.kx64_raw[i & 63] : v->cps_key16[i & 15];
+        v->kx.out1[i] = (uint8_t)(a ^ b ^ c ^ (uint8_t)(0x5Au + i));
+    }
+
+    v->kx.seed32_valid = 1;
+    v->kx.out0_valid = 1;
+    v->kx.out1_valid = 1;
+
+    if (v->debug)
+    {
+        fprintf(stderr, "[VEDA2 TEMP-KX-SPLIT] proof=not_confirmed cand_len=%d kx64=%d seed32=",
+                v->ms.cand_len, v->ms.kx64_valid);
+        veda_hexdump_stderr(NULL, v->kx.seed32, 8);
+        fprintf(stderr, " out0=");
+        veda_hexdump_stderr(NULL, v->kx.out0, 8);
+        fprintf(stderr, " out1=");
+        veda_hexdump_stderr(NULL, v->kx.out1, 8);
+        fprintf(stderr, "\n");
+    }
+
+    return VEDA_RC_OK;
+}
+
+static int veda_fill_temp_key32_out0(veda_context_t *v, veda_key_candidate_t *kc)
+{
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+    if (!v->kx.out0_valid)
+        return VEDA_RC_WAIT_KEY32;
+
+    memcpy(kc->key32, v->kx.out0, VEDA_KEY32_BYTES);
+    kc->source = VEDA_KEY32_SRC_OUT0;
+    return VEDA_RC_OK;
+}
+
+static int veda_fill_temp_key32_out1(veda_context_t *v, veda_key_candidate_t *kc)
+{
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+    if (!v->kx.out1_valid)
+        return VEDA_RC_WAIT_KEY32;
+
+    memcpy(kc->key32, v->kx.out1, VEDA_KEY32_BYTES);
+    kc->source = VEDA_KEY32_SRC_OUT1;
+    return VEDA_RC_OK;
+}
+
+static int veda_fill_temp_key32_by_hypothesis(veda_context_t *v, veda_key_candidate_t *kc)
+{
+    int rc;
+    int hprofile;
+
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+
+    hprofile = veda_air_profile_from_hypothesis(v);
+
+    rc = veda_air_build_session_key32(v, kc, hprofile);
+    if (rc == VEDA_RC_OK)
+        return rc;
+
+    rc = veda_fill_temp_key32_kx64_first32(v, kc);
+    if (rc != VEDA_RC_OK)
+        rc = veda_fill_temp_key32_cps_cand(v, kc);
+    if (rc != VEDA_RC_OK)
+        rc = veda_fill_temp_key32_cand_repeat(v, kc);
+
+    return rc;
+}
+
+int veda_try_build_temporary_key_candidate(veda_context_t *v, veda_key_candidate_t *kc)
+{
     uint8_t seed8[VEDA_SEED8_BYTES];
     uint32_t tweak0 = 0;
     uint32_t tweak1 = 0;
+    veda_seed_tweak_profile_t st_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
     int rc;
 
     if (!v || !kc)
@@ -363,20 +825,11 @@ int veda_try_build_temporary_key_candidate(
     if (!v->ms.cand_valid || v->ms.cand_len < 8)
         return VEDA_RC_WAIT_KEY32;
 
-    for (i = 0; i < VEDA_KEY32_BYTES; i++)
-    {
-        uint8_t a = v->cps_key16[i & 15];
-        uint8_t b = v->ms.cand_raw[i % v->ms.cand_len];
-        uint8_t c = v->ms.kx64_valid ? v->ms.kx64_raw[i] : 0;
-        kc->key32[i] = (uint8_t)(a ^ b ^ c ^ (uint8_t)(0xA5u + i));
-    }
+    rc = veda_fill_temp_key32_by_hypothesis(v, kc);
+    if (rc != VEDA_RC_OK)
+        return rc;
 
-    rc = veda_build_seed_tweak_from_candidate(
-        v,
-        VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8,
-        seed8,
-        &tweak0,
-        &tweak1);
+    rc = veda_try_build_temporary_seed_tweak(v, &st_profile, seed8, &tweak0, &tweak1);
 
     if (rc != VEDA_RC_OK)
         return rc;
@@ -388,13 +841,15 @@ int veda_try_build_temporary_key_candidate(
     kc->key_valid = 1;
     kc->seed_valid = 1;
     kc->tweak_valid = 1;
-    kc->source = VEDA_KEY32_SRC_NONE;
     kc->score = 0;
 
     if (v->debug)
     {
         fprintf(stderr,
-                "[VEDA2 TEMP-KEY] proof=not_confirmed cand_len=%d kx64=%d source=temp_cps_cand_mix\n",
+                "[VEDA2 TEMP-KEY] proof=not_confirmed hyp=%s source=%s st_profile=%s cand_len=%d kx64=%d\n",
+                veda_hypothesis_name(v->hypothesis),
+                veda_key32_source_name(kc->source),
+                veda_st_profile_name(st_profile),
                 v->ms.cand_len,
                 v->ms.kx64_valid);
     }
@@ -402,9 +857,8 @@ int veda_try_build_temporary_key_candidate(
     return VEDA_RC_OK;
 }
 
-int veda_stream_init_from_key_candidate(
-    veda_context_t *v,
-    veda_key_candidate_t *kc)
+int veda_stream_init_from_key_candidate(veda_context_t *v,
+                                        veda_key_candidate_t *kc)
 {
     int rc;
 
@@ -442,11 +896,13 @@ int veda_stream_init_from_key_candidate(
 
         if (v->debug)
         {
-            fprintf(stderr,
-                    "[VEDA2 STREAM-FROM-KC] ready keysrc=%d tweak=%08X:%08X proof=not_confirmed\n",
-                    (int)kc->source,
-                    kc->tweak0,
-                    kc->tweak1);
+            fprintf(stderr, "[VEDA2 STREAM-FROM-KC] ready keysrc=%s proof=not_confirmed key32=", veda_key32_source_name(kc->source));
+            veda_hexdump_stderr(NULL, kc->key32, VEDA_KEY32_BYTES);
+
+            fprintf(stderr, " seed8=");
+            veda_hexdump_stderr(NULL, kc->seed8, VEDA_SEED8_BYTES);
+
+            fprintf(stderr, " tweak=%08X:%08X\n", kc->tweak0, kc->tweak1);
         }
     }
 
@@ -712,24 +1168,31 @@ int veda_ms_on_voice_triplet(dsd_opts *opts, dsd_state *state, int slot, char am
         return 0;
     }
 
+    rc = VEDA_RC_WAIT_IDA_PROOF;
+
     if (v->hypothesis == VEDA_HYP_MAIN_TREE || v->hypothesis == VEDA_HYP_AUTO)
     {
         rc = veda_try_build_key32_main_tree(v, &v->key_candidate);
+    }
+    else if (v->debug)
+    {
+        fprintf(stderr, "[VEDA2 RX-HYP-GATE] hyp=%d real_key32=WAIT_IDA_PROOF, using temp candidate\n",
+                (int)v->hypothesis);
+    }
 
-        if (rc != VEDA_RC_OK)
-        {
-            rc = veda_try_build_temporary_key_candidate(v, &v->key_candidate);
-        }
+    if (rc != VEDA_RC_OK)
+    {
+        rc = veda_try_build_temporary_key_candidate(v, &v->key_candidate);
+    }
 
-        if (rc == VEDA_RC_OK)
-        {
-            rc = veda_stream_init_from_key_candidate(v, &v->key_candidate);
-        }
+    if (rc == VEDA_RC_OK)
+    {
+        rc = veda_stream_init_from_key_candidate(v, &v->key_candidate);
+    }
 
-        if (rc != VEDA_RC_OK && v->debug)
-        {
-            fprintf(stderr, "[VEDA2 RX-KEY-STREAM-BUILD] rc=%d\n", rc);
-        }
+    if (rc != VEDA_RC_OK && v->debug)
+    {
+        fprintf(stderr, "[VEDA2 RX-KEY-STREAM-BUILD] hyp=%d rc=%d\n", (int)v->hypothesis, rc);
     }
 
     prc = veda_rx_try_payload216(v, state);
@@ -759,21 +1222,44 @@ int veda_stream256_init_model(veda_stream_ctx_t *ctx, const uint8_t *seed8, cons
     memcpy(ctx->seed8, seed8, VEDA_SEED8_BYTES);
     memcpy(ctx->key32, key32, VEDA_KEY32_BYTES);
 
-    for (i = 0; i < 8; i++)
-    {
-        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 0] << 0);
-        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 1] << 8);
-        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 2] << 16);
-        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 3] << 24);
-    }
+    ctx->st[0] = veda_load_le32(seed8 + 0);
+    ctx->st[1] = veda_load_le32(seed8 + 4);
+    ctx->st[2] = 0x78323673u; /* "sbx8" marker/model */
+    ctx->st[3] = 0x00000100u;
 
-    ctx->st[8] ^= veda_load_le32(seed8 + 0);
-    ctx->st[9] ^= veda_load_le32(seed8 + 4);
-    ctx->st[10] ^= 0x78323673u;
-    ctx->st[11] ^= 0x000000FDu;
+    for (i = 0; i < 4; i++)
+        ctx->st[4 + i] ^= veda_load_le32(key32 + (i * 4));
+
+    veda_gimli384_permute_model(ctx->st);
+
+    for (i = 0; i < 4; i++)
+        ctx->st[4 + i] ^= veda_load_le32(key32 + 16 + (i * 4));
+
+    ctx->st[10] ^= 0x78323673u; /* sbx256/domain placeholder */
+    ctx->st[11] ^= 0x000000FDu; /* model: permute/domain param 253 */
 
     ctx->seed8_valid = 1;
     ctx->key32_valid = 1;
+
+    return VEDA_RC_OK;
+}
+
+int veda_stream256_apply_tweak64_model(veda_stream_ctx_t *ctx, uint32_t tweak0, uint32_t tweak1)
+{
+    if (!ctx || !ctx->key32_valid || !ctx->seed8_valid)
+        return VEDA_RC_ERROR;
+
+    ctx->tweak0 = tweak0;
+    ctx->tweak1 = tweak1;
+
+    ctx->st[0] ^= tweak0;
+    ctx->st[1] ^= tweak1;
+    ctx->st[2] ^= 0x54574B36u; /* "TWK6" model marker */
+    ctx->st[3] ^= 0x00000040u; /* 64-bit tweak marker */
+
+    veda_gimli384_permute_model(ctx->st);
+
+    ctx->tweak_valid = 1;
 
     return VEDA_RC_OK;
 }
@@ -797,47 +1283,34 @@ int veda_stream_init_model(veda_stream_ctx_t *ctx, const uint8_t *key32, const u
     return VEDA_RC_OK;
 }
 
-int veda_stream256_apply_tweak64_model(veda_stream_ctx_t *ctx, uint32_t tweak0, uint32_t tweak1)
-{
-    if (!ctx || !ctx->key32_valid || !ctx->seed8_valid)
-    {
-        return VEDA_RC_ERROR;
-    }
-
-    ctx->tweak0 = tweak0;
-    ctx->tweak1 = tweak1;
-
-    ctx->st[0] ^= tweak0;
-    ctx->st[1] ^= tweak1;
-    ctx->st[10] ^= 0x54574B36u;
-    ctx->st[11] ^= 0x00000040u;
-
-    ctx->tweak_valid = 1;
-
-    return VEDA_RC_OK;
-}
-
 int veda_stream_generate_keystream_model(veda_stream_ctx_t *ctx, uint8_t *out, size_t len)
 {
-    size_t i;
-    uint32_t x;
+    uint8_t word[4];
+    size_t pos = 0;
+    size_t n;
+    int i;
 
     if (!ctx || !out || len == 0)
         return VEDA_RC_ERROR;
 
     if (!ctx->key32_valid || !ctx->seed8_valid || !ctx->tweak_valid)
-    {
         return VEDA_RC_WAIT_KEY32;
-    }
 
-    x = ctx->st[0] ^ ctx->st[3] ^ ctx->st[7] ^ ctx->st[11];
-
-    for (i = 0; i < len; i++)
+    while (pos < len)
     {
-        x ^= ctx->st[i % 12] + 0x9E3779B9u + (uint32_t)i;
-        x = veda_rotl32(x, 7) ^ veda_rotl32(x, 19);
-        out[i] = (uint8_t)(x >> ((i & 3) * 8));
-        ctx->st[(i + 5) % 12] ^= x + (uint32_t)i;
+        veda_gimli384_permute_model(ctx->st);
+
+        for (i = 0; i < 4 && pos < len; i++)
+        {
+            veda_store_le32(word, ctx->st[i]);
+
+            n = len - pos;
+            if (n > 4)
+                n = 4;
+
+            memcpy(out + pos, word, n);
+            pos += n;
+        }
     }
 
     return VEDA_RC_OK;
@@ -858,10 +1331,14 @@ int veda_stream_cfb128_crypt_model(veda_stream_ctx_t *ctx, uint8_t *buf, size_t 
     if (rc != VEDA_RC_OK)
         return rc;
 
+#ifdef VEDA_DEBUG_KEYSTREAM
+    fprintf(stderr, "[VEDA2 KS27] len=%zu raw=", len);
+    veda_hexdump_stderr(NULL, ks, len);
+    fprintf(stderr, "\n");
+#endif
+
     for (i = 0; i < len; i++)
-    {
         buf[i] ^= ks[i];
-    }
 
     return VEDA_RC_OK;
 }
