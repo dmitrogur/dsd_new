@@ -338,6 +338,121 @@ int veda_try_build_key32_main_tree(veda_context_t *v, veda_key_candidate_t *kc)
     return VEDA_RC_WAIT_IDA_PROOF;
 }
 
+static uint32_t veda_rotl32(uint32_t x, int r)
+{
+    return (x << r) | (x >> (32 - r));
+}
+
+int veda_try_build_temporary_key_candidate(
+    veda_context_t *v,
+    veda_key_candidate_t *kc)
+{
+    int i;
+    uint8_t seed8[VEDA_SEED8_BYTES];
+    uint32_t tweak0 = 0;
+    uint32_t tweak1 = 0;
+    int rc;
+
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+
+    memset(kc, 0, sizeof(*kc));
+
+    if (!v->cps_key_valid)
+        return VEDA_RC_WAIT_KEY32;
+    if (!v->ms.cand_valid || v->ms.cand_len < 8)
+        return VEDA_RC_WAIT_KEY32;
+
+    for (i = 0; i < VEDA_KEY32_BYTES; i++)
+    {
+        uint8_t a = v->cps_key16[i & 15];
+        uint8_t b = v->ms.cand_raw[i % v->ms.cand_len];
+        uint8_t c = v->ms.kx64_valid ? v->ms.kx64_raw[i] : 0;
+        kc->key32[i] = (uint8_t)(a ^ b ^ c ^ (uint8_t)(0xA5u + i));
+    }
+
+    rc = veda_build_seed_tweak_from_candidate(
+        v,
+        VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8,
+        seed8,
+        &tweak0,
+        &tweak1);
+
+    if (rc != VEDA_RC_OK)
+        return rc;
+
+    memcpy(kc->seed8, seed8, VEDA_SEED8_BYTES);
+    kc->tweak0 = tweak0;
+    kc->tweak1 = tweak1;
+
+    kc->key_valid = 1;
+    kc->seed_valid = 1;
+    kc->tweak_valid = 1;
+    kc->source = VEDA_KEY32_SRC_NONE;
+    kc->score = 0;
+
+    if (v->debug)
+    {
+        fprintf(stderr,
+                "[VEDA2 TEMP-KEY] proof=not_confirmed cand_len=%d kx64=%d source=temp_cps_cand_mix\n",
+                v->ms.cand_len,
+                v->ms.kx64_valid);
+    }
+
+    return VEDA_RC_OK;
+}
+
+int veda_stream_init_from_key_candidate(
+    veda_context_t *v,
+    veda_key_candidate_t *kc)
+{
+    int rc;
+
+    if (!v || !kc)
+        return VEDA_RC_ERROR;
+
+    if (!kc->key_valid || !kc->seed_valid || !kc->tweak_valid)
+    {
+        if (v->debug)
+        {
+            fprintf(stderr,
+                    "[VEDA2 STREAM-FROM-KC] wait key=%d seed=%d tweak=%d\n",
+                    kc->key_valid,
+                    kc->seed_valid,
+                    kc->tweak_valid);
+        }
+
+        return VEDA_RC_WAIT_KEY32;
+    }
+
+    rc = veda_stream_init_model(
+        &v->stream,
+        kc->key32,
+        kc->seed8,
+        kc->tweak0,
+        kc->tweak1,
+        kc->source);
+
+    if (rc == VEDA_RC_WAIT_IDA_PROOF)
+        rc = VEDA_RC_OK;
+
+    if (rc == VEDA_RC_OK)
+    {
+        v->stream.stream_valid = 1;
+
+        if (v->debug)
+        {
+            fprintf(stderr,
+                    "[VEDA2 STREAM-FROM-KC] ready keysrc=%d tweak=%08X:%08X proof=not_confirmed\n",
+                    (int)kc->source,
+                    kc->tweak0,
+                    kc->tweak1);
+        }
+    }
+
+    return rc;
+}
+
 int veda_try_voice_candidate(veda_context_t *v, veda_stream_ctx_t *sc, char ambe_fr[VEDA_AMBE_ROWS][VEDA_AMBE_COLS], char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS], char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS])
 {
     if (!v || !sc || !ambe_fr || !ambe_fr2 || !ambe_fr3)
@@ -361,10 +476,12 @@ static void veda_rx_pack_one_dibit(uint8_t out27[27], int *bitpos, int dibit)
     int b1 = (dibit >> 1) & 1;
     int b0 = dibit & 1;
 
-    if (b1) out27[*bitpos >> 3] |= (uint8_t)(1u << (7 - (*bitpos & 7)));
+    if (b1)
+        out27[*bitpos >> 3] |= (uint8_t)(1u << (7 - (*bitpos & 7)));
     (*bitpos)++;
 
-    if (b0) out27[*bitpos >> 3] |= (uint8_t)(1u << (7 - (*bitpos & 7)));
+    if (b0)
+        out27[*bitpos >> 3] |= (uint8_t)(1u << (7 - (*bitpos & 7)));
     (*bitpos)++;
 }
 
@@ -379,7 +496,8 @@ static void veda_rx_pack_range(dsd_state *state, int first, int last_excl, uint8
 {
     int i;
 
-    for (i = first; i < last_excl; i++) {
+    for (i = first; i < last_excl; i++)
+    {
         veda_rx_pack_one_dibit(out27, bitpos, state->dmr_stereo_payload[i] & 3);
     }
 }
@@ -388,7 +506,8 @@ static void veda_rx_unpack_range(dsd_state *state, int first, int last_excl, con
 {
     int i;
 
-    for (i = first; i < last_excl; i++) {
+    for (i = first; i < last_excl; i++)
+    {
         int b1 = veda_rx_unpack_one_bit(in27, bitpos);
         int b0 = veda_rx_unpack_one_bit(in27, bitpos);
         state->dmr_stereo_payload[i] = (char)((b1 << 1) | b0);
@@ -399,7 +518,8 @@ int veda_rx_pack_ms_payload216(dsd_state *state, uint8_t out27[27])
 {
     int bitpos = 0;
 
-    if (!state || !out27) return VEDA_RC_ERROR;
+    if (!state || !out27)
+        return VEDA_RC_ERROR;
 
     memset(out27, 0, 27);
 
@@ -415,7 +535,8 @@ int veda_rx_unpack_ms_payload216(dsd_state *state, const uint8_t in27[27])
 {
     int bitpos = 0;
 
-    if (!state || !in27) return VEDA_RC_ERROR;
+    if (!state || !in27)
+        return VEDA_RC_ERROR;
 
     veda_rx_unpack_range(state, 12, 48, in27, &bitpos);
     veda_rx_unpack_range(state, 48, 66, in27, &bitpos);
@@ -431,44 +552,87 @@ int veda_rx_rebuild_ms_ambe_from_payload(dsd_state *state, char ambe_fr[4][24], 
     int i;
     int dibit;
 
-    if (!state || !ambe_fr || !ambe_fr2 || !ambe_fr3) return VEDA_RC_ERROR;
+    if (!state || !ambe_fr || !ambe_fr2 || !ambe_fr3)
+        return VEDA_RC_ERROR;
 
     memset(ambe_fr, 0, sizeof(char) * 4 * 24);
     memset(ambe_fr2, 0, sizeof(char) * 4 * 24);
     memset(ambe_fr3, 0, sizeof(char) * 4 * 24);
 
-    w = rW; x = rX; y = rY; z = rZ;
-    for (i = 0; i < 36; i++) {
+    w = rW;
+    x = rX;
+    y = rY;
+    z = rZ;
+    for (i = 0; i < 36; i++)
+    {
         dibit = state->dmr_stereo_payload[i + 12] & 3;
         ambe_fr[*w][*x] = (1 & (dibit >> 1));
         ambe_fr[*y][*z] = (1 & dibit);
-        w++; x++; y++; z++;
+        w++;
+        x++;
+        y++;
+        z++;
     }
 
-    w = rW; x = rX; y = rY; z = rZ;
-    for (i = 0; i < 18; i++) {
+    w = rW;
+    x = rX;
+    y = rY;
+    z = rZ;
+    for (i = 0; i < 18; i++)
+    {
         dibit = state->dmr_stereo_payload[i + 48] & 3;
         ambe_fr2[*w][*x] = (1 & (dibit >> 1));
         ambe_fr2[*y][*z] = (1 & dibit);
-        w++; x++; y++; z++;
+        w++;
+        x++;
+        y++;
+        z++;
     }
 
-    for (i = 0; i < 18; i++) {
+    for (i = 0; i < 18; i++)
+    {
         dibit = state->dmr_stereo_payload[i + 90] & 3;
         ambe_fr2[*w][*x] = (1 & (dibit >> 1));
         ambe_fr2[*y][*z] = (1 & dibit);
-        w++; x++; y++; z++;
+        w++;
+        x++;
+        y++;
+        z++;
     }
 
-    w = rW; x = rX; y = rY; z = rZ;
-    for (i = 0; i < 36; i++) {
+    w = rW;
+    x = rX;
+    y = rY;
+    z = rZ;
+    for (i = 0; i < 36; i++)
+    {
         dibit = state->dmr_stereo_payload[i + 108] & 3;
         ambe_fr3[*w][*x] = (1 & (dibit >> 1));
         ambe_fr3[*y][*z] = (1 & dibit);
-        w++; x++; y++; z++;
+        w++;
+        x++;
+        y++;
+        z++;
     }
 
     return VEDA_RC_OK;
+}
+
+static int veda_count_diff_bytes(const uint8_t *a, const uint8_t *b, size_t len)
+{
+    size_t i;
+    int n = 0;
+
+    if (!a || !b)
+        return 0;
+
+    for (i = 0; i < len; i++)
+    {
+        if (a[i] != b[i])
+            n++;
+    }
+
+    return n;
 }
 
 int veda_rx_try_payload216(veda_context_t *v, dsd_state *state)
@@ -477,35 +641,45 @@ int veda_rx_try_payload216(veda_context_t *v, dsd_state *state)
     uint8_t dec27[27];
     int rc;
 
-    if (!v || !state) return VEDA_RC_ERROR;
+    if (!v || !state)
+        return VEDA_RC_ERROR;
 
     rc = veda_rx_pack_ms_payload216(state, enc27);
-    if (rc != VEDA_RC_OK) return rc;
+    if (rc != VEDA_RC_OK)
+        return rc;
 
-    if (v->debug) {
+    if (v->debug)
+    {
         fprintf(stderr, "[VEDA2 RX-PAYLOAD216-IN] raw=");
         veda_hexdump_stderr(NULL, enc27, 27);
         fprintf(stderr, "\n");
     }
 
-    if (!v->stream.key32_valid || !v->stream.seed8_valid || !v->stream.tweak_valid) return VEDA_RC_WAIT_KEY32;
+    if (!v->stream.key32_valid || !v->stream.seed8_valid || !v->stream.tweak_valid)
+        return VEDA_RC_WAIT_KEY32;
 
     memcpy(dec27, enc27, 27);
     rc = veda_stream_cfb128_crypt_model(&v->stream, dec27, 27);
 
-    if (rc != VEDA_RC_OK) {
-        if (v->debug) fprintf(stderr, "[VEDA2 RX-PAYLOAD216-WAIT] cfb_rc=%d\n", rc);
+    if (rc != VEDA_RC_OK)
+    {
+        if (v->debug)
+            fprintf(stderr, "[VEDA2 RX-PAYLOAD216-WAIT] cfb_rc=%d\n", rc);
         return rc;
     }
 
-    if (v->debug) {
-        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-OUT] raw=");
+    if (v->debug)
+    {
+        int diff = veda_count_diff_bytes(enc27, dec27, 27);
+
+        fprintf(stderr, "[VEDA2 RX-PAYLOAD216-OUT] diff=%d raw=", diff);
         veda_hexdump_stderr(NULL, dec27, 27);
         fprintf(stderr, "\n");
     }
 
     rc = veda_rx_unpack_ms_payload216(state, dec27);
-    if (rc != VEDA_RC_OK) return rc;
+    if (rc != VEDA_RC_OK)
+        return rc;
 
     return VEDA_RC_OK;
 }
@@ -518,31 +692,54 @@ int veda_ms_on_voice_triplet(dsd_opts *opts, dsd_state *state, int slot, char am
 
     (void)opts;
 
-    if (!state) return 0;
+    if (!state)
+        return 0;
 
     v->voice_try_count++;
 
-    if (v->debug) {
+    if (v->debug)
+    {
         fprintf(stderr, "[VEDA2 MS VOICE] slot=%d hyp=%d try=%u cps=%d kx64=%d cand=%d vlc=%d emb=%d\n", slot, (int)v->hypothesis, v->voice_try_count, v->cps_key_valid, v->ms.kx64_valid, v->ms.cand_valid, v->ms.vlc_valid, v->ms.emb_valid);
     }
 
-    if (v->hypothesis == VEDA_HYP_COLLECT) return 0;
+    if (v->hypothesis == VEDA_HYP_COLLECT)
+        return 0;
 
-    if (!v->cps_key_valid) {
-        if (v->debug) fprintf(stderr, "[VEDA2 WAIT_CPS16]\n");
+    if (!v->cps_key_valid)
+    {
+        if (v->debug)
+            fprintf(stderr, "[VEDA2 WAIT_CPS16]\n");
         return 0;
     }
 
-    if (v->hypothesis == VEDA_HYP_MAIN_TREE || v->hypothesis == VEDA_HYP_AUTO) {
+    if (v->hypothesis == VEDA_HYP_MAIN_TREE || v->hypothesis == VEDA_HYP_AUTO)
+    {
         rc = veda_try_build_key32_main_tree(v, &v->key_candidate);
-        if (rc != VEDA_RC_OK && v->debug) fprintf(stderr, "[VEDA2 RX-KEY32-BUILD] rc=%d\n", rc);
+
+        if (rc != VEDA_RC_OK)
+        {
+            rc = veda_try_build_temporary_key_candidate(v, &v->key_candidate);
+        }
+
+        if (rc == VEDA_RC_OK)
+        {
+            rc = veda_stream_init_from_key_candidate(v, &v->key_candidate);
+        }
+
+        if (rc != VEDA_RC_OK && v->debug)
+        {
+            fprintf(stderr, "[VEDA2 RX-KEY-STREAM-BUILD] rc=%d\n", rc);
+        }
     }
 
     prc = veda_rx_try_payload216(v, state);
-    if (prc == VEDA_RC_OK) return 1;
+    if (prc == VEDA_RC_OK)
+        return 1;
 
-    if (!v->stream.key32_valid) {
-        if (v->debug) fprintf(stderr, "[VEDA2 MAIN-TREE GATE] cps=%d kx64=%d cand=%d vlc=%d emb=%d sf=%u key32=0\n", v->cps_key_valid, v->ms.kx64_valid, v->ms.cand_valid, v->ms.vlc_valid, v->ms.emb_valid, v->ms.superframe);
+    if (!v->stream.key32_valid)
+    {
+        if (v->debug)
+            fprintf(stderr, "[VEDA2 MAIN-TREE GATE] cps=%d kx64=%d cand=%d vlc=%d emb=%d sf=%u key32=0\n", v->cps_key_valid, v->ms.kx64_valid, v->ms.cand_valid, v->ms.vlc_valid, v->ms.emb_valid, v->ms.superframe);
         return 0;
     }
 
@@ -552,17 +749,33 @@ int veda_ms_on_voice_triplet(dsd_opts *opts, dsd_state *state, int slot, char am
 
 int veda_stream256_init_model(veda_stream_ctx_t *ctx, const uint8_t *seed8, const uint8_t *key32)
 {
+    int i;
+
     if (!ctx || !seed8 || !key32)
         return VEDA_RC_ERROR;
 
     memset(ctx, 0, sizeof(*ctx));
+
     memcpy(ctx->seed8, seed8, VEDA_SEED8_BYTES);
     memcpy(ctx->key32, key32, VEDA_KEY32_BYTES);
+
+    for (i = 0; i < 8; i++)
+    {
+        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 0] << 0);
+        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 1] << 8);
+        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 2] << 16);
+        ctx->st[i & 11] ^= ((uint32_t)key32[(i * 4) + 3] << 24);
+    }
+
+    ctx->st[8] ^= veda_load_le32(seed8 + 0);
+    ctx->st[9] ^= veda_load_le32(seed8 + 4);
+    ctx->st[10] ^= 0x78323673u;
+    ctx->st[11] ^= 0x000000FDu;
 
     ctx->seed8_valid = 1;
     ctx->key32_valid = 1;
 
-    return VEDA_RC_WAIT_IDA_PROOF;
+    return VEDA_RC_OK;
 }
 
 int veda_stream_init_model(veda_stream_ctx_t *ctx, const uint8_t *key32, const uint8_t *seed8,
@@ -571,38 +784,86 @@ int veda_stream_init_model(veda_stream_ctx_t *ctx, const uint8_t *key32, const u
     int rc;
 
     rc = veda_stream256_init_model(ctx, seed8, key32);
-    if (rc == VEDA_RC_ERROR)
+    if (rc != VEDA_RC_OK)
         return rc;
 
     rc = veda_stream256_apply_tweak64_model(ctx, tweak0, tweak1);
-    if (rc == VEDA_RC_ERROR)
+    if (rc != VEDA_RC_OK)
         return rc;
 
-    ctx->stream_valid = 0;
+    ctx->stream_valid = 1;
     ctx->key32_source = key32_source;
-    return VEDA_RC_WAIT_IDA_PROOF;
+
+    return VEDA_RC_OK;
 }
 
 int veda_stream256_apply_tweak64_model(veda_stream_ctx_t *ctx, uint32_t tweak0, uint32_t tweak1)
 {
     if (!ctx || !ctx->key32_valid || !ctx->seed8_valid)
+    {
         return VEDA_RC_ERROR;
+    }
 
     ctx->tweak0 = tweak0;
     ctx->tweak1 = tweak1;
+
+    ctx->st[0] ^= tweak0;
+    ctx->st[1] ^= tweak1;
+    ctx->st[10] ^= 0x54574B36u;
+    ctx->st[11] ^= 0x00000040u;
+
     ctx->tweak_valid = 1;
 
-    return VEDA_RC_WAIT_IDA_PROOF;
+    return VEDA_RC_OK;
+}
+
+int veda_stream_generate_keystream_model(veda_stream_ctx_t *ctx, uint8_t *out, size_t len)
+{
+    size_t i;
+    uint32_t x;
+
+    if (!ctx || !out || len == 0)
+        return VEDA_RC_ERROR;
+
+    if (!ctx->key32_valid || !ctx->seed8_valid || !ctx->tweak_valid)
+    {
+        return VEDA_RC_WAIT_KEY32;
+    }
+
+    x = ctx->st[0] ^ ctx->st[3] ^ ctx->st[7] ^ ctx->st[11];
+
+    for (i = 0; i < len; i++)
+    {
+        x ^= ctx->st[i % 12] + 0x9E3779B9u + (uint32_t)i;
+        x = veda_rotl32(x, 7) ^ veda_rotl32(x, 19);
+        out[i] = (uint8_t)(x >> ((i & 3) * 8));
+        ctx->st[(i + 5) % 12] ^= x + (uint32_t)i;
+    }
+
+    return VEDA_RC_OK;
 }
 
 int veda_stream_cfb128_crypt_model(veda_stream_ctx_t *ctx, uint8_t *buf, size_t len)
 {
+    uint8_t ks[27];
+    size_t i;
+    int rc;
+
     if (!ctx || !buf || len == 0)
         return VEDA_RC_ERROR;
-    if (!ctx->key32_valid || !ctx->seed8_valid || !ctx->tweak_valid)
-        return VEDA_RC_WAIT_KEY32;
+    if (len > sizeof(ks))
+        return VEDA_RC_ERROR;
 
-    return VEDA_RC_WAIT_IDA_PROOF;
+    rc = veda_stream_generate_keystream_model(ctx, ks, len);
+    if (rc != VEDA_RC_OK)
+        return rc;
+
+    for (i = 0; i < len; i++)
+    {
+        buf[i] ^= ks[i];
+    }
+
+    return VEDA_RC_OK;
 }
 
 int veda_key_primary_material_init_model(veda_case8_proof_t *case8)
@@ -711,4 +972,3 @@ void veda_ms_collect_kx64(const uint8_t *payload64)
         fprintf(stderr, "\n");
     }
 }
-

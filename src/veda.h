@@ -218,6 +218,10 @@ extern "C"
     void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur);
     void veda_ms_collect_kx64(const uint8_t *payload64);
 
+    int veda_try_build_temporary_key_candidate(veda_context_t *v, veda_key_candidate_t *kc);
+    int veda_stream_init_from_key_candidate(veda_context_t *v, veda_key_candidate_t *kc);
+    int veda_stream_generate_keystream_model(veda_stream_ctx_t *ctx, uint8_t *out,size_t len);
+
     int veda_rx_pack_ms_payload216(dsd_state *state, uint8_t out27[27]);
     int veda_rx_unpack_ms_payload216(dsd_state *state, const uint8_t in27[27]);    
 
