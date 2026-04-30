@@ -210,6 +210,14 @@ static const char *veda_key32_source_name(veda_key32_source_t s)
         return "temp-kx64-first32";
     case VEDA_KEY32_SRC_TEMP_CAND_REPEAT:
         return "temp-cand-repeat";
+    case VEDA_KEY32_SRC_AIR_H1_DB01_BASE:
+        return "air-h1-db01-base";
+    case VEDA_KEY32_SRC_AIR_H2_DB01_EB_REFRESH:
+        return "air-h2-db01-eb-refresh";
+    case VEDA_KEY32_SRC_AIR_H3_DB01_EB_KEY32:
+        return "air-h3-db01-eb-key32";
+    case VEDA_KEY32_SRC_AIR_H4_SPLIT_LEVELS:
+        return "air-h4-split-levels";
     default:
         return "unknown";
     }
@@ -289,17 +297,81 @@ void veda_ms_reset(veda_context_t *v)
     v->voice_try_count = 0;
 }
 
+static void veda_ms_reset_dynamic_after_db01(veda_context_t *v)
+{
+    if (!v)
+        return;
+
+    memset(v->ms.emb_raw, 0, sizeof(v->ms.emb_raw));
+    memset(v->ms.last_unique_emb_raw, 0, sizeof(v->ms.last_unique_emb_raw));
+    memset(v->ms.mi32_source, 0, sizeof(v->ms.mi32_source));
+
+    v->ms.emb_len = 0;
+    v->ms.emb_valid = 0;
+    v->ms.last_unique_emb_len = 0;
+    v->ms.last_unique_emb_valid = 0;
+    v->ms.emb_changed = 0;
+    v->ms.emb_unique_count = 0;
+
+    v->ms.mi32 = 0;
+    v->ms.mi32_valid = 0;
+
+    memset(v->ms.cand_raw, 0, sizeof(v->ms.cand_raw));
+    v->ms.cand_len = 0;
+    v->ms.cand_valid = 0;
+    v->ms.cand_source_type = 0;
+
+    memset(v->ms.kx64_raw, 0, sizeof(v->ms.kx64_raw));
+    v->ms.kx64_valid = 0;
+    v->ms.kx64_count = 0;
+
+    memset(&v->kx, 0, sizeof(v->kx));
+    memset(&v->stream, 0, sizeof(v->stream));
+    memset(&v->key_candidate, 0, sizeof(v->key_candidate));
+
+    v->voice_try_count = 0;
+    v->key32_candidate_count = 0;
+}
+
 void veda_ms_collect_vlc(const uint8_t *raw, int len, int crc_ok, int fec_err)
 {
     veda_context_t *v = &g_veda_ctx;
+    int same = 0;
+
+    if (raw != NULL && len > 0 && v->ms.last_unique_vlc_valid &&
+        v->ms.last_unique_vlc_len == len &&
+        memcmp(v->ms.last_unique_vlc_raw, raw, (size_t)len) == 0)
+    {
+        same = 1;
+    }
+
     veda_copy_field(v->ms.vlc_raw, &v->ms.vlc_len, &v->ms.vlc_valid, raw, len);
+
     v->ms.crc_ok = (uint8_t)(crc_ok ? 1 : 0);
     v->ms.fec_err = (uint8_t)(fec_err ? 1 : 0);
+    v->ms.vlc_changed = same ? 0 : 1;
+
+    if (!same && raw != NULL && len > 0)
+    {
+        v->ms.session_count++;
+        v->ms.session_id = v->ms.session_count;
+
+        veda_copy_field(v->ms.last_unique_vlc_raw, &v->ms.last_unique_vlc_len,
+            &v->ms.last_unique_vlc_valid, raw, len);
+
+        veda_ms_reset_dynamic_after_db01(v);
+    }
 
     if (v->debug)
     {
-        fprintf(stderr, "\n[VEDA MS VLC] slot=%d len=%d crc=%d fec_err=%d raw=",
-                VEDA_MS_DISPLAY_SLOT, v->ms.vlc_len, crc_ok, fec_err);
+        fprintf(stderr,
+            "\n[VEDA MS VLC] slot=%d session=%u len=%d crc=%d fec_err=%d changed=%d raw=",
+            VEDA_MS_DISPLAY_SLOT,
+            v->ms.session_id,
+            v->ms.vlc_len,
+            crc_ok,
+            fec_err,
+            v->ms.vlc_changed);
         veda_hexdump_stderr(NULL, v->ms.vlc_raw, v->ms.vlc_len);
         fprintf(stderr, "\n");
     }
@@ -308,37 +380,68 @@ void veda_ms_collect_vlc(const uint8_t *raw, int len, int crc_ok, int fec_err)
 void veda_ms_collect_emb(const uint8_t *raw, int len, int crc_ok, int fec_err)
 {
     veda_context_t *v = &g_veda_ctx;
+    int same = 0;
+
+    if (raw != NULL && len > 0 && v->ms.last_unique_emb_valid &&
+        v->ms.last_unique_emb_len == len &&
+        memcmp(v->ms.last_unique_emb_raw, raw, (size_t)len) == 0)
+    {
+        same = 1;
+    }
+
     veda_copy_field(v->ms.emb_raw, &v->ms.emb_len, &v->ms.emb_valid, raw, len);
+
     v->ms.crc_ok = (uint8_t)(crc_ok ? 1 : 0);
     v->ms.fec_err = (uint8_t)(fec_err ? 1 : 0);
+    v->ms.emb_changed = same ? 0 : 1;
+
+    if (!same && raw != NULL && len > 0)
+    {
+        veda_copy_field(v->ms.last_unique_emb_raw, &v->ms.last_unique_emb_len,
+                        &v->ms.last_unique_emb_valid, raw, len);
+        v->ms.emb_unique_count++;
+    }
 
     if (v->debug)
     {
-        fprintf(stderr, "\n[VEDA MS EMB] slot=%d sf=%u len=%d crc=%d fec_err=%d raw=",
-                VEDA_MS_DISPLAY_SLOT, v->ms.superframe, v->ms.emb_len, crc_ok, fec_err);
+        fprintf(stderr,
+                "\n[VEDA MS EMB] slot=%d sf=%u len=%d crc=%d fec_err=%d changed=%d uniq=%u raw=",
+                VEDA_MS_DISPLAY_SLOT,
+                v->ms.superframe,
+                v->ms.emb_len,
+                crc_ok,
+                fec_err,
+                v->ms.emb_changed,
+                v->ms.emb_unique_count);
         veda_hexdump_stderr(NULL, v->ms.emb_raw, v->ms.emb_len);
         fprintf(stderr, "\n");
     }
 }
 
-void veda_ms_collect_mi32(uint32_t mi32, const char *source)
+void veda_ms_collect_voice_dyn32(uint32_t voice_dyn32, const char *source)
 {
     veda_context_t *v = &g_veda_ctx;
-    v->ms.mi32 = mi32;
+
+    v->ms.mi32 = voice_dyn32;
     v->ms.mi32_valid = 1;
+
     memset(v->ms.mi32_source, 0, sizeof(v->ms.mi32_source));
     if (source != NULL)
-    {
         strncpy(v->ms.mi32_source, source, sizeof(v->ms.mi32_source) - 1);
-    }
 
     if (v->debug)
     {
-        fprintf(stderr, "\n[VEDA MS MI] slot=%d sf=%u source=%s mi32=%08X\n",
-                VEDA_MS_DISPLAY_SLOT, v->ms.superframe,
+        fprintf(stderr, "\n[VEDA MS VOICE-DYN32] slot=%d sf=%u source=%s dyn32=%08X\n",
+                VEDA_MS_DISPLAY_SLOT,
+                v->ms.superframe,
                 v->ms.mi32_source[0] ? v->ms.mi32_source : "unknown",
                 v->ms.mi32);
     }
+}
+
+void veda_ms_collect_mi32(uint32_t mi32, const char *source)
+{
+    veda_ms_collect_voice_dyn32(mi32, source ? source : "legacy-mi32");
 }
 
 void veda_ms_collect_ids(uint32_t id_a, uint32_t id_b)
@@ -502,7 +605,7 @@ static uint32_t veda_load_le32_part(const uint8_t *p, int n, int off)
 }
 
 static void veda_air_absorb_bytes_model(uint32_t st[12], const uint8_t *p, int n,
-    uint32_t domain)
+                                        uint32_t domain)
 {
     int i;
 
@@ -534,7 +637,7 @@ static void veda_air_squeeze_key32_model(uint32_t st[12], uint8_t out32[VEDA_KEY
 }
 
 static int veda_air_build_session_key32(veda_context_t *v, veda_key_candidate_t *kc,
-    int hprofile)
+                                        int hprofile)
 {
     uint32_t st[12];
     int i;
@@ -606,9 +709,9 @@ static int veda_air_profile_from_hypothesis(veda_context_t *v)
 }
 
 static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_tweak_profile_t *used_profile,
-    uint8_t seed8[VEDA_SEED8_BYTES], uint32_t *tweak0, uint32_t *tweak1)
+                                               uint8_t seed8[VEDA_SEED8_BYTES], uint32_t *tweak0, uint32_t *tweak1)
 {
-    uint32_t mi;
+    uint32_t voice_dyn32;
     uint32_t eb0;
     uint32_t eb1;
     uint32_t db01;
@@ -617,71 +720,79 @@ static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_twea
     if (!v || !used_profile || !seed8 || !tweak0 || !tweak1)
         return VEDA_RC_ERROR;
 
-    if (!v->ms.cand_valid || v->ms.cand_len < 8)
+    if (!v->ms.vlc_valid && !v->ms.emb_valid && !v->ms.mi32_valid && !v->ms.cand_valid)
         return VEDA_RC_WAIT_KEY32;
 
     hprofile = veda_air_profile_from_hypothesis(v);
 
     memset(seed8, 0, VEDA_SEED8_BYTES);
 
-    mi = v->ms.mi32_valid ? v->ms.mi32 : 0;
+    voice_dyn32 = v->ms.mi32_valid ? v->ms.mi32 : 0;
     eb0 = v->ms.emb_valid ? veda_load_le32_part(v->ms.emb_raw, v->ms.emb_len, 0) : 0;
     eb1 = v->ms.emb_valid ? veda_load_le32_part(v->ms.emb_raw, v->ms.emb_len, v->ms.emb_len - 4) : 0;
     db01 = v->ms.vlc_valid ? veda_load_le32_part(v->ms.vlc_raw, v->ms.vlc_len, 0) : 0;
 
     if (hprofile == 1)
     {
-        /* H1: db01=session key, EB/MI/phase=tweak */
-        seed8[0] = (uint8_t)(mi >> 0);
-        seed8[1] = (uint8_t)(mi >> 8);
-        seed8[2] = (uint8_t)(mi >> 16);
-        seed8[3] = (uint8_t)(mi >> 24);
+        seed8[0] = (uint8_t)(voice_dyn32 >> 0);
+        seed8[1] = (uint8_t)(voice_dyn32 >> 8);
+        seed8[2] = (uint8_t)(voice_dyn32 >> 16);
+        seed8[3] = (uint8_t)(voice_dyn32 >> 24);
         seed8[4] = (uint8_t)v->ms.superframe;
         seed8[5] = (uint8_t)v->ms.burst_index;
         seed8[6] = (uint8_t)v->ms.seq;
         seed8[7] = 0x01;
 
-        *tweak0 = veda_mix_u32(eb0, mi, v->ms.superframe);
-        *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->ms.voice_triplet_count);
+        if (v->ms.emb_changed)
+        {
+            *tweak0 = veda_mix_u32(eb0, db01, voice_dyn32);
+            *tweak1 = veda_mix_u32(eb1, v->ms.seq, v->ms.superframe);
+        }
+        else
+        {
+            *tweak0 = veda_mix_u32(voice_dyn32, db01, v->ms.burst_index);
+            *tweak1 = veda_mix_u32(v->ms.emb_unique_count, v->ms.seq, v->ms.superframe);
+        }
         *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
     }
     else if (hprofile == 2)
     {
-        /* H2: db01=session base, EB refresh changes dynamic tweak */
         seed8[0] = (uint8_t)(db01 >> 0);
         seed8[1] = (uint8_t)(db01 >> 8);
         seed8[2] = (uint8_t)(db01 >> 16);
         seed8[3] = (uint8_t)(db01 >> 24);
-        seed8[4] = (uint8_t)(mi >> 0);
-        seed8[5] = (uint8_t)(mi >> 8);
+        seed8[4] = (uint8_t)(voice_dyn32 >> 0);
+        seed8[5] = (uint8_t)(voice_dyn32 >> 8);
         seed8[6] = (uint8_t)v->ms.burst_index;
         seed8[7] = 0x02;
 
-        *tweak0 = veda_mix_u32(eb0, db01, mi);
+        *tweak0 = veda_mix_u32(eb0, db01, voice_dyn32);
         *tweak1 = veda_mix_u32(eb1, v->ms.seq, v->ms.superframe);
         *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
     }
     else if (hprofile == 3)
     {
-        /* H3: EB participates in key32; MI/phase drives stream side */
         if (v->ms.emb_valid && v->ms.emb_len >= 8)
             memcpy(seed8, v->ms.emb_raw, 8);
-        else
+        else if (v->ms.cand_valid && v->ms.cand_len >= 8)
             memcpy(seed8, v->ms.cand_raw, 8);
+        else
+            return VEDA_RC_WAIT_KEY32;
 
-        *tweak0 = veda_mix_u32(mi, v->ms.superframe, v->ms.seq);
+        *tweak0 = veda_mix_u32(voice_dyn32, v->ms.superframe, v->ms.seq);
         *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->ms.voice_triplet_count);
         *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
     }
     else
     {
-        /* H4: db01 for base, EB/MI for voice-side stream material */
         if (v->ms.vlc_valid && v->ms.vlc_len >= 8)
             memcpy(seed8, v->ms.vlc_raw, 8);
-        else
+        else if (v->ms.cand_valid && v->ms.cand_len >= 8)
             memcpy(seed8, v->ms.cand_raw, 8);
+        else
+            return VEDA_RC_WAIT_KEY32;
 
-        *tweak0 = veda_mix_u32(eb0, mi, v->ms.burst_index);
+        *tweak0 = veda_mix_u32(eb0, voice_dyn32, v->ms.burst_index);
         *tweak1 = veda_mix_u32(eb1, db01, v->ms.seq);
         *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
     }
@@ -689,10 +800,15 @@ static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_twea
     if (v->debug)
     {
         fprintf(stderr,
-            "[VEDA2 AIR-H%d] db01=%d eb=%d mi=%d seed=%02X%02X%02X%02X%02X%02X%02X%02X tweak=%08X:%08X\n",
-            hprofile, v->ms.vlc_valid, v->ms.emb_valid, v->ms.mi32_valid,
-            seed8[0], seed8[1], seed8[2], seed8[3], seed8[4], seed8[5], seed8[6], seed8[7],
-            *tweak0, *tweak1);
+                "[VEDA2 AIR-H%d] db01=%d eb=%d voice_dyn32=%d seed=%02X%02X%02X%02X%02X%02X%02X%02X tweak=%08X:%08X\n",
+                hprofile,
+                v->ms.vlc_valid,
+                v->ms.emb_valid,
+                v->ms.mi32_valid,
+                seed8[0], seed8[1], seed8[2], seed8[3],
+                seed8[4], seed8[5], seed8[6], seed8[7],
+                *tweak0,
+                *tweak1);
     }
 
     return VEDA_RC_OK;
@@ -1388,7 +1504,8 @@ int veda_case8_build_tweak64_candidate_model(veda_case8_proof_t *case8)
     return VEDA_RC_OK;
 }
 
-void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur)
+void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload,
+    uint8_t payload_len, int sf_cur)
 {
     veda_context_t *v = &g_veda_ctx;
     int n;
@@ -1400,34 +1517,24 @@ void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint
     if (n > VEDA_MAX_FIELD_BYTES)
         n = VEDA_MAX_FIELD_BYTES;
 
-    memset(v->ms.cand_raw, 0, sizeof(v->ms.cand_raw));
-    memcpy(v->ms.cand_raw, payload, (size_t)n);
-    v->ms.cand_len = n;
-    v->ms.cand_valid = 1;
+    if (source_type == VEDA_CAND_VLC01)
+        veda_ms_collect_vlc(payload, n, 1, 0);
+    else if (source_type == VEDA_CAND_VC_EMB)
+        veda_ms_collect_emb(payload, n, 1, 0);
+
+    veda_copy_field(v->ms.cand_raw, &v->ms.cand_len,
+        &v->ms.cand_valid, payload, n);
+
     v->ms.cand_source_type = source_type;
     v->ms.cand_sf_cur = sf_cur;
     v->ms.cand_count++;
 
-    if (source_type == VEDA_CAND_VLC01)
-    {
-        memcpy(v->ms.vlc_raw, payload, n);
-        v->ms.vlc_len = n;
-        v->ms.vlc_valid = 1;
-    }
-    else if (source_type == VEDA_CAND_VC_EMB)
-    {
-        memcpy(v->ms.emb_raw, payload, n);
-        v->ms.emb_len = n;
-        v->ms.emb_valid = 1;
-    }
-
-    v->ms.superframe = (uint32_t)sf_cur;
-
     if (v->debug)
     {
-        fprintf(stderr, "[VEDA2 CAND] src=%u sf=%d len=%d raw=", source_type, sf_cur, n);
-        for (int i = 0; i < n; i++)
-            fprintf(stderr, "%02X", payload[i]);
+        fprintf(stderr,
+            "\n[VEDA2 CAND] src=%u sf=%d len=%d count=%u raw=",
+            source_type, sf_cur, v->ms.cand_len, v->ms.cand_count);
+        veda_hexdump_stderr(NULL, v->ms.cand_raw, v->ms.cand_len);
         fprintf(stderr, "\n");
     }
 }

@@ -4,56 +4,75 @@
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
 static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
 
-
 // Ротация вправо (из вашего реверса sub_8005DE4)
 #define ROR32(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
 
 // Основная перестановка VEDA-Permute-384 (sub_8005DE4)
-void veda_permute_384(uint32_t *state, uint8_t domain) {
-    ((uint8_t*)state)[47] ^= domain;
-    for (int round = 24; round > 0; --round) {
-        for (int i = 0; i < 4; ++i) {
+void veda_permute_384(uint32_t *state, uint8_t domain)
+{
+    ((uint8_t *)state)[47] ^= domain;
+    for (int round = 24; round > 0; --round)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
             uint32_t v5 = state[i];
             uint32_t v6 = state[i + 8];
             uint32_t v7 = ROR32(state[i + 4], 23);
-            state[i]     = v6 ^ v7 ^ (8 * (v7 & ROR32(v5, 8)));
+            state[i] = v6 ^ v7 ^ (8 * (v7 & ROR32(v5, 8)));
             state[i + 8] = (2 * v6) ^ ROR32(v5, 8) ^ (4 * (v6 & v7));
             state[i + 4] = v7 ^ ROR32(v5, 8) ^ (2 * (v6 | ROR32(v5, 8)));
         }
         uint32_t mod4 = round & 3;
-        if (mod4 == 1 || mod4 == 2) {
+        if (mod4 == 1 || mod4 == 2)
+        {
             uint32_t v8 = state[0], v9 = state[1], v10 = state[3];
-            state[0] = state[2]; state[1] = v10; state[2] = v8; state[3] = v9;
-        } else if (mod4 == 3) {
+            state[0] = state[2];
+            state[1] = v10;
+            state[2] = v8;
+            state[3] = v9;
+        }
+        else if (mod4 == 3)
+        {
             uint32_t v11 = state[0], v12 = state[1], v13 = state[2], v14 = state[3];
-            state[0] = v14; state[1] = v13; state[2] = v12; state[3] = v11;
-        } else {
+            state[0] = v14;
+            state[1] = v13;
+            state[2] = v12;
+            state[3] = v11;
+        }
+        else
+        {
             uint32_t v11 = state[0], v12 = state[1];
             state[0] = v12 ^ (round | 0x9E377900);
             state[1] = v11;
-            uint32_t tmp = state[2]; state[2] = state[3]; state[3] = tmp;
+            uint32_t tmp = state[2];
+            state[2] = state[3];
+            state[3] = tmp;
         }
     }
 }
 
 // Инициализация шифра сессионным ключом (аналог sub_8006372)
-void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key) {
-    uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
+void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key)
+{
+    uint8_t *s8 = (uint8_t *)state->veda_crypto_state[slot];
     memset(state->veda_crypto_state[slot], 0, 48);
     memcpy(s8, "\x06sbx256\x08PrssEntr", 16);
 
     veda_permute_384(state->veda_crypto_state[slot], 1);
-    for(int i=0; i<4; i++) state->veda_crypto_state[slot][i] ^= ((uint32_t*)session_key)[i];
+    for (int i = 0; i < 4; i++)
+        state->veda_crypto_state[slot][i] ^= ((uint32_t *)session_key)[i];
     veda_permute_384(state->veda_crypto_state[slot], 253);
-    for(int i=0; i<4; i++) state->veda_crypto_state[slot][i] ^= ((uint32_t*)session_key)[i+4];
+    for (int i = 0; i < 4; i++)
+        state->veda_crypto_state[slot][i] ^= ((uint32_t *)session_key)[i + 4];
     veda_permute_384(state->veda_crypto_state[slot], 253);
-    
+
     state->veda_pos[slot] = 0;
     state->veda_stream_valid[slot] = 0;
 }
 
 // Применение Tweak (MI)
-void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
+void veda_apply_mi(dsd_state *state, int slot, uint64_t mi)
+{
     state->veda_crypto_state[slot][0] ^= (uint32_t)(mi & 0xFFFFFFFF);
     state->veda_crypto_state[slot][1] ^= (uint32_t)(mi >> 32);
     veda_permute_384(state->veda_crypto_state[slot], 2);
@@ -61,10 +80,11 @@ void veda_apply_mi(dsd_state *state, int slot, uint64_t mi) {
     state->veda_stream_valid[slot] = 1;
 }
 
-void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload_64_bytes) {
+void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload_64_bytes)
+{
     hydro_kx_session_keypair kp;
     hydro_kx_keypair static_kp;
-    uint8_t primary_material[32]; 
+    uint8_t primary_material[32];
     int slot = state->currentslot & 1;
 
     // 1. Формируем PM (Primary Material) - 32 байта
@@ -78,53 +98,62 @@ void handle_veda_kx_packet(dsd_opts *opts, dsd_state *state, uint8_t *payload_64
 
     // 2. Генерируем статику (как в IDA)
     hydro_kx_keygen_deterministic(&static_kp, primary_material);
-    
+
     veda_ms_collect_kx64(payload_64_bytes);
-    // 3. Вызываем правильный протокол: KK или XX (в Hydrogen нет прямого эквивалента Npsk0, 
-    // но hydro_kx_xx_2 или hydro_kx_kk_2 с нужными параметрами делают то же самое. 
+    // 3. Вызываем правильный протокол: KK или XX (в Hydrogen нет прямого эквивалента Npsk0,
+    // но hydro_kx_xx_2 или hydro_kx_kk_2 с нужными параметрами делают то же самое.
     // В идеале нам нужно вызвать именно ту функцию, которую расписал твой спец:
     // dmr_kx_npsk0_responder(kp.rx, payload_64_bytes, 0, primary_material);
-    
+
     // ПРОВЕРОЧНЫЙ ХАК: Просто распечатаем эти 64 байта, чтобы убедиться, что мы их правильно собрали
     fprintf(stderr, "\n[VEDA KX ATTEMPT] Feeding 64 bytes: ");
-    for(int i=0; i<64; i++) fprintf(stderr, "%02X", payload_64_bytes[i]);
+    for (int i = 0; i < 64; i++)
+        fprintf(stderr, "%02X", payload_64_bytes[i]);
     fprintf(stderr, "\n");
-    
+
     // Здесь будет вызов крипты
 }
 
 // Единая функция получения бита гаммы с Feedback
-static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint8_t cipher_bit) {
-    if (state->veda_pos[slot] >= 128) { // 16 байт
+static uint8_t veda_get_gamma_bit_with_feedback(dsd_state *state, int slot, uint8_t cipher_bit)
+{
+    if (state->veda_pos[slot] >= 128)
+    { // 16 байт
         veda_permute_384(state->veda_crypto_state[slot], 2);
         state->veda_pos[slot] = 0;
     }
 
-    uint8_t *s8 = (uint8_t*)state->veda_crypto_state[slot];
+    uint8_t *s8 = (uint8_t *)state->veda_crypto_state[slot];
     int byte_idx = state->veda_pos[slot] >> 3;
     int bit_idx = 7 - (state->veda_pos[slot] & 7); // MSB First
 
     uint8_t gamma_bit = (s8[byte_idx] >> bit_idx) & 1;
     uint8_t plain_bit = cipher_bit ^ gamma_bit;
 
-    // ОБРАТНАЯ СВЯЗЬ (Feedback): 
+    // ОБРАТНАЯ СВЯЗЬ (Feedback):
     // В режиме дешифрования состояние обновляется ВХОДНЫМ битом (cipher_bit)
-    if (cipher_bit) s8[byte_idx] |= (1 << bit_idx);
-    else s8[byte_idx] &= ~(1 << bit_idx);
+    if (cipher_bit)
+        s8[byte_idx] |= (1 << bit_idx);
+    else
+        s8[byte_idx] &= ~(1 << bit_idx);
 
     state->veda_pos[slot]++;
     return plain_bit;
 }
 
 // Дешифрование ровно 72 бит фрейма (DMR TCH стандарт)
-void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24]) {
-    if (!state->veda_stream_valid[slot]) return;    
+void veda_decrypt_ambe(dsd_state *state, int slot, char ambe_fr[4][24])
+{
+    if (!state->veda_stream_valid[slot])
+        return;
 
     // Проходим по 72 битам (3 блока по 24 бита в матрице ambe_fr)
-    // dsd-fme использует 4x24, но DMR Voice - это 72 бита. 
+    // dsd-fme использует 4x24, но DMR Voice - это 72 бита.
     // Обычно это ambe_fr[0], [1], [2].
-    for (int i = 0; i < 3; i++) { // Используем 3 строки по 24 бита = 72
-        for (int j = 0; j < 24; j++) {
+    for (int i = 0; i < 3; i++)
+    { // Используем 3 строки по 24 бита = 72
+        for (int j = 0; j < 24; j++)
+        {
             ambe_fr[i][j] = veda_get_gamma_bit_with_feedback(state, slot, ambe_fr[i][j] & 1);
         }
     }
@@ -166,23 +195,26 @@ void veda_prepare_voice_ctx(dsd_opts *opts, dsd_state *state, int slot, uint64_t
 }
 
 int veda_try_decrypt_voice_triplet2(dsd_opts *opts,
-                                   dsd_state *state,
-                                   int slot,
-                                   char ambe_fr[4][24],
-                                   char ambe_fr2[4][24],
-                                   char ambe_fr3[4][24])
+                                    dsd_state *state,
+                                    int slot,
+                                    char ambe_fr[4][24],
+                                    char ambe_fr2[4][24],
+                                    char ambe_fr3[4][24])
 {
     uint64_t eff_mi;
 
-    if (!opts || !state || slot < 0 || slot > 1) return 0;
-    if (!opts->isVEDA) return 0;
+    if (!opts || !state || slot < 0 || slot > 1)
+        return 0;
+    if (!opts->isVEDA)
+        return 0;
 
     // --- VEDA BYPASS: ФОРСИРУЕМ PRIMARY MATERIAL КАК СЕССИОННЫЙ КЛЮЧ ---
-    if (!state->veda_state_valid[slot]) {
+    if (!state->veda_state_valid[slot])
+    {
         uint8_t pm[32];
         memset(pm, 0, 32);
         memcpy(pm, opts->veda_master_key, 16); // 128 бит твоего ключа
-        
+
         // Накладываем железные маски из дампа
         uint32_t *pm_u32 = (uint32_t *)pm;
         pm_u32[0] ^= veda_masks[0]; // 0x17C20B2A
@@ -214,7 +246,6 @@ int veda_try_decrypt_voice_triplet2(dsd_opts *opts,
     return 1;
 }
 
-
 void veda_debug_voice_wait(dsd_opts *opts,
                            dsd_state *state,
                            int slot,
@@ -225,8 +256,8 @@ void veda_debug_voice_wait(dsd_opts *opts,
     uint64_t payload_mi;
     const char *reason;
     uint8_t reason_code;
-    static int last_sf[2] = { -1, -1 };
-    static uint8_t last_reason[2] = { 0, 0 };
+    static int last_sf[2] = {-1, -1};
+    static uint8_t last_reason[2] = {0, 0};
 
     if (!opts || !state || slot < 0 || slot > 1)
         return;
@@ -260,30 +291,32 @@ void veda_debug_voice_wait(dsd_opts *opts,
 
 uint64_t veda_get_effective_mi(dsd_state *state, int slot)
 {
-    if (!state || slot < 0 || slot > 1) return 0;
+    if (!state || slot < 0 || slot > 1)
+        return 0;
 
     // 1. Приоритет MI из заголовков (если они есть)
-    if (state->payload_mi != 0 && slot == 0) return state->payload_mi;
-    if (state->payload_miR != 0 && slot == 1) return state->payload_miR;
+    if (state->payload_mi != 0 && slot == 0)
+        return state->payload_mi;
+    if (state->payload_miR != 0 && slot == 1)
+        return state->payload_miR;
 
     // 2. Если MI пришел из SBRC (Vendor MI)
     if (state->veda_vendor_mi_valid[slot])
     {
         uint32_t x = state->veda_vendor_mi32[slot];
-        
+
         // ГИПОТЕЗА 2: MI используется как младшие 32 бита 64-битного Nonce
         // (x << 32) | x  <-- твой старый вариант
         // return (uint64_t)x; <-- вариант с 32-битным значением
-        
-        // Попробуем стандартный для Hydrogen/Sponge вариант: 
+
+        // Попробуем стандартный для Hydrogen/Sponge вариант:
         // MI заходит в начало (младшие байты), остальное нули.
-        return (uint64_t)x; 
+        return (uint64_t)x;
         // return ((uint64_t)x << 32); - если деривация в следующем логе сработает (SUCCESS), а голос будет мусором — это будет первым кандидатом на правку
     }
 
     return 0;
 }
-
 
 int veda_session_key_valid(const dsd_state *state, int slot)
 {
@@ -345,59 +378,64 @@ void veda_trace_baseline(dsd_opts *opts,
 
     if (slot == 0)
     {
-        tg  = (uint32_t)state->lasttg;
+        tg = (uint32_t)state->lasttg;
         src = (uint32_t)state->lastsrc;
     }
     else
     {
-        tg  = (uint32_t)state->lasttgR;
+        tg = (uint32_t)state->lasttgR;
         src = (uint32_t)state->lastsrcR;
     }
 
     fprintf(stderr,
-        "\n[VEDA BASE] tag=%s slot=%d "
-        "sf=%d/%d tg=%u src=%u "
-        "sess_valid=%u stream_valid=%u kx_pos=%d "
-        "vendor_mi_valid=%u vendor_mi32=%08X eff_mi=%016llX "
-        "last_hdr_valid=%u last_hdr_src=%u "
-        "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
-        "sm=%u len_lo=%u len_hi=%u f9_count=%u\n",
-        tag ? tag : "?",
-        slot + 1,
-        sf_cur,
-        sf_total,
-        tg,
-        src,
-        (unsigned)veda_session_key_valid(state, slot),
-        (unsigned)veda_stream_ctx_valid(state, slot),
-        state->veda_kx_pos[slot],
-        (unsigned)state->veda_vendor_mi_valid[slot],
-        (unsigned)state->veda_vendor_mi32[slot],
-        (unsigned long long)eff_mi,
-        (unsigned)state->veda_last_hdr_valid[slot],
-        (unsigned)state->veda_last_hdr_src[slot],
-        (unsigned)state->veda_last_b0[slot],
-        (unsigned)state->veda_last_b1[slot],
-        (unsigned)state->veda_last_w2[slot],
-        (unsigned)state->veda_last_w4[slot],
-        (unsigned)state->veda_last_w6[slot],
-        (unsigned)state->veda_sm[slot],
-        (unsigned)state->veda_len_lo[slot],
-        (unsigned)state->veda_len_hi[slot],
-        (unsigned)state->veda_f9_lc_count[slot]);
+            "\n[VEDA BASE] tag=%s slot=%d "
+            "sf=%d/%d tg=%u src=%u "
+            "sess_valid=%u stream_valid=%u kx_pos=%d "
+            "vendor_mi_valid=%u vendor_mi32=%08X eff_mi=%016llX "
+            "last_hdr_valid=%u last_hdr_src=%u "
+            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
+            "sm=%u len_lo=%u len_hi=%u f9_count=%u\n",
+            tag ? tag : "?",
+            slot + 1,
+            sf_cur,
+            sf_total,
+            tg,
+            src,
+            (unsigned)veda_session_key_valid(state, slot),
+            (unsigned)veda_stream_ctx_valid(state, slot),
+            state->veda_kx_pos[slot],
+            (unsigned)state->veda_vendor_mi_valid[slot],
+            (unsigned)state->veda_vendor_mi32[slot],
+            (unsigned long long)eff_mi,
+            (unsigned)state->veda_last_hdr_valid[slot],
+            (unsigned)state->veda_last_hdr_src[slot],
+            (unsigned)state->veda_last_b0[slot],
+            (unsigned)state->veda_last_b1[slot],
+            (unsigned)state->veda_last_w2[slot],
+            (unsigned)state->veda_last_w4[slot],
+            (unsigned)state->veda_last_w6[slot],
+            (unsigned)state->veda_sm[slot],
+            (unsigned)state->veda_len_lo[slot],
+            (unsigned)state->veda_len_hi[slot],
+            (unsigned)state->veda_f9_lc_count[slot]);
 }
-
 
 static const char *veda_candidate_source_name(uint8_t source_type)
 {
     switch (source_type)
     {
-    case VEDA_CAND_MBC05:  return "MBC05";
-    case VEDA_CAND_VLC01:  return "VLC01";
-    case VEDA_CAND_VC_EMB: return "VC_EMB";
-    case VEDA_CAND_TLC02:  return "TLC02";
-    case VEDA_CAND_TLC_F9: return "TLC_F9";
-    default:               return "NONE";
+    case VEDA_CAND_MBC05:
+        return "MBC05";
+    case VEDA_CAND_VLC01:
+        return "VLC01";
+    case VEDA_CAND_VC_EMB:
+        return "VC_EMB";
+    case VEDA_CAND_TLC02:
+        return "TLC02";
+    case VEDA_CAND_TLC_F9:
+        return "TLC_F9";
+    default:
+        return "NONE";
     }
 }
 
@@ -544,24 +582,24 @@ static void veda_emit_path_summary(dsd_opts *opts,
         return;
 
     fprintf(stderr,
-        "\n[VEDA PATH] slot=%d sess=%u reason=%s pattern=%s "
-        "sf=%u..%u mbc_seq=%u vlc_seq=%u voice_seq=%u tail_seq=%u tail=%u "
-        "db06=%u db07=%u mbc48=%u kx_try=%u\n",
-        slot + 1,
-        (unsigned)ps->session_no,
-        reason ? reason : "none",
-        veda_path_pattern_name(ps),
-        (unsigned)ps->start_sf,
-        (unsigned)ps->last_sf,
-        (unsigned)ps->mbc_seq,
-        (unsigned)ps->vlc_seq,
-        (unsigned)ps->voice_seq,
-        (unsigned)ps->tail_seq,
-        (unsigned)ps->tail_kind,
-        (unsigned)state->veda_seen_db06[slot],
-        (unsigned)state->veda_seen_db07[slot],
-        (unsigned)state->veda_seen_mbc48[slot],
-        (unsigned)state->veda_kx_try_count[slot]);
+            "\n[VEDA PATH] slot=%d sess=%u reason=%s pattern=%s "
+            "sf=%u..%u mbc_seq=%u vlc_seq=%u voice_seq=%u tail_seq=%u tail=%u "
+            "db06=%u db07=%u mbc48=%u kx_try=%u\n",
+            slot + 1,
+            (unsigned)ps->session_no,
+            reason ? reason : "none",
+            veda_path_pattern_name(ps),
+            (unsigned)ps->start_sf,
+            (unsigned)ps->last_sf,
+            (unsigned)ps->mbc_seq,
+            (unsigned)ps->vlc_seq,
+            (unsigned)ps->voice_seq,
+            (unsigned)ps->tail_seq,
+            (unsigned)ps->tail_kind,
+            (unsigned)state->veda_seen_db06[slot],
+            (unsigned)state->veda_seen_db07[slot],
+            (unsigned)state->veda_seen_mbc48[slot],
+            (unsigned)state->veda_kx_try_count[slot]);
 }
 
 static void veda_path_note_candidate(dsd_opts *opts,
@@ -584,9 +622,9 @@ static void veda_path_note_candidate(dsd_opts *opts,
             memset(ps, 0, sizeof(*ps));
             ps->active = 1;
             ps->stage = VEDA_PATH_PREVOICE;
-            
+
             if (state->veda_path_counter[slot] > 1000)
-                state->veda_path_counter[slot] = 0;            
+                state->veda_path_counter[slot] = 0;
             state->veda_path_counter[slot]++;
             if (state->veda_path_counter[slot] == 0)
                 state->veda_path_counter[slot] = 1;
@@ -668,8 +706,8 @@ void veda_note_candidate(dsd_opts *opts,
 {
     veda_session_candidate_t *cand;
     veda_session_candidate_t prev;
-    static const uint8_t pat_sbx256[]   = {0x06, 0x73, 0x62, 0x78, 0x32, 0x35, 0x36, 0x08};
-    static const uint8_t pat_prssentr[] = {'P','r','s','s','E','n','t','r'};
+    static const uint8_t pat_sbx256[] = {0x06, 0x73, 0x62, 0x78, 0x32, 0x35, 0x36, 0x08};
+    static const uint8_t pat_prssentr[] = {'P', 'r', 's', 's', 'E', 'n', 't', 'r'};
     uint8_t n;
     int i;
     int same_prev = 0;
@@ -777,6 +815,18 @@ void veda_note_candidate(dsd_opts *opts,
         fprintf(stderr, "\n");
     }
     veda_path_note_candidate(opts, state, slot, cand);
+    if (source_type == VEDA_CAND_TLC02 || source_type == VEDA_CAND_TLC_F9)
+    {
+        if (opts->veda_debug)
+        {
+            fprintf(stderr,
+                    "\n[VEDA2 BRIDGE-RESET] slot=%d source=%s reason=db02/tlc\n",
+                    slot + 1,
+                    veda_candidate_source_name(source_type));
+        }
+
+        veda_ms_reset(veda_get_context());
+    }
 }
 
 int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
@@ -825,7 +875,7 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
             likely = "LIKELY_MIDCALL_OR_TRUNCATED_MBC_START";
         }
         else if (state->veda_ref_vlc[slot].valid &&
-             !state->veda_ref_mbc[slot].valid)
+                 !state->veda_ref_mbc[slot].valid)
         {
             likely = "LIKELY_MIDCALL_VLC_START";
         }
@@ -838,30 +888,30 @@ int veda_try_session_bridge(dsd_opts *opts, dsd_state *state, int slot)
     if (opts->veda_debug)
     {
         fprintf(stderr,
-        "\n[VEDA CASE6 MISS] slot=%d sess=%u cause=NO_VISIBLE_CASE6_PATH "
-        "likely=%s pattern=%s svc_hdr=%u reject=%u reject_svc=%u "
-        "db06=%u db07=%u mbc48=%u kx_try=%u "
-        "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u "
-        "db03=%u db04=%u svc_db03=%u svc_db04=%u\n",
-        slot + 1,
-        (unsigned)ps->session_no,
-        likely,
-        veda_path_pattern_name(ps),
-        (unsigned)state->veda_svc_hdr_hits[slot],
-        (unsigned)state->veda_reject_probe_count[slot],
-        (unsigned)state->veda_reject_svc_hits[slot],
-        (unsigned)state->veda_seen_db06[slot],
-        (unsigned)state->veda_seen_db07[slot],
-        (unsigned)state->veda_seen_mbc48[slot],
-        (unsigned)state->veda_kx_try_count[slot],
-        (unsigned)state->veda_vendor_mi_valid[slot],
-        (unsigned long long)eff_mi,
-        (unsigned)state->veda_ref_mbc[slot].payload_len,
-        (unsigned)state->veda_ref_vlc[slot].payload_len,
-        (unsigned)state->veda_seen_db03[slot],
-        (unsigned)state->veda_seen_db04[slot],
-        (unsigned)state->veda_seen_svc_db03[slot],
-        (unsigned)state->veda_seen_svc_db04[slot]);
+                "\n[VEDA CASE6 MISS] slot=%d sess=%u cause=NO_VISIBLE_CASE6_PATH "
+                "likely=%s pattern=%s svc_hdr=%u reject=%u reject_svc=%u "
+                "db06=%u db07=%u mbc48=%u kx_try=%u "
+                "mi_valid=%u eff_mi=%016llX ref_mbc_len=%u ref_vlc_len=%u "
+                "db03=%u db04=%u svc_db03=%u svc_db04=%u\n",
+                slot + 1,
+                (unsigned)ps->session_no,
+                likely,
+                veda_path_pattern_name(ps),
+                (unsigned)state->veda_svc_hdr_hits[slot],
+                (unsigned)state->veda_reject_probe_count[slot],
+                (unsigned)state->veda_reject_svc_hits[slot],
+                (unsigned)state->veda_seen_db06[slot],
+                (unsigned)state->veda_seen_db07[slot],
+                (unsigned)state->veda_seen_mbc48[slot],
+                (unsigned)state->veda_kx_try_count[slot],
+                (unsigned)state->veda_vendor_mi_valid[slot],
+                (unsigned long long)eff_mi,
+                (unsigned)state->veda_ref_mbc[slot].payload_len,
+                (unsigned)state->veda_ref_vlc[slot].payload_len,
+                (unsigned)state->veda_seen_db03[slot],
+                (unsigned)state->veda_seen_db04[slot],
+                (unsigned)state->veda_seen_svc_db03[slot],
+                (unsigned)state->veda_seen_svc_db04[slot]);
     }
 
     return 0;
@@ -878,11 +928,11 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_last_sel[slot] = 0;
     state->veda_subst_active[slot] = 0;
     memset(state->veda_tx_buf[slot], 0, sizeof(state->veda_tx_buf[slot]));
-    
+
     state->veda_raw_src_kind[slot] = VEDA_HDRSRC_NONE;
 
     state->veda_last_hdr_valid[slot] = 0;
-    state->veda_last_hdr_src[slot]   = VEDA_HDRSRC_NONE;
+    state->veda_last_hdr_src[slot] = VEDA_HDRSRC_NONE;
     state->veda_last_b0[slot] = 0;
     state->veda_last_b1[slot] = 0;
     state->veda_last_w2[slot] = 0;
@@ -890,8 +940,8 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_last_w6[slot] = 0;
 
     state->veda_cmd0[slot] = 0;
-    state->veda_cmd1[slot] = 0;  
-    
+    state->veda_cmd1[slot] = 0;
+
     state->veda_last_applied_mi[slot] = 0;
     state->veda_mi_applied[slot] = 0;
 
@@ -914,27 +964,27 @@ void veda_reset_slot(dsd_state *state, int slot)
     state->veda_seen_db06[slot] = 0;
     state->veda_seen_db07[slot] = 0;
     state->veda_seen_mbc48[slot] = 0;
-    state->veda_kx_try_count[slot] = 0;    
+    state->veda_kx_try_count[slot] = 0;
 
     veda_clear_candidate(state, slot);
     state->veda_candidate_seq[slot] = 0;
 
     state->veda_stream_valid[slot] = 0;
-    state->veda_pos[slot] = 0;   
-    
+    state->veda_pos[slot] = 0;
+
     state->veda_bridge_notice_done[slot] = 0;
     state->veda_bridge_probe_count[slot] = 0;
-    
+
     state->veda_svc_hdr_hits[slot] = 0;
 
     state->veda_reject_probe_count[slot] = 0;
-    state->veda_reject_svc_hits[slot] = 0;    
+    state->veda_reject_svc_hits[slot] = 0;
 
     state->veda_seen_db03[slot] = 0;
     state->veda_seen_db04[slot] = 0;
     state->veda_seen_svc_db03[slot] = 0;
     state->veda_seen_svc_db04[slot] = 0;
-    
+
     veda_raw_reset_slot(state, slot);
 }
 
@@ -969,8 +1019,7 @@ void veda_log_subst(dsd_state *state, int slot, int chng)
                 "\nVEDA IDS slot=%d id_a=0x%06X (%d) id_b=0x%06X (%d)\n",
                 slot + 1,
                 state->veda_id24_a[slot] & 0xFFFFFFu, state->veda_id24_a[slot] & 0xFFFFFFu,
-                state->veda_id24_b[slot] & 0xFFFFFFu, state->veda_id24_b[slot] & 0xFFFFFFu
-            );
+                state->veda_id24_b[slot] & 0xFFFFFFu, state->veda_id24_b[slot] & 0xFFFFFFu);
         break;
 
     case 4:
@@ -1024,12 +1073,18 @@ static int veda_src_prio(uint8_t src_kind)
 {
     switch (src_kind)
     {
-    case VEDA_HDRSRC_VLC:     return 60;
-    case VEDA_HDRSRC_TLC:     return 30;
-    case VEDA_HDRSRC_CSBK:    return 40;
-    case VEDA_HDRSRC_DHEADER: return 20;
-    case VEDA_HDRSRC_UDT:     return 10;
-    default:                  return 0;
+    case VEDA_HDRSRC_VLC:
+        return 60;
+    case VEDA_HDRSRC_TLC:
+        return 30;
+    case VEDA_HDRSRC_CSBK:
+        return 40;
+    case VEDA_HDRSRC_DHEADER:
+        return 20;
+    case VEDA_HDRSRC_UDT:
+        return 10;
+    default:
+        return 0;
     }
 }
 
@@ -1053,8 +1108,8 @@ void veda_note_raw_src_tgt_ex(dsd_state *state, int slot,
         state->veda_raw_tgt[slot] == 0 ||
         veda_src_prio(src_kind) >= veda_src_prio(state->veda_raw_src_kind[slot]))
     {
-        state->veda_raw_src[slot]      = src24;
-        state->veda_raw_tgt[slot]      = tgt24;
+        state->veda_raw_src[slot] = src24;
+        state->veda_raw_tgt[slot] = tgt24;
         state->veda_raw_src_kind[slot] = src_kind;
     }
 
@@ -1102,12 +1157,12 @@ static void veda_store_last_hdr(dsd_state *state, int slot, const veda_air_heade
         return;
 
     state->veda_last_hdr_valid[slot] = 1;
-    state->veda_last_hdr_src[slot]   = src_kind;
-    state->veda_last_b0[slot]        = hdr->b0;
-    state->veda_last_b1[slot]        = hdr->b1;
-    state->veda_last_w2[slot]        = hdr->w2;
-    state->veda_last_w4[slot]        = hdr->w4;
-    state->veda_last_w6[slot]        = hdr->w6;
+    state->veda_last_hdr_src[slot] = src_kind;
+    state->veda_last_b0[slot] = hdr->b0;
+    state->veda_last_b1[slot] = hdr->b1;
+    state->veda_last_w2[slot] = hdr->w2;
+    state->veda_last_w4[slot] = hdr->w4;
+    state->veda_last_w6[slot] = hdr->w6;
 
     state->veda_cmd0[slot] = hdr->b0;
     state->veda_cmd1[slot] = hdr->b1;
@@ -1133,27 +1188,27 @@ int veda_try_handle_header(dsd_opts *opts, dsd_state *state, int slot,
     uint8_t svc_class = (((hdr->b0 & 0x60) == 0x20) ? 1 : 0);
 
     if (svc_class)
-        state->veda_svc_hdr_hits[slot]++;        
+        state->veda_svc_hdr_hits[slot]++;
 
     if (state->veda_debug)
     {
-    fprintf(stderr,
-            "\n[VEDA HTRY] slot=%d src=%u svc=%u "
-            "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
-            "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u\n",
-            slot + 1,
-            (unsigned)src_kind,
-            (unsigned)svc_class,
-            (unsigned)hdr->b0,
-            (unsigned)hdr->b1,
-            (unsigned)hdr->w2,
-            (unsigned)hdr->w4,
-            (unsigned)hdr->w6,
-            (unsigned)state->veda_sm[slot],
-            (unsigned)state->veda_len_lo[slot],
-            (unsigned)state->veda_len_hi[slot],
-            (unsigned)state->veda_raw_src[slot],
-            (unsigned)state->veda_raw_tgt[slot]);
+        fprintf(stderr,
+                "\n[VEDA HTRY] slot=%d src=%u svc=%u "
+                "b0=%02X b1=%02X w2=%04X w4=%04X w6=%04X "
+                "sm=%u len_lo=%u len_hi=%u raw_src=%u raw_tgt=%u\n",
+                slot + 1,
+                (unsigned)src_kind,
+                (unsigned)svc_class,
+                (unsigned)hdr->b0,
+                (unsigned)hdr->b1,
+                (unsigned)hdr->w2,
+                (unsigned)hdr->w4,
+                (unsigned)hdr->w6,
+                (unsigned)state->veda_sm[slot],
+                (unsigned)state->veda_len_lo[slot],
+                (unsigned)state->veda_len_hi[slot],
+                (unsigned)state->veda_raw_src[slot],
+                (unsigned)state->veda_raw_tgt[slot]);
     }
 
     veda_store_last_hdr(state, slot, hdr, src_kind);
@@ -1230,8 +1285,8 @@ int veda_try_build_tx_subst_frame(dsd_state *state, int slot)
 
     if (!state || slot < 0 || slot > 1)
         return 0;
-    
-    veda_refresh_profile_from_live_ids(state, slot); 
+
+    veda_refresh_profile_from_live_ids(state, slot);
 
     buf = state->veda_tx_buf[slot];
 
@@ -1348,17 +1403,18 @@ int veda_control_header_handler(dsd_opts *opts, dsd_state *state, int slot, cons
             if (state->veda_debug)
                 veda_log_subst(state, slot, 2);
 
-            if (opts->veda_debug) {
-              fprintf(stderr,
-               "\nVEDA CMP slot=%d raw_src=%u raw_tgt=%u id_a=%u id_b=%u sel=%u subst=%u\n",
-               slot + 1,
-               state->veda_raw_src[slot],
-               state->veda_raw_tgt[slot],
-               state->veda_id24_a[slot],
-               state->veda_id24_b[slot],
-               state->veda_last_sel[slot],
-               state->veda_subst_active[slot]);                
-            }             
+            if (opts->veda_debug)
+            {
+                fprintf(stderr,
+                        "\nVEDA CMP slot=%d raw_src=%u raw_tgt=%u id_a=%u id_b=%u sel=%u subst=%u\n",
+                        slot + 1,
+                        state->veda_raw_src[slot],
+                        state->veda_raw_tgt[slot],
+                        state->veda_id24_a[slot],
+                        state->veda_id24_b[slot],
+                        state->veda_last_sel[slot],
+                        state->veda_subst_active[slot]);
+            }
 
             if (veda_try_build_tx_subst_frame(state, slot))
                 return 2;
@@ -1422,12 +1478,12 @@ static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a,
         if (slot == 0)
         {
             src = ((uint32_t)state->lastsrc) & 0xFFFFFFu;
-            tgt = ((uint32_t)state->lasttg)  & 0xFFFFFFu;
+            tgt = ((uint32_t)state->lasttg) & 0xFFFFFFu;
         }
         else
         {
             src = ((uint32_t)state->lastsrcR) & 0xFFFFFFu;
-            tgt = ((uint32_t)state->lasttgR)  & 0xFFFFFFu;
+            tgt = ((uint32_t)state->lasttgR) & 0xFFFFFFu;
         }
     }
 
@@ -1509,7 +1565,6 @@ void veda_trace_probe_air_header(dsd_opts *opts,
 
     fprintf(stderr, "\n");
 }
-
 
 void veda_trace_rejected_air_header(dsd_opts *opts,
                                     dsd_state *state,
@@ -1595,29 +1650,37 @@ void veda_trace_rejected_air_header(dsd_opts *opts,
     fprintf(stderr, "\n");
 }
 
-
 static const char *veda_raw_kind_name(uint8_t kind)
 {
     switch (kind)
     {
-    case VEDA_RAW_MBC_BLK0: return "MBC_BLK0";
-    case VEDA_RAW_MBC_SF:   return "MBC_SF";
-    case VEDA_RAW_DB:       return "DB";
-    case VEDA_RAW_VLC:      return "VLC";
-    case VEDA_RAW_TLC:      return "TLC";
-    case VEDA_RAW_EMB:      return "EMB";
-    case VEDA_RAW_CACH:     return "CACH";
-    case VEDA_RAW_MI:       return "MI";
-    default:                return "NONE";
+    case VEDA_RAW_MBC_BLK0:
+        return "MBC_BLK0";
+    case VEDA_RAW_MBC_SF:
+        return "MBC_SF";
+    case VEDA_RAW_DB:
+        return "DB";
+    case VEDA_RAW_VLC:
+        return "VLC";
+    case VEDA_RAW_TLC:
+        return "TLC";
+    case VEDA_RAW_EMB:
+        return "EMB";
+    case VEDA_RAW_CACH:
+        return "CACH";
+    case VEDA_RAW_MI:
+        return "MI";
+    default:
+        return "NONE";
     }
 }
 
 static int veda_raw_can_open(uint8_t kind)
 {
     return (kind == VEDA_RAW_MBC_BLK0 ||
-            kind == VEDA_RAW_MBC_SF   ||
-            kind == VEDA_RAW_VLC      ||
-            kind == VEDA_RAW_DB       ||
+            kind == VEDA_RAW_MBC_SF ||
+            kind == VEDA_RAW_VLC ||
+            kind == VEDA_RAW_DB ||
             kind == VEDA_RAW_EMB);
 }
 
@@ -1842,10 +1905,14 @@ void veda_raw_log_lc(dsd_opts *opts, dsd_state *state, int slot,
     if (!veda_raw_prepare_event(state, slot, kind, sf, &evt))
         return;
 
-    if (kind == VEDA_RAW_VLC) evt.databurst = 0x01;
-    else if (kind == VEDA_RAW_TLC) evt.databurst = 0x02;
-    else if (kind == VEDA_RAW_EMB) evt.databurst = 0xEB;
-    else evt.databurst = 0x00;
+    if (kind == VEDA_RAW_VLC)
+        evt.databurst = 0x01;
+    else if (kind == VEDA_RAW_TLC)
+        evt.databurst = 0x02;
+    else if (kind == VEDA_RAW_EMB)
+        evt.databurst = 0xEB;
+    else
+        evt.databurst = 0x00;
 
     evt.crc_ok = crc_ok;
     evt.irr_err = irr_err;
@@ -1892,6 +1959,11 @@ void veda_raw_log_cach(dsd_opts *opts, dsd_state *state, int slot,
     veda_raw_push_evt(opts, state, slot, &evt);
 }
 
+void veda_bridge_voice_dyn32(uint32_t voice_dyn32, const char *source)
+{
+    veda_ms_collect_voice_dyn32(voice_dyn32, source);
+}
+
 void veda_raw_log_mi(dsd_opts *opts, dsd_state *state, int slot,
                      uint32_t mi32, uint16_t sf)
 {
@@ -1908,4 +1980,3 @@ void veda_raw_log_mi(dsd_opts *opts, dsd_state *state, int slot,
 
     veda_raw_push_evt(opts, state, slot, &evt);
 }
-

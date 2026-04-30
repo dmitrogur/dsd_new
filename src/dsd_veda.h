@@ -111,6 +111,7 @@ void veda_raw_log_cach(dsd_opts *opts, dsd_state *state, int slot,
 void veda_raw_log_mi(dsd_opts *opts, dsd_state *state, int slot,
                      uint32_t mi32, uint16_t sf);
 
+void veda_bridge_voice_dyn32(uint32_t voice_dyn32, const char *source);
 // инлайны
 static inline uint32_t dmr_u24_le_read(const uint8_t *p) {
     return ((uint32_t)p[0]) | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);

@@ -72,7 +72,7 @@ extern "C"
         VEDA_KEY32_SRC_AIR_H1_DB01_BASE,
         VEDA_KEY32_SRC_AIR_H2_DB01_EB_REFRESH,
         VEDA_KEY32_SRC_AIR_H3_DB01_EB_KEY32,
-        VEDA_KEY32_SRC_AIR_H4_SPLIT_LEVELS                
+        VEDA_KEY32_SRC_AIR_H4_SPLIT_LEVELS
     } veda_key32_source_t;
 
     typedef enum
@@ -90,9 +90,22 @@ extern "C"
         int vlc_len;
         int vlc_valid;
 
+        uint8_t last_unique_vlc_raw[VEDA_MAX_FIELD_BYTES];
+        int last_unique_vlc_len;
+        int last_unique_vlc_valid;
+        int vlc_changed;
+        uint32_t session_count;
+        uint32_t session_id;
+
         uint8_t emb_raw[VEDA_MAX_FIELD_BYTES];
         int emb_len;
         int emb_valid;
+
+        uint8_t last_unique_emb_raw[VEDA_MAX_FIELD_BYTES];
+        int last_unique_emb_len;
+        int last_unique_emb_valid;
+        int emb_changed;
+        uint32_t emb_unique_count;
 
         uint32_t mi32;
         int mi32_valid;
@@ -215,12 +228,13 @@ extern "C"
     void veda_set_hypothesis(veda_hypothesis_t h);
     void veda_set_debug(int debug);
     void veda_set_cps_key16(const uint8_t key16[VEDA_CPS_KEY16_BYTES]);
-    
+
     /* MS-only collector API. */
     void veda_ms_reset(veda_context_t *v);
     void veda_ms_collect_vlc(const uint8_t *raw, int len, int crc_ok, int fec_err);
     void veda_ms_collect_emb(const uint8_t *raw, int len, int crc_ok, int fec_err);
     void veda_ms_collect_mi32(uint32_t mi32, const char *source);
+    void veda_ms_collect_voice_dyn32(uint32_t voice_dyn32, const char *source);
     void veda_ms_collect_ids(uint32_t id_a, uint32_t id_b);
     void veda_ms_set_position(uint32_t superframe, uint32_t burst_index, uint32_t seq);
     void veda_ms_collect_candidate(uint8_t source_type, const uint8_t *payload, uint8_t payload_len, int sf_cur);
@@ -228,10 +242,10 @@ extern "C"
 
     int veda_try_build_temporary_key_candidate(veda_context_t *v, veda_key_candidate_t *kc);
     int veda_stream_init_from_key_candidate(veda_context_t *v, veda_key_candidate_t *kc);
-    int veda_stream_generate_keystream_model(veda_stream_ctx_t *ctx, uint8_t *out,size_t len);
+    int veda_stream_generate_keystream_model(veda_stream_ctx_t *ctx, uint8_t *out, size_t len);
 
     int veda_rx_pack_ms_payload216(dsd_state *state, uint8_t out27[27]);
-    int veda_rx_unpack_ms_payload216(dsd_state *state, const uint8_t in27[27]);    
+    int veda_rx_unpack_ms_payload216(dsd_state *state, const uint8_t in27[27]);
 
     int veda_try_build_key32_main_tree(veda_context_t *v, veda_key_candidate_t *kc);
     /* Main hook for dmr_ms.c, called before processMbeFrame().
@@ -239,7 +253,7 @@ extern "C"
      * current dsd.h uses anonymous typedef structs for dsd_opts/dsd_state.
      * For collect mode this must not modify AMBE frames.
      */
-    
+
     int veda_ms_on_voice_triplet(
         dsd_opts *opts,
         dsd_state *state,
@@ -256,10 +270,10 @@ extern "C"
         char ambe_fr2[VEDA_AMBE_ROWS][VEDA_AMBE_COLS],
         char ambe_fr3[VEDA_AMBE_ROWS][VEDA_AMBE_COLS]);
 
-    int veda_build_seed_tweak_from_candidate(veda_context_t *v, veda_seed_tweak_profile_t profile, 
-        uint8_t seed8[VEDA_SEED8_BYTES], 
-        uint32_t *tweak0, uint32_t *tweak1);
-    int veda_rx_try_payload216(veda_context_t *v, dsd_state *state);        
+    int veda_build_seed_tweak_from_candidate(veda_context_t *v, veda_seed_tweak_profile_t profile,
+                                             uint8_t seed8[VEDA_SEED8_BYTES],
+                                             uint32_t *tweak0, uint32_t *tweak1);
+    int veda_rx_try_payload216(veda_context_t *v, dsd_state *state);
 
     int veda_rx_rebuild_ms_ambe_from_payload(dsd_state *state, char ambe_fr[4][24], char ambe_fr2[4][24], char ambe_fr3[4][24]);
     /* Firmware-like model function prototypes.

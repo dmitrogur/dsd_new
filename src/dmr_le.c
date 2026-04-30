@@ -446,6 +446,7 @@ void dmr_sbrc (dsd_opts * opts, dsd_state * state, uint8_t power)
         veda_raw_log_mi(opts, state, slot,
                 state->veda_vendor_mi32[slot],
                 state->indx_SF);
+        veda_bridge_voice_dyn32(sbrcpl, "VOICE-SBRC32");        
                 
         if (opts->veda_debug)
         {
