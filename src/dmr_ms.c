@@ -26,6 +26,23 @@ static void log_ms_voic_288(int vc, const uint8_t raw36[36])
   fprintf(stderr, "\n");
 }
 
+static void veda_pack_ms_raw36_from_payload(const dsd_state *state, uint8_t raw36[36])
+{
+  int i;
+
+  memset(raw36, 0, 36);
+
+  for (i = 0; i < 144; i++)
+  {
+    uint8_t dibit = state->dmr_stereo_payload[i];
+    int bit_idx = i * 2;
+
+    if (dibit & 2)
+      raw36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
+    if (dibit & 1)
+      raw36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
+  }
+}
 
 //A subroutine for processing MS voice
 void dmrMS (dsd_opts * opts, dsd_state * state)
@@ -89,6 +106,9 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
   ipp_last_sample_num();
   
   state->dmrburstL = 16;
+
+  uint8_t veda_raw36_original[36];
+  memset(veda_raw36_original, 0, sizeof(veda_raw36_original));
 
   memset (ambe_fr, 0, sizeof(ambe_fr));
   memset (ambe_fr2, 0, sizeof(ambe_fr2));
@@ -244,6 +264,9 @@ void dmrMS (dsd_opts * opts, dsd_state * state)
     z++;
 
   }
+
+  if (opts->isVEDA)
+    veda_pack_ms_raw36_from_payload(state, veda_raw36_original);
     //DMH
 /*
 if (opts->run_scout)  
@@ -371,6 +394,8 @@ if (opts->isVEDA) {
 
     veda_voice_done = veda_ms_on_voice_triplet(opts, state, 0,
         ambe_fr, ambe_fr2, ambe_fr3);
+    veda_ms_set_position((uint32_t)state->indx_SF, (uint32_t)(j + 1), (uint32_t)j);       
+
     if (veda_voice_done) veda_rx_rebuild_ms_ambe_from_payload(state, 
       ambe_fr, ambe_fr2, ambe_fr3);
 }
@@ -549,29 +574,31 @@ if (opts->isVEDA) {
       playSynthesizedVoiceFS3(opts, state);
   }
 
-if (opts->isVEDA) {
-    uint8_t raw_36[36]; 
-    memset(raw_36, 0, 36);
-    for (int i = 0; i < 144; i++) {
-        uint8_t dibit = state->dmr_stereo_payload[i];
-        int bit_idx = i * 2;
-        if (dibit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
-        if (dibit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
-    }
-    if (opts->veda_debug) {
-      log_ms_voic_288(vc, raw_36);
-      veda_burst288_stream_write(0xEB, raw_36);      
-    }
-    // Накапливаем первые 64 байта в начале сессии
+if (opts->isVEDA)
+{
     int slot = state->currentslot & 1;
-    if (state->veda_kx_pos[slot] < 64) {
+
+    if (opts->veda_debug)
+    {
+      log_ms_voic_288(vc, veda_raw36_original);
+      veda_burst288_stream_write(0xEB, veda_raw36_original);
+
+      fprintf(stderr,
+        "\n[VEDA2 KX64-SRC] slot=%d source=original-ms-burst before_payload_xor=1\n",
+        slot + 1);
+    }
+
+    if (state->veda_kx_pos[slot] < 64)
+    {
         int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
-        memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
+
+        memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]],
+          veda_raw36_original, copy_len);
+
         state->veda_kx_pos[slot] += copy_len;
-        
-        if (state->veda_kx_pos[slot] == 64) {
+
+        if (state->veda_kx_pos[slot] == 64)
             handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-        }
     }
 }
   if (vc == 6)
@@ -775,6 +802,9 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
   state->dmrburstL = 16;
   state->currentslot = 0; //force to slot 0
 
+  uint8_t veda_raw36_original[36];
+  memset(veda_raw36_original, 0, sizeof(veda_raw36_original));
+
   dibit_p = state->dmr_payload_p - 90;
 
   //CACH + First Half Payload + Sync = 12 + 54 + 24
@@ -892,6 +922,8 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
 
   }
 
+  if (opts->isVEDA)
+    veda_pack_ms_raw36_from_payload(state, veda_raw36_original);
   //=============== суперкад
 /*  
 if (opts->run_scout)  
@@ -903,35 +935,33 @@ if (opts->run_scout)
   }
 }
 */
-if (opts->isVEDA) {
-      uint8_t raw_36[36]; 
-      memset(raw_36, 0, 36);
-      for (int i = 0; i < 144; i++) {
-          uint8_t d_bit = state->dmr_stereo_payload[i];
-          int bit_idx = i * 2;
-          if (d_bit & 2) raw_36[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
-          if (d_bit & 1) raw_36[(bit_idx + 1) / 8] |= (1 << (7 - ((bit_idx + 1) % 8)));
-      }
-      if (opts->veda_debug) {
-        log_ms_voic_288(1, raw_36);
-        veda_burst288_stream_write(0xEB, raw_36);        
-      }
-        
-      int slot = state->currentslot & 1;
-      if (state->veda_kx_pos[slot] < 64) {
-          int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
-          memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]], raw_36, copy_len);
-          state->veda_kx_pos[slot] += copy_len;
-          
-          if (opts->veda_debug) {
-              fprintf(stderr, "[VEDA KX-BOOTSTRAP] (dmrMSBootstrap) Added %d bytes. Pos: %d/64\n", copy_len, state->veda_kx_pos[slot]);
-          }
+if (opts->isVEDA)
+{
+    int slot = state->currentslot & 1;
 
-          if (state->veda_kx_pos[slot] == 64) {
-              handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
-          }
-      }
-  }
+    if (opts->veda_debug)
+    {
+      log_ms_voic_288(1, veda_raw36_original);
+      veda_burst288_stream_write(0xEB, veda_raw36_original);
+
+      fprintf(stderr,
+        "\n[VEDA2 KX64-SRC] slot=%d source=original-ms-burst before_payload_xor=1\n",
+        slot + 1);
+    }
+
+    if (state->veda_kx_pos[slot] < 64)
+    {
+        int copy_len = (state->veda_kx_pos[slot] + 36 <= 64) ? 36 : (64 - state->veda_kx_pos[slot]);
+
+        memcpy(&state->veda_kx_buffer[slot][state->veda_kx_pos[slot]],
+          veda_raw36_original, copy_len);
+
+        state->veda_kx_pos[slot] += copy_len;
+
+        if (state->veda_kx_pos[slot] == 64)
+            handle_veda_kx_packet(opts, state, state->veda_kx_buffer[slot]);
+    }
+}
 
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
@@ -1008,15 +1038,10 @@ if (opts->isVEDA) {
     }
 
     veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
-
-    veda_voice_done = veda_ms_on_voice_triplet(
-        opts,
-        state,
-        0,
-        ambe_fr,
-        ambe_fr2,
-        ambe_fr3
-    );
+    
+    veda_voice_done = veda_ms_on_voice_triplet(opts, state, 0,
+      ambe_fr, ambe_fr2, ambe_fr3);
+    
 }
 
   #ifdef PRINT_AMBE72
