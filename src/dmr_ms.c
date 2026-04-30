@@ -392,9 +392,9 @@ if (opts->isVEDA) {
 
     veda_set_hypothesis((veda_hypothesis_t)opts->veda_hypothesis);
 
+    veda_ms_set_position((uint32_t)state->indx_SF, (uint32_t)(j + 1), (uint32_t)j);       
     veda_voice_done = veda_ms_on_voice_triplet(opts, state, 0,
         ambe_fr, ambe_fr2, ambe_fr3);
-    veda_ms_set_position((uint32_t)state->indx_SF, (uint32_t)(j + 1), (uint32_t)j);       
 
     if (veda_voice_done) veda_rx_rebuild_ms_ambe_from_payload(state, 
       ambe_fr, ambe_fr2, ambe_fr3);

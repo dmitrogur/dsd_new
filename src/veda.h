@@ -206,6 +206,7 @@ extern "C"
         veda_stream_ctx_t stream;
 
         uint32_t voice_try_count;
+        uint32_t rx_transform_count;
         uint32_t key32_candidate_count;
 
         int debug;

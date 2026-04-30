@@ -295,6 +295,7 @@ void veda_ms_reset(veda_context_t *v)
     memset(&v->key_candidate, 0, sizeof(v->key_candidate));
     v->key32_candidate_count = 0;
     v->voice_try_count = 0;
+    v->rx_transform_count = 0;
 }
 
 static void veda_ms_reset_dynamic_after_db01(veda_context_t *v)
@@ -331,6 +332,7 @@ static void veda_ms_reset_dynamic_after_db01(veda_context_t *v)
 
     v->voice_try_count = 0;
     v->key32_candidate_count = 0;
+    v->rx_transform_count = 0;
 }
 
 void veda_ms_collect_vlc(const uint8_t *raw, int len, int crc_ok, int fec_err)
@@ -756,21 +758,21 @@ static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_twea
         seed8[3] = (uint8_t)(voice_dyn32 >> 24);
         seed8[4] = (uint8_t)v->ms.superframe;
         seed8[5] = (uint8_t)v->ms.burst_index;
-        seed8[6] = (uint8_t)v->voice_try_count;
         // seed8[6] = (uint8_t)v->ms.seq;
+        seed8[6] = (uint8_t)(v->rx_transform_count + 1);
         seed8[7] = 0x01;
 
         if (v->ms.emb_changed)
         {
             *tweak0 = veda_mix_u32(eb0, db01, voice_dyn32);
             // *tweak1 = veda_mix_u32(eb1, v->ms.seq, v->ms.superframe);
-            *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->voice_try_count);
+            *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->rx_transform_count + 1);
         }
         else
         {
             *tweak0 = veda_mix_u32(voice_dyn32, db01, v->ms.burst_index);
             // *tweak1 = veda_mix_u32(v->ms.emb_unique_count, v->ms.seq, v->ms.superframe);
-            *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->voice_try_count);
+            *tweak1 = veda_mix_u32(eb1, v->ms.burst_index, v->rx_transform_count + 1);
         }
         *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
     }
@@ -1334,7 +1336,10 @@ int veda_ms_on_voice_triplet(dsd_opts *opts, dsd_state *state, int slot, char am
 
     prc = veda_rx_try_payload216(v, state);
     if (prc == VEDA_RC_OK)
+    {
+        v->rx_transform_count++;
         return 1;
+    }
 
     if (!v->stream.key32_valid)
     {
