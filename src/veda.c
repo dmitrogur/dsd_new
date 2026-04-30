@@ -672,12 +672,12 @@ static int veda_air_build_session_key32(veda_context_t *v, veda_key_candidate_t 
     if (hprofile == 3 && v->ms.emb_valid)
         veda_air_absorb_bytes_model(st, v->ms.emb_raw, v->ms.emb_len, 0x45423033u); /* EB03 */
 
-    if (hprofile == 4 && v->ms.mi32_valid)
+    /*if (hprofile == 4 && v->ms.mi32_valid)
     {
         st[8] ^= v->ms.mi32;
         st[9] ^= veda_mix_u32(v->ms.mi32, v->ms.superframe, v->ms.burst_index);
         veda_gimli384_permute_model(st);
-    }
+    }*/
 
     veda_air_squeeze_key32_model(st, kc->key32);
 
@@ -727,7 +727,7 @@ static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_twea
 
     hprofile = veda_air_profile_from_hypothesis(v);
 
-    if ((hprofile == 1 || hprofile == 2) &&
+    if ((hprofile == 1 || hprofile == 2 || hprofile == 3 || hprofile == 4) &&
         (!v->ms.vlc_valid || !v->ms.emb_valid || !v->ms.mi32_valid))
     {
         if (v->debug)
@@ -776,24 +776,39 @@ static int veda_try_build_temporary_seed_tweak(veda_context_t *v, veda_seed_twea
         }
         *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
     }
-    else if (hprofile == 2)
-    {
-        seed8[0] = (uint8_t)(db01 >> 0);
-        seed8[1] = (uint8_t)(db01 >> 8);
-        seed8[2] = (uint8_t)(db01 >> 16);
-        seed8[3] = (uint8_t)(db01 >> 24);
-        seed8[4] = (uint8_t)(voice_dyn32 >> 0);
-        seed8[5] = (uint8_t)(voice_dyn32 >> 8);
-        // seed8[6] = (uint8_t)v->ms.burst_index;
-        seed8[6] = (uint8_t)v->voice_try_count;
-        seed8[7] = 0x02;
-
-        *tweak0 = veda_mix_u32(eb0, db01, voice_dyn32);
-        // *tweak1 = veda_mix_u32(eb1, v->ms.seq, v->ms.superframe);
-        *tweak1 = veda_mix_u32(v->ms.emb_unique_count, v->voice_try_count, v->ms.superframe);
-        *used_profile = VEDA_ST_PROFILE_CAND_SEED_FIRST8_CAND_TWEAK_LAST8;
-    }
     else if (hprofile == 3)
+    {
+        seed8[0] = (uint8_t)(voice_dyn32 >> 0);
+        seed8[1] = (uint8_t)(voice_dyn32 >> 8);
+        seed8[2] = (uint8_t)(voice_dyn32 >> 16);
+        seed8[3] = (uint8_t)(voice_dyn32 >> 24);
+        seed8[4] = (uint8_t)v->ms.superframe;
+        seed8[5] = (uint8_t)v->ms.burst_index;
+        seed8[6] = (uint8_t)(v->rx_transform_count + 1);
+        seed8[7] = 0x03;
+
+        *tweak0 = veda_mix_u32(eb0, db01, v->ms.emb_unique_count);
+        *tweak1 = veda_mix_u32(eb1, voice_dyn32, v->rx_transform_count + 1);
+
+        *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
+    }
+    else if (hprofile == 4)
+    {
+        seed8[0] = (uint8_t)(eb0 >> 0);
+        seed8[1] = (uint8_t)(eb0 >> 8);
+        seed8[2] = (uint8_t)(eb0 >> 16);
+        seed8[3] = (uint8_t)(eb0 >> 24);
+        seed8[4] = (uint8_t)v->ms.superframe;
+        seed8[5] = (uint8_t)v->ms.burst_index;
+        seed8[6] = (uint8_t)(v->rx_transform_count + 1);
+        seed8[7] = 0x04;
+
+        *tweak0 = veda_mix_u32(db01, voice_dyn32, v->ms.emb_unique_count);
+        *tweak1 = veda_mix_u32(eb1, v->ms.superframe, v->rx_transform_count + 1);
+
+        *used_profile = VEDA_ST_PROFILE_ZERO_SEED_CAND_TWEAK_FIRST8;
+    }
+    else if (hprofile == 33) //было 3
     {
         if (v->ms.emb_valid && v->ms.emb_len >= 8)
             memcpy(seed8, v->ms.emb_raw, 8);
