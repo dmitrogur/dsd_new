@@ -656,10 +656,10 @@ static int veda_air_build_session_key32(veda_context_t *v, veda_key_candidate_t 
     for (i = 0; i < 4; i++)
         st[i] = veda_load_le32(v->cps_key16 + (i * 4));
 
-    st[4] = 0x56454441u; /* VEDA */
-    st[5] = (uint32_t)hprofile;
-    st[6] = v->ms.superframe;
-    st[7] = v->ms.seq;
+    st[4] = (uint32_t)hprofile;
+    st[5] = v->ms.session_id;
+    st[6] = 0;
+    st[7] = 0;
 
     if (v->ms.vlc_valid)
         veda_air_absorb_bytes_model(st, v->ms.vlc_raw, v->ms.vlc_len, 0x44423031u); /* DB01 */

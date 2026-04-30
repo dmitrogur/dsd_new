@@ -730,7 +730,11 @@ void veda_note_candidate(dsd_opts *opts,
     if (n > sizeof(cand->raw_payload))
         n = sizeof(cand->raw_payload);
 
-    /* не спамим полностью одинаковым кандидатом подряд */
+    if (source_type == VEDA_CAND_VC_EMB)
+        veda_ms_collect_candidate(source_type, payload, n, sf_cur);
+    
+    /* не спамим полностью одинаковым кандидатом подряд.
+       VC_EMB уже отдан в новый VEDA-state выше. */
     if (cand->valid &&
         cand->source_type == source_type &&
         cand->payload_len == n &&
@@ -738,7 +742,7 @@ void veda_note_candidate(dsd_opts *opts,
     {
         return;
     }
-
+    
     if (prev.valid &&
         prev.payload_len == n &&
         memcmp(prev.raw_payload, payload, n) == 0)
@@ -765,7 +769,8 @@ void veda_note_candidate(dsd_opts *opts,
     cand->seq_in_session = state->veda_candidate_seq[slot];
     memcpy(cand->raw_payload, payload, n);
 
-    veda_ms_collect_candidate(source_type, payload, n, sf_cur);
+    if (source_type != VEDA_CAND_VC_EMB)
+        veda_ms_collect_candidate(source_type, payload, n, sf_cur);
 
     /* запоминаем опорные объекты начала сеанса */
     if (source_type == VEDA_CAND_MBC05 && !state->veda_ref_mbc[slot].valid)
