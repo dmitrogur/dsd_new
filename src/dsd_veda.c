@@ -1,6 +1,7 @@
 #include "dsd_veda.h"
 #include "veda.h"
 
+static veda_trait_slot_t g_veda_trait[2];
 
 void veda_trait_reset_slot(int slot)
 {
@@ -64,6 +65,10 @@ void veda_trait_note_a37_slot(int slot, int burst_phase_1_6, uint8_t a37_bit)
   t->a37_hits[p][a37_bit]++;
   t->a37_total[p]++;
   t->a37_seen = 1;
+  
+  if (t->a37_seq_len[p] < VEDA_TRAIT_MAX_PHASE_SAMPLES) {
+    t->a37_seq[p][t->a37_seq_len[p]++] = a37_bit;
+  }
 }
 
 int veda_trait_a37_seen(int slot)
@@ -122,6 +127,7 @@ int veda_trait_a37_phase_majority_bit(int slot, int phase_1_6)
   return (o > z) ? 1 : 0;
 }
 
+
 int veda_trait_a37_phase_conf_pct(int slot, int phase_1_6)
 {
   uint32_t z, o, tot, best;
@@ -148,6 +154,103 @@ int veda_trait_a37_seen_enough(int slot)
     if (veda_trait_a37_total(slot, p) == 0) return 0;
   }
   return 1;
+}
+
+int veda_trait_a37_phase_len(int slot, int phase_1_6)
+{
+  if (slot < 0 || slot > 1) return 0;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return 0;
+  return (int)g_veda_trait[slot].a37_seq_len[phase_1_6 - 1];
+}
+
+int veda_trait_a37_phase_bit_at(int slot, int phase_1_6, int idx)
+{
+  int p;
+  veda_trait_slot_t *t;
+
+  if (slot < 0 || slot > 1) return -1;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return -1;
+
+  p = phase_1_6 - 1;
+  t = &g_veda_trait[slot];
+
+  if (idx < 0 || idx >= (int)t->a37_seq_len[p]) return -1;
+  return t->a37_seq[p][idx] & 1;
+}
+
+static uint32_t veda_trait_expected_a37_bit(int phase_1_6, uint32_t idx)
+{
+  switch (phase_1_6) {
+    case 6: return (idx & 1U);
+    case 5: return ((idx >> 1) & 1U);
+    case 4: return ((idx >> 2) & 1U);
+    case 3: return ((idx >> 3) & 1U);
+    case 2: return ((idx >> 4) & 1U);
+    case 1: return ((idx >> 5) & 1U);
+    default: return 0;
+  }
+}
+
+int veda_trait_a37_ready_min(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+
+  if (veda_trait_a37_phase_len(slot, 6) < 8) return 0;
+  if (veda_trait_a37_phase_len(slot, 5) < 8) return 0;
+  if (veda_trait_a37_phase_len(slot, 4) < 8) return 0;
+
+  return 1;
+}
+
+int veda_trait_a37_score_pct(int slot)
+{
+  int c6, c5, c4, c3;
+  int have3;
+
+  if (slot < 0 || slot > 1) return 0;
+  if (!veda_trait_a37_ready_min(slot)) return 0;
+
+  c6 = veda_trait_a37_phase_conf_pct(slot, 6);
+  c5 = veda_trait_a37_phase_conf_pct(slot, 5);
+  c4 = veda_trait_a37_phase_conf_pct(slot, 4);
+
+  have3 = (veda_trait_a37_phase_len(slot, 3) >= 8);
+  c3 = have3 ? veda_trait_a37_phase_conf_pct(slot, 3) : 0;
+
+  if (have3) {
+    return (c6 * 35 + c5 * 30 + c4 * 20 + c3 * 15) / 100;
+  }
+
+  return (c6 * 40 + c5 * 35 + c4 * 25) / 100;
+}
+
+void veda_trait_dump_a37(FILE *fp, int slot)
+{
+  int p, len, conf, i, bit;
+
+  if (fp == NULL) return;
+  if (slot < 0 || slot > 1) return;
+
+  fprintf(fp, "\n[VEDA TRAIT] slot=%d ready=%d score=%d\n",
+          slot,
+          veda_trait_a37_ready_min(slot),
+          veda_trait_a37_score_pct(slot));
+
+  for (p = 1; p <= 6; p++) {
+    len = veda_trait_a37_phase_len(slot, p);
+    conf = veda_trait_a37_phase_conf_pct(slot, p);
+
+    fprintf(fp, "[VEDA TRAIT] phase=%d len=%d conf=%d seq=",
+            p, len, conf);
+
+    for (i = 0; i < len; i++) {
+      bit = veda_trait_a37_phase_bit_at(slot, p, i);
+      if (bit < 0) break;
+      fputc(bit ? '1' : '0', fp);
+    }
+
+    fputc('\n', fp);
+  }
 }
 //==============================================================================
 

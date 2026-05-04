@@ -9,6 +9,7 @@
 #include "dmr_const.h"
 #include "avr_kv.h"
 #include "dsd_veda.h"
+
 // static avr_kv_ctx_t g_kv;
 
 // A subroutine for processing each TDMA frame individually to allow for

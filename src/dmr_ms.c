@@ -12,6 +12,7 @@
 #include "veda.h"
 #include <string.h>
 #include <stdlib.h>
+
 // #define PRINT_AMBE72 //enable to view 72-bit AMBE codewords
 
 extern void veda_burst288_stream_write(uint8_t db, const uint8_t raw36[36]);
@@ -383,6 +384,9 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   }
 
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
+  if ((state->indx_SF % 24) == 0) {
+    veda_trait_dump_a37(stderr, state->currentslot & 1);
+  }  
 
 int veda_voice_done = 0;
 if (opts->isVEDA) {
@@ -926,6 +930,9 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
 
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
 
+  if ((state->indx_SF % 24) == 0) {
+    veda_trait_dump_a37(stderr, state->currentslot & 1);
+  }  
   if (opts->isVEDA)
     veda_pack_ms_raw36_from_payload(state, veda_raw36_original);
   //=============== суперкад

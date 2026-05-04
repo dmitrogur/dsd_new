@@ -10,6 +10,7 @@ extern "C" {
 // Все инклуды С-библиотек только здесь
 #include <hydrogen.h>
 static const uint32_t veda_masks[] = {0x17C20B2A, 0x56456023, 0x4794E038, 0x8BC3C444};
+#define VEDA_TRAIT_MAX_PHASE_SAMPLES 256
 
 typedef struct {
   uint8_t last_db[3];
@@ -19,9 +20,9 @@ typedef struct {
   uint32_t a37_hits[6][2];
   uint32_t a37_total[6];
   uint8_t a37_seen;  
+  uint8_t a37_seq[6][VEDA_TRAIT_MAX_PHASE_SAMPLES];
+  uint16_t a37_seq_len[6];
 } veda_trait_slot_t;
-
-static veda_trait_slot_t g_veda_trait[2];
 
 void veda_trait_reset_all(void);
 void veda_trait_reset_slot(int slot);
@@ -36,6 +37,12 @@ void veda_trait_note_ms_a37(int slot, uint32_t sf_idx, const char ambe_fr[4][24]
 int veda_trait_a37_phase_majority_bit(int slot, int phase_1_6);
 int veda_trait_a37_phase_conf_pct(int slot, int phase_1_6);
 int veda_trait_a37_seen_enough(int slot);
+int veda_trait_a37_phase_len(int slot, int phase_1_6);
+int veda_trait_a37_phase_bit_at(int slot, int phase_1_6, int idx);
+
+int veda_trait_a37_ready_min(int slot);
+int veda_trait_a37_score_pct(int slot);
+void veda_trait_dump_a37(FILE *fp, int slot);
 
 // Все прототипы только здесь и только один раз
 void veda_permute_384(uint32_t *state, uint8_t domain);
