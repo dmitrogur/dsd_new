@@ -1,6 +1,156 @@
 #include "dsd_veda.h"
 #include "veda.h"
 
+
+void veda_trait_reset_slot(int slot)
+{
+  if (slot < 0 || slot > 1) return;
+  memset(&g_veda_trait[slot], 0, sizeof(g_veda_trait[slot]));
+}
+
+void veda_trait_reset_all(void)
+{
+  memset(g_veda_trait, 0, sizeof(g_veda_trait));
+}
+
+void veda_trait_note_db(int slot, uint8_t databurst)
+{
+  veda_trait_slot_t *t;
+
+  if (slot < 0 || slot > 1) return;
+  t = &g_veda_trait[slot];
+
+  if (t->db_count < 3) {
+    t->last_db[t->db_count++] = databurst;
+  } else {
+    t->last_db[0] = t->last_db[1];
+    t->last_db[1] = t->last_db[2];
+    t->last_db[2] = databurst;
+  }
+
+  if (t->db_count == 3 &&
+      t->last_db[0] == 0x01 &&
+      t->last_db[1] == 0xEB &&
+      t->last_db[2] == 0x01) {
+    t->db_01_eb_01_hits++;
+    t->db_pattern_seen = 1;
+  }
+}
+
+int veda_trait_db_pattern_seen(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+  return g_veda_trait[slot].db_pattern_seen;
+}
+
+uint32_t veda_trait_db_pattern_hits(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+  return g_veda_trait[slot].db_01_eb_01_hits;
+}
+
+void veda_trait_note_a37_slot(int slot, int burst_phase_1_6, uint8_t a37_bit)
+{
+  veda_trait_slot_t *t;
+  int p;
+
+  if (slot < 0 || slot > 1) return;
+  if (burst_phase_1_6 < 1 || burst_phase_1_6 > 6) return;
+
+  t = &g_veda_trait[slot];
+  p = burst_phase_1_6 - 1;
+  a37_bit &= 1;
+
+  t->a37_hits[p][a37_bit]++;
+  t->a37_total[p]++;
+  t->a37_seen = 1;
+}
+
+int veda_trait_a37_seen(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+  return g_veda_trait[slot].a37_seen;
+}
+
+uint32_t veda_trait_a37_hits(int slot, int phase_1_6, int bit)
+{
+  if (slot < 0 || slot > 1) return 0;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return 0;
+  if (bit < 0 || bit > 1) return 0;
+
+  return g_veda_trait[slot].a37_hits[phase_1_6 - 1][bit];
+}
+
+uint32_t veda_trait_a37_total(int slot, int phase_1_6)
+{
+  if (slot < 0 || slot > 1) return 0;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return 0;
+
+  return g_veda_trait[slot].a37_total[phase_1_6 - 1];
+}
+
+void veda_trait_note_ms_a37(int slot, uint32_t sf_idx, const char ambe_fr[4][24])
+{
+  int phase_1_6;
+  uint8_t a37_bit;
+
+  if (slot < 0 || slot > 1) return;
+  if (sf_idx == 0) return;
+
+  phase_1_6 = (int)(((sf_idx - 1U) % 6U) + 1U);
+
+  /* Рабочая привязка:
+   * A49[37] -> C3[12]
+   * в deinterleaved ambe_fr это текущая рабочая точка [3][12]
+   */
+  a37_bit = (uint8_t)(ambe_fr[3][12] & 1);
+
+  veda_trait_note_a37_slot(slot, phase_1_6, a37_bit);
+}
+
+int veda_trait_a37_phase_majority_bit(int slot, int phase_1_6)
+{
+  uint32_t z, o;
+
+  if (slot < 0 || slot > 1) return -1;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return -1;
+
+  z = g_veda_trait[slot].a37_hits[phase_1_6 - 1][0];
+  o = g_veda_trait[slot].a37_hits[phase_1_6 - 1][1];
+
+  if (z == 0 && o == 0) return -1;
+  return (o > z) ? 1 : 0;
+}
+
+int veda_trait_a37_phase_conf_pct(int slot, int phase_1_6)
+{
+  uint32_t z, o, tot, best;
+
+  if (slot < 0 || slot > 1) return 0;
+  if (phase_1_6 < 1 || phase_1_6 > 6) return 0;
+
+  z = g_veda_trait[slot].a37_hits[phase_1_6 - 1][0];
+  o = g_veda_trait[slot].a37_hits[phase_1_6 - 1][1];
+  tot = z + o;
+  if (tot == 0) return 0;
+
+  best = (z > o) ? z : o;
+  return (int)((best * 100U) / tot);
+}
+
+int veda_trait_a37_seen_enough(int slot)
+{
+  int p;
+
+  if (slot < 0 || slot > 1) return 0;
+
+  for (p = 1; p <= 6; p++) {
+    if (veda_trait_a37_total(slot, p) == 0) return 0;
+  }
+  return 1;
+}
+//==============================================================================
+
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);
 static void veda_refresh_profile_from_live_ids(dsd_state *state, int slot);
 

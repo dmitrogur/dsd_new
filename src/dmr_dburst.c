@@ -24,6 +24,8 @@ void dmr_data_burst_handler(dsd_opts * opts, dsd_state * state, uint8_t info[196
   uint32_t IrrecoverableErrors = 0;
   uint8_t slot = state->currentslot;
 
+  veda_trait_note_db(slot, databurst);
+
 if (opts->isVEDA)
 {
     uint8_t raw_bytes[25];

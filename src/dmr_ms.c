@@ -382,6 +382,8 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
+  veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
+
 int veda_voice_done = 0;
 if (opts->isVEDA) {
     veda_set_debug(opts->veda_debug);
@@ -922,6 +924,8 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
 
   }
 
+  veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
+
   if (opts->isVEDA)
     veda_pack_ms_raw36_from_payload(state, veda_raw36_original);
   //=============== суперкад
@@ -1029,6 +1033,7 @@ if (opts->isVEDA)
     csi72_ambe2_codeword_keystream(state, ambe_fr3);
   }
 
+  
 int veda_voice_done = 0;
 if (opts->isVEDA) {
     veda_set_debug(opts->veda_debug);

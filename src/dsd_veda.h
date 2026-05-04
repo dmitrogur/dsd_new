@@ -10,6 +10,33 @@ extern "C" {
 // Все инклуды С-библиотек только здесь
 #include <hydrogen.h>
 static const uint32_t veda_masks[] = {0x17C20B2A, 0x56456023, 0x4794E038, 0x8BC3C444};
+
+typedef struct {
+  uint8_t last_db[3];
+  uint8_t db_count;
+  uint32_t db_01_eb_01_hits;
+  uint8_t db_pattern_seen;
+  uint32_t a37_hits[6][2];
+  uint32_t a37_total[6];
+  uint8_t a37_seen;  
+} veda_trait_slot_t;
+
+static veda_trait_slot_t g_veda_trait[2];
+
+void veda_trait_reset_all(void);
+void veda_trait_reset_slot(int slot);
+void veda_trait_note_db(int slot, uint8_t databurst);
+int veda_trait_db_pattern_seen(int slot);
+uint32_t veda_trait_db_pattern_hits(int slot);
+void veda_trait_note_a37_slot(int slot, int burst_phase_1_6, uint8_t a37_bit);
+int veda_trait_a37_seen(int slot);
+uint32_t veda_trait_a37_hits(int slot, int phase_1_6, int bit);
+uint32_t veda_trait_a37_total(int slot, int phase_1_6);
+void veda_trait_note_ms_a37(int slot, uint32_t sf_idx, const char ambe_fr[4][24]);
+int veda_trait_a37_phase_majority_bit(int slot, int phase_1_6);
+int veda_trait_a37_phase_conf_pct(int slot, int phase_1_6);
+int veda_trait_a37_seen_enough(int slot);
+
 // Все прототипы только здесь и только один раз
 void veda_permute_384(uint32_t *state, uint8_t domain);
 void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key);

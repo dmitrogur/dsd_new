@@ -8,6 +8,7 @@
 #include "dsd.h"
 #include "dmr_const.h"
 #include "avr_kv.h"
+#include "dsd_veda.h"
 // static avr_kv_ctx_t g_kv;
 
 // A subroutine for processing each TDMA frame individually to allow for
@@ -1150,6 +1151,7 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
   // === SCOUT: суперкадр готов (все 3 AMBE собраны) ===
   // if(opts->run_scout)
   //  avr_scout_on_superframe(opts, state);
+  veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
   
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
