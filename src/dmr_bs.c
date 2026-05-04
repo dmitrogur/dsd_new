@@ -1152,7 +1152,12 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
   // === SCOUT: суперкадр готов (все 3 AMBE собраны) ===
   // if(opts->run_scout)
   //  avr_scout_on_superframe(opts, state);
+  if (state->indx_SF == 1U) {
+    veda_trait_reset_slot(state->currentslot & 1);
+  }
+
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
+  veda_trait_update_slot(state->currentslot & 1);
 
   if ((state->indx_SF % 24U) == 0U) {
     int veda_conf = veda_trait_confidence_pct(state->currentslot & 1);

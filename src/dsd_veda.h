@@ -22,6 +22,11 @@ typedef struct {
   uint8_t a37_seen;  
   uint8_t a37_seq[6][VEDA_TRAIT_MAX_PHASE_SAMPLES];
   uint16_t a37_seq_len[6];
+  uint8_t candidate_latched;
+  uint8_t last_confidence_pct;
+  uint8_t best_confidence_pct;
+  uint32_t last_a37_sf_idx;
+  uint32_t last_dump_sf_idx;
 } veda_trait_slot_t;
 
 void veda_trait_reset_all(void);
@@ -46,6 +51,12 @@ void veda_trait_dump_a37(FILE *fp, int slot);
 
 int veda_trait_is_candidate(int slot);
 int veda_trait_confidence_pct(int slot);
+
+void veda_trait_update_slot(int slot);
+int veda_trait_candidate_latched(int slot);
+int veda_trait_best_confidence_pct(int slot);
+
+
 
 // Все прототипы только здесь и только один раз
 void veda_permute_384(uint32_t *state, uint8_t domain);

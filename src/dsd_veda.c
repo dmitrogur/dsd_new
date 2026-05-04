@@ -101,6 +101,8 @@ void veda_trait_note_ms_a37(int slot, uint32_t sf_idx, const char ambe_fr[4][24]
 
   if (slot < 0 || slot > 1) return;
   if (sf_idx == 0) return;
+  if (g_veda_trait[slot].last_a37_sf_idx == sf_idx) return;
+  g_veda_trait[slot].last_a37_sf_idx = sf_idx;
 
   phase_1_6 = (int)(((sf_idx - 1U) % 6U) + 1U);
 
@@ -127,21 +129,40 @@ int veda_trait_a37_phase_majority_bit(int slot, int phase_1_6)
   return (o > z) ? 1 : 0;
 }
 
+static uint32_t veda_trait_expected_a37_bit(int phase_1_6, uint32_t idx)
+{
+  switch (phase_1_6) {
+    case 6: return (idx & 1U);
+    case 5: return 1U ^ ((idx >> 1) & 1U);
+    case 4: return 1U ^ ((idx >> 2) & 1U);
+    case 3: return 1U ^ ((idx >> 3) & 1U);
+    case 2: return 1U ^ ((idx >> 4) & 1U);
+    case 1: return ((idx >> 5) & 1U);
+    default: return 0;
+  }
+}
 
 int veda_trait_a37_phase_conf_pct(int slot, int phase_1_6)
 {
-  uint32_t z, o, tot, best;
+  int i, len, got;
+  int ok = 0;
 
   if (slot < 0 || slot > 1) return 0;
   if (phase_1_6 < 1 || phase_1_6 > 6) return 0;
 
-  z = g_veda_trait[slot].a37_hits[phase_1_6 - 1][0];
-  o = g_veda_trait[slot].a37_hits[phase_1_6 - 1][1];
-  tot = z + o;
-  if (tot == 0) return 0;
+  len = veda_trait_a37_phase_len(slot, phase_1_6);
+  if (len <= 0) return 0;
 
-  best = (z > o) ? z : o;
-  return (int)((best * 100U) / tot);
+  for (i = 0; i < len; i++) {
+    got = veda_trait_a37_phase_bit_at(slot, phase_1_6, i);
+    if (got < 0) break;
+
+    if ((uint32_t)got == veda_trait_expected_a37_bit(phase_1_6, (uint32_t)i)) {
+      ok++;
+    }
+  }
+
+  return (ok * 100) / len;
 }
 
 int veda_trait_a37_seen_enough(int slot)
@@ -178,18 +199,6 @@ int veda_trait_a37_phase_bit_at(int slot, int phase_1_6, int idx)
   return t->a37_seq[p][idx] & 1;
 }
 
-static uint32_t veda_trait_expected_a37_bit(int phase_1_6, uint32_t idx)
-{
-  switch (phase_1_6) {
-    case 6: return (idx & 1U);
-    case 5: return ((idx >> 1) & 1U);
-    case 4: return ((idx >> 2) & 1U);
-    case 3: return ((idx >> 3) & 1U);
-    case 2: return ((idx >> 4) & 1U);
-    case 1: return ((idx >> 5) & 1U);
-    default: return 0;
-  }
-}
 
 int veda_trait_a37_ready_min(int slot)
 {
@@ -285,6 +294,39 @@ int veda_trait_is_candidate(int slot)
   if (conf >= 75 && veda_trait_db_pattern_seen(slot)) return 1;
 
   return 0;
+}
+
+void veda_trait_update_slot(int slot)
+{
+  int conf;
+
+  if (slot < 0 || slot > 1) return;
+
+  conf = veda_trait_confidence_pct(slot);
+  if (conf < 0) conf = 0;
+  if (conf > 100) conf = 100;
+
+  g_veda_trait[slot].last_confidence_pct = (uint8_t)conf;
+
+  if ((uint8_t)conf > g_veda_trait[slot].best_confidence_pct) {
+    g_veda_trait[slot].best_confidence_pct = (uint8_t)conf;
+  }
+
+  if (veda_trait_is_candidate(slot)) {
+    g_veda_trait[slot].candidate_latched = 1;
+  }
+}
+
+int veda_trait_candidate_latched(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+  return g_veda_trait[slot].candidate_latched;
+}
+
+int veda_trait_best_confidence_pct(int slot)
+{
+  if (slot < 0 || slot > 1) return 0;
+  return g_veda_trait[slot].best_confidence_pct;
 }
 
 //==============================================================================
