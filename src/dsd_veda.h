@@ -44,6 +44,9 @@ int veda_trait_a37_ready_min(int slot);
 int veda_trait_a37_score_pct(int slot);
 void veda_trait_dump_a37(FILE *fp, int slot);
 
+int veda_trait_is_candidate(int slot);
+int veda_trait_confidence_pct(int slot);
+
 // Все прототипы только здесь и только один раз
 void veda_permute_384(uint32_t *state, uint8_t domain);
 void veda_stream_init(dsd_state *state, int slot, uint8_t *session_key);

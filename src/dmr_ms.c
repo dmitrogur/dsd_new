@@ -384,9 +384,20 @@ if (opts->verbose > 2 && state->payload_algid == 0x25) // AES-256 (тест)
   }
 
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
-  if ((state->indx_SF % 24) == 0) {
+  if ((state->indx_SF % 24U) == 0U) {
+    int veda_conf = veda_trait_confidence_pct(state->currentslot & 1);
+    int veda_cand = veda_trait_is_candidate(state->currentslot & 1);
     veda_trait_dump_a37(stderr, state->currentslot & 1);
-  }  
+
+    fprintf(stderr, "\n[VEDA TRAIT] slot=%d sf=%u cand=%d conf=%d dbhits=%u dbseen=%d\n",
+          state->currentslot & 1,
+          (unsigned)state->indx_SF,
+          veda_cand,
+          veda_conf,
+          (unsigned)veda_trait_db_pattern_hits(state->currentslot & 1),
+          veda_trait_db_pattern_seen(state->currentslot & 1));
+  }
+
 
 int veda_voice_done = 0;
 if (opts->isVEDA) {
@@ -929,10 +940,20 @@ void dmrMSBootstrap (dsd_opts * opts, dsd_state * state)
   }
 
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
-
-  if ((state->indx_SF % 24) == 0) {
+  
+  if ((state->indx_SF % 24U) == 0U) {
+    int veda_conf = veda_trait_confidence_pct(state->currentslot & 1);
+    int veda_cand = veda_trait_is_candidate(state->currentslot & 1);
     veda_trait_dump_a37(stderr, state->currentslot & 1);
-  }  
+
+    fprintf(stderr, "\n[VEDA TRAIT] slot=%d sf=%u cand=%d conf=%d dbhits=%u dbseen=%d\n",
+          state->currentslot & 1,
+          (unsigned)state->indx_SF,
+          veda_cand,
+          veda_conf,
+          (unsigned)veda_trait_db_pattern_hits(state->currentslot & 1),
+          veda_trait_db_pattern_seen(state->currentslot & 1));
+  }
   if (opts->isVEDA)
     veda_pack_ms_raw36_from_payload(state, veda_raw36_original);
   //=============== суперкад

@@ -252,6 +252,41 @@ void veda_trait_dump_a37(FILE *fp, int slot)
     fputc('\n', fp);
   }
 }
+
+int veda_trait_confidence_pct(int slot)
+{
+  int a37;
+  int db_bonus = 0;
+
+  if (slot < 0 || slot > 1) return 0;
+
+  a37 = veda_trait_a37_score_pct(slot);
+  if (a37 <= 0) return 0;
+
+  if (veda_trait_db_pattern_seen(slot)) {
+    if (veda_trait_db_pattern_hits(slot) >= 2) db_bonus = 10;
+    else db_bonus = 5;
+  }
+
+  if (a37 + db_bonus > 100) return 100;
+  return a37 + db_bonus;
+}
+
+int veda_trait_is_candidate(int slot)
+{
+  int conf;
+
+  if (slot < 0 || slot > 1) return 0;
+  if (!veda_trait_a37_ready_min(slot)) return 0;
+
+  conf = veda_trait_confidence_pct(slot);
+
+  if (conf >= 85) return 1;
+  if (conf >= 75 && veda_trait_db_pattern_seen(slot)) return 1;
+
+  return 0;
+}
+
 //==============================================================================
 
 static int veda_get_live_ids(const dsd_state *state, int slot, uint32_t *id24_a, uint32_t *id24_b);

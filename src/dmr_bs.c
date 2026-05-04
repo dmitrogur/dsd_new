@@ -1153,6 +1153,21 @@ void dmrBSBootstrap(dsd_opts *opts, dsd_state *state)
   // if(opts->run_scout)
   //  avr_scout_on_superframe(opts, state);
   veda_trait_note_ms_a37(state->currentslot & 1, (uint32_t)state->indx_SF, ambe_fr);
+
+  if ((state->indx_SF % 24U) == 0U) {
+    int veda_conf = veda_trait_confidence_pct(state->currentslot & 1);
+    int veda_cand = veda_trait_is_candidate(state->currentslot & 1);
+    veda_trait_dump_a37(stderr, state->currentslot & 1);
+
+    fprintf(stderr, "\n[VEDA TRAIT] slot=%d sf=%u cand=%d conf=%d dbhits=%u dbseen=%d\n",
+          state->currentslot & 1,
+          (unsigned)state->indx_SF,
+          veda_cand,
+          veda_conf,
+          (unsigned)veda_trait_db_pattern_hits(state->currentslot & 1),
+          veda_trait_db_pattern_seen(state->currentslot & 1));
+  }
+
   
   //'DSP' output to file
   if (opts->use_dsp_output == 1)
